@@ -2109,19 +2109,404 @@ function copyPromo(id, code){
   });
 }
 
+
+window.REG_MODAL_I18N = {
+  "ar": {
+    "reg_title": "التسجيل في",
+    "reg_subtitle": "سجّل ثم أنسخ معرف الحساب والصقه هنا",
+    "reg_promo_label": "كود البرومو",
+    "reg_copy": "نسخ",
+    "reg_copied": "تم النسخ",
+    "reg_download_app": "تحميل التطبيق",
+    "reg_account_label": "معرف الحساب",
+    "reg_account_placeholder": "الصق معرف الحساب هنا",
+    "reg_pin_label": "الرمز السري (4 أرقام)",
+    "reg_confirm": "تأكيد التسجيل",
+    "reg_submit": "تسجيل",
+    "reg_close": "إغلاق",
+    "reg_success": "تم التسجيل بنجاح",
+    "reg_error_empty": "أدخل معرف الحساب",
+    "reg_error_pin": "الرمز يجب أن يكون 4 أرقام",
+    "reg_loading": "جارٍ التسجيل...",
+    "reg_connection_error": "خطأ في الاتصال",
+    "reg_info": "افتح الرابط وسجّل حسابك ثم عد هنا"
+  },
+  "en": {
+    "reg_title": "Register at",
+    "reg_subtitle": "Register then copy your account ID and paste it here",
+    "reg_promo_label": "Promo Code",
+    "reg_copy": "Copy",
+    "reg_copied": "Copied",
+    "reg_download_app": "Download App",
+    "reg_account_label": "Account ID",
+    "reg_account_placeholder": "Paste your account ID here",
+    "reg_pin_label": "Secret Code (4 digits)",
+    "reg_confirm": "Confirm Registration",
+    "reg_submit": "Register",
+    "reg_close": "Close",
+    "reg_success": "Registration successful",
+    "reg_error_empty": "Enter your account ID",
+    "reg_error_pin": "Code must be 4 digits",
+    "reg_loading": "Registering...",
+    "reg_connection_error": "Connection error",
+    "reg_info": "Open the link, register your account, then come back here"
+  },
+  "fr": {
+    "reg_title": "S'inscrire sur",
+    "reg_subtitle": "Inscrivez-vous puis copiez votre ID de compte et collez-le ici",
+    "reg_promo_label": "Code Promo",
+    "reg_copy": "Copier",
+    "reg_copied": "Copié",
+    "reg_download_app": "Télécharger l'appli",
+    "reg_account_label": "ID du compte",
+    "reg_account_placeholder": "Collez votre ID de compte ici",
+    "reg_pin_label": "Code secret (4 chiffres)",
+    "reg_confirm": "Confirmer l'inscription",
+    "reg_submit": "S'inscrire",
+    "reg_close": "Fermer",
+    "reg_success": "Inscription réussie",
+    "reg_error_empty": "Entrez votre ID de compte",
+    "reg_error_pin": "Le code doit être 4 chiffres",
+    "reg_loading": "Inscription en cours...",
+    "reg_connection_error": "Erreur de connexion",
+    "reg_info": "Ouvrez le lien, inscrivez votre compte, puis revenez ici"
+  },
+  "es": {
+    "reg_title": "Registrarse en",
+    "reg_subtitle": "Regístrate y luego copia tu ID de cuenta y pégalo aquí",
+    "reg_promo_label": "Código Promo",
+    "reg_copy": "Copiar",
+    "reg_copied": "Copiado",
+    "reg_download_app": "Descargar App",
+    "reg_account_label": "ID de cuenta",
+    "reg_account_placeholder": "Pega tu ID de cuenta aquí",
+    "reg_pin_label": "Código secreto (4 dígitos)",
+    "reg_confirm": "Confirmar registro",
+    "reg_submit": "Registrarse",
+    "reg_close": "Cerrar",
+    "reg_success": "Registro exitoso",
+    "reg_error_empty": "Ingresa tu ID de cuenta",
+    "reg_error_pin": "El código debe tener 4 dígitos",
+    "reg_loading": "Registrando...",
+    "reg_connection_error": "Error de conexión",
+    "reg_info": "Abre el enlace, registra tu cuenta, luego vuelve aquí"
+  },
+  "de": {
+    "reg_title": "Registrieren bei",
+    "reg_subtitle": "Registriere dich, kopiere dann deine Konto-ID und füge sie hier ein",
+    "reg_promo_label": "Promo-Code",
+    "reg_copy": "Kopieren",
+    "reg_copied": "Kopiert",
+    "reg_download_app": "App herunterladen",
+    "reg_account_label": "Konto-ID",
+    "reg_account_placeholder": "Konto-ID hier einfügen",
+    "reg_pin_label": "Geheimcode (4 Ziffern)",
+    "reg_confirm": "Registrierung bestätigen",
+    "reg_submit": "Registrieren",
+    "reg_close": "Schließen",
+    "reg_success": "Registrierung erfolgreich",
+    "reg_error_empty": "Konto-ID eingeben",
+    "reg_error_pin": "Code muss 4 Ziffern haben",
+    "reg_loading": "Registrierung läuft...",
+    "reg_connection_error": "Verbindungsfehler",
+    "reg_info": "Öffne den Link, registriere dein Konto und kehre dann zurück"
+  },
+  "it": {
+    "reg_title": "Registrati su",
+    "reg_subtitle": "Registrati poi copia il tuo ID account e incollalo qui",
+    "reg_promo_label": "Codice Promo",
+    "reg_copy": "Copia",
+    "reg_copied": "Copiato",
+    "reg_download_app": "Scarica App",
+    "reg_account_label": "ID Account",
+    "reg_account_placeholder": "Incolla il tuo ID account qui",
+    "reg_pin_label": "Codice segreto (4 cifre)",
+    "reg_confirm": "Conferma registrazione",
+    "reg_submit": "Registrati",
+    "reg_close": "Chiudi",
+    "reg_success": "Registrazione riuscita",
+    "reg_error_empty": "Inserisci il tuo ID account",
+    "reg_error_pin": "Il codice deve essere 4 cifre",
+    "reg_loading": "Registrazione in corso...",
+    "reg_connection_error": "Errore di connessione",
+    "reg_info": "Apri il link, registra il tuo account, poi torna qui"
+  },
+  "pt": {
+    "reg_title": "Registrar-se na",
+    "reg_subtitle": "Registre-se e copie seu ID de conta e cole aqui",
+    "reg_promo_label": "Código Promo",
+    "reg_copy": "Copiar",
+    "reg_copied": "Copiado",
+    "reg_download_app": "Baixar App",
+    "reg_account_label": "ID da Conta",
+    "reg_account_placeholder": "Cole seu ID de conta aqui",
+    "reg_pin_label": "Código secreto (4 dígitos)",
+    "reg_confirm": "Confirmar registro",
+    "reg_submit": "Registrar",
+    "reg_close": "Fechar",
+    "reg_success": "Registro bem-sucedido",
+    "reg_error_empty": "Digite seu ID de conta",
+    "reg_error_pin": "O código deve ter 4 dígitos",
+    "reg_loading": "Registrando...",
+    "reg_connection_error": "Erro de conexão",
+    "reg_info": "Abra o link, registre sua conta e volte aqui"
+  },
+  "ru": {
+    "reg_title": "Зарегистрироваться в",
+    "reg_subtitle": "Зарегистрируйтесь, затем скопируйте ID аккаунта и вставьте сюда",
+    "reg_promo_label": "Промо-код",
+    "reg_copy": "Копировать",
+    "reg_copied": "Скопировано",
+    "reg_download_app": "Скачать приложение",
+    "reg_account_label": "ID аккаунта",
+    "reg_account_placeholder": "Вставьте ID аккаунта сюда",
+    "reg_pin_label": "Секретный код (4 цифры)",
+    "reg_confirm": "Подтвердить регистрацию",
+    "reg_submit": "Зарегистрировать",
+    "reg_close": "Закрыть",
+    "reg_success": "Регистрация успешна",
+    "reg_error_empty": "Введите ID аккаунта",
+    "reg_error_pin": "Код должен быть 4 цифры",
+    "reg_loading": "Регистрация...",
+    "reg_connection_error": "Ошибка соединения",
+    "reg_info": "Откройте ссылку, зарегистрируйте аккаунт, затем вернитесь сюда"
+  },
+  "zh": {
+    "reg_title": "注册",
+    "reg_subtitle": "注册后复制您的账户ID并粘贴到这里",
+    "reg_promo_label": "优惠码",
+    "reg_copy": "复制",
+    "reg_copied": "已复制",
+    "reg_download_app": "下载应用",
+    "reg_account_label": "账户ID",
+    "reg_account_placeholder": "在此粘贴您的账户ID",
+    "reg_pin_label": "密码（4位数字）",
+    "reg_confirm": "确认注册",
+    "reg_submit": "注册",
+    "reg_close": "关闭",
+    "reg_success": "注册成功",
+    "reg_error_empty": "请输入账户ID",
+    "reg_error_pin": "密码必须是4位数字",
+    "reg_loading": "注册中...",
+    "reg_connection_error": "连接错误",
+    "reg_info": "打开链接，注册账户，然后返回这里"
+  },
+  "tr": {
+    "reg_title": "Kayıt Ol",
+    "reg_subtitle": "Kayıt olun sonra hesap ID'nizi kopyalayın ve buraya yapıştırın",
+    "reg_promo_label": "Promo Kodu",
+    "reg_copy": "Kopyala",
+    "reg_copied": "Kopyalandı",
+    "reg_download_app": "Uygulamayı İndir",
+    "reg_account_label": "Hesap ID",
+    "reg_account_placeholder": "Hesap ID'nizi buraya yapıştırın",
+    "reg_pin_label": "Gizli Kod (4 rakam)",
+    "reg_confirm": "Kaydı Onayla",
+    "reg_submit": "Kayıt Ol",
+    "reg_close": "Kapat",
+    "reg_success": "Kayıt başarılı",
+    "reg_error_empty": "Hesap ID'nizi girin",
+    "reg_error_pin": "Kod 4 rakam olmalı",
+    "reg_loading": "Kayıt yapılıyor...",
+    "reg_connection_error": "Bağlantı hatası",
+    "reg_info": "Bağlantıyı açın, hesabınızı kaydedin, sonra buraya dönün"
+  },
+  "ur": {
+    "reg_title": "رجسٹر ہوں",
+    "reg_subtitle": "رجسٹر ہوں پھر اپنا اکاؤنٹ ID کاپی کریں اور یہاں پیسٹ کریں",
+    "reg_promo_label": "پرومو کوڈ",
+    "reg_copy": "کاپی",
+    "reg_copied": "کاپی ہو گیا",
+    "reg_download_app": "ایپ ڈاؤنلوڈ",
+    "reg_account_label": "اکاؤنٹ ID",
+    "reg_account_placeholder": "اپنا اکاؤنٹ ID یہاں پیسٹ کریں",
+    "reg_pin_label": "خفیہ کوڈ (4 ہندسے)",
+    "reg_confirm": "رجسٹریشن کی تصدیق",
+    "reg_submit": "رجسٹر",
+    "reg_close": "بند کریں",
+    "reg_success": "رجسٹریشن کامیاب",
+    "reg_error_empty": "اکاؤنٹ ID درج کریں",
+    "reg_error_pin": "کوڈ 4 ہندسوں کا ہونا چاہیے",
+    "reg_loading": "رجسٹر ہو رہا ہے...",
+    "reg_connection_error": "کنکشن میں خرابی",
+    "reg_info": "لنک کھولیں، اکاؤنٹ رجسٹر کریں، پھر یہاں واپس آئیں"
+  },
+  "hi": {
+    "reg_title": "पर रजिस्टर करें",
+    "reg_subtitle": "रजिस्टर करें फिर अपना अकाउंट ID कॉपी करें और यहां पेस्ट करें",
+    "reg_promo_label": "प्रोमो कोड",
+    "reg_copy": "कॉपी",
+    "reg_copied": "कॉपी हो गया",
+    "reg_download_app": "ऐप डाउनलोड",
+    "reg_account_label": "अकाउंट ID",
+    "reg_account_placeholder": "अपना अकाउंट ID यहां पेस्ट करें",
+    "reg_pin_label": "गुप्त कोड (4 अंक)",
+    "reg_confirm": "पंजीकरण की पुष्टि करें",
+    "reg_submit": "रजिस्टर",
+    "reg_close": "बंद करें",
+    "reg_success": "पंजीकरण सफल",
+    "reg_error_empty": "अकाउंट ID दर्ज करें",
+    "reg_error_pin": "कोड 4 अंकों का होना चाहिए",
+    "reg_loading": "रजिस्टर हो रहा है...",
+    "reg_connection_error": "कनेक्शन त्रुटि",
+    "reg_info": "लिंक खोलें, अकाउंट रजिस्टर करें, फिर यहां वापस आएं"
+  },
+  "fa": {
+    "reg_title": "ثبت نام در",
+    "reg_subtitle": "ثبت نام کنید سپس شناسه حساب خود را کپی کنید و اینجا بچسبانید",
+    "reg_promo_label": "کد پرومو",
+    "reg_copy": "کپی",
+    "reg_copied": "کپی شد",
+    "reg_download_app": "دانلود اپلیکیشن",
+    "reg_account_label": "شناسه حساب",
+    "reg_account_placeholder": "شناسه حساب خود را اینجا بچسبانید",
+    "reg_pin_label": "کد محرمانه (4 رقم)",
+    "reg_confirm": "تأیید ثبت نام",
+    "reg_submit": "ثبت نام",
+    "reg_close": "بستن",
+    "reg_success": "ثبت نام موفق",
+    "reg_error_empty": "شناسه حساب را وارد کنید",
+    "reg_error_pin": "کد باید 4 رقم باشد",
+    "reg_loading": "در حال ثبت نام...",
+    "reg_connection_error": "خطا در اتصال",
+    "reg_info": "لینک را باز کنید، حساب ثبت نام کنید، سپس اینجا برگردید"
+  },
+  "id": {
+    "reg_title": "Daftar di",
+    "reg_subtitle": "Daftar lalu salin ID akun Anda dan tempel di sini",
+    "reg_promo_label": "Kode Promo",
+    "reg_copy": "Salin",
+    "reg_copied": "Tersalin",
+    "reg_download_app": "Unduh Aplikasi",
+    "reg_account_label": "ID Akun",
+    "reg_account_placeholder": "Tempel ID akun Anda di sini",
+    "reg_pin_label": "Kode Rahasia (4 digit)",
+    "reg_confirm": "Konfirmasi Pendaftaran",
+    "reg_submit": "Daftar",
+    "reg_close": "Tutup",
+    "reg_success": "Pendaftaran berhasil",
+    "reg_error_empty": "Masukkan ID akun Anda",
+    "reg_error_pin": "Kode harus 4 digit",
+    "reg_loading": "Mendaftar...",
+    "reg_connection_error": "Kesalahan koneksi",
+    "reg_info": "Buka tautan, daftarkan akun Anda, lalu kembali ke sini"
+  },
+  "ja": {
+    "reg_title": "で登録",
+    "reg_subtitle": "登録してからアカウントIDをコピーしてここに貼り付けてください",
+    "reg_promo_label": "プロモコード",
+    "reg_copy": "コピー",
+    "reg_copied": "コピー済み",
+    "reg_download_app": "アプリをダウンロード",
+    "reg_account_label": "アカウントID",
+    "reg_account_placeholder": "アカウントIDをここに貼り付けてください",
+    "reg_pin_label": "暗証番号（4桁）",
+    "reg_confirm": "登録を確認",
+    "reg_submit": "登録",
+    "reg_close": "閉じる",
+    "reg_success": "登録成功",
+    "reg_error_empty": "アカウントIDを入力してください",
+    "reg_error_pin": "コードは4桁でなければなりません",
+    "reg_loading": "登録中...",
+    "reg_connection_error": "接続エラー",
+    "reg_info": "リンクを開き、アカウントを登録してから、ここに戻ってください"
+  },
+  "ko": {
+    "reg_title": "등록",
+    "reg_subtitle": "등록 후 계정 ID를 복사하여 여기에 붙여넣으세요",
+    "reg_promo_label": "프로모 코드",
+    "reg_copy": "복사",
+    "reg_copied": "복사됨",
+    "reg_download_app": "앱 다운로드",
+    "reg_account_label": "계정 ID",
+    "reg_account_placeholder": "계정 ID를 여기에 붙여넣으세요",
+    "reg_pin_label": "비밀번호 (4자리)",
+    "reg_confirm": "등록 확인",
+    "reg_submit": "등록",
+    "reg_close": "닫기",
+    "reg_success": "등록 성공",
+    "reg_error_empty": "계정 ID를 입력하세요",
+    "reg_error_pin": "코드는 4자리여야 합니다",
+    "reg_loading": "등록 중...",
+    "reg_connection_error": "연결 오류",
+    "reg_info": "링크를 열고 계정을 등록한 후 여기로 돌아오세요"
+  },
+  "th": {
+    "reg_title": "สมัครที่",
+    "reg_subtitle": "สมัครแล้วคัดลอก ID บัญชีของคุณมาวางที่นี่",
+    "reg_promo_label": "รหัสโปรโมชั่น",
+    "reg_copy": "คัดลอก",
+    "reg_copied": "คัดลอกแล้ว",
+    "reg_download_app": "ดาวน์โหลดแอป",
+    "reg_account_label": "ID บัญชี",
+    "reg_account_placeholder": "วาง ID บัญชีของคุณที่นี่",
+    "reg_pin_label": "รหัสลับ (4 หลัก)",
+    "reg_confirm": "ยืนยันการสมัคร",
+    "reg_submit": "สมัคร",
+    "reg_close": "ปิด",
+    "reg_success": "สมัครสำเร็จ",
+    "reg_error_empty": "กรุณาใส่ ID บัญชี",
+    "reg_error_pin": "รหัสต้องเป็น 4 หลัก",
+    "reg_loading": "กำลังสมัคร...",
+    "reg_connection_error": "เกิดข้อผิดพลาดในการเชื่อมต่อ",
+    "reg_info": "เปิดลิงก์ สมัครบัญชีของคุณ แล้วกลับมาที่นี่"
+  }
+};
+
 window.COMPANY_TRANS = {{ company_translations | safe }};
 
-var _regModal=null,_regData={};
+var _regModal=null,_regData={},_regStep=0;
+
+function _regT(key){
+  var lang=localStorage.getItem('vex_lang')||'ar';
+  var t=window.REG_MODAL_I18N&&window.REG_MODAL_I18N[lang];
+  return(t&&t[key])||key;
+}
 
 function _regIconHtml(icon){
   if(!icon)return '<span style="font-size:36px">\ud83c\udfe2</span>';
-  if(icon.indexOf('/')===0||icon.indexOf('http')===0)return '<img src="'+icon+'" style="width:48px;height:48px;border-radius:14px;object-fit:cover">';
-  return '<span style="font-size:42px">'+icon+'</span>';
+  if(icon.indexOf('/')===0||icon.indexOf('http')===0)return '<img src="'+icon+'" style="width:56px;height:56px;border-radius:14px;object-fit:cover">';
+  return '<span style="font-size:48px">'+icon+'</span>';
 }
 
 function _regClose(){
   if(_regModal){_regModal.remove();_regModal=null;}
-  _regData={};
+  _regData={};_regStep=0;
+}
+
+function _regRenderStep1(){
+  var d=_regData;
+  var h='<div style="text-align:center;margin-bottom:18px">'
+    +'<div style="width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,var(--green,#00e701)15,var(--green,#00e701)05);border:1px solid var(--green,#00e701)33;display:flex;align-items:center;justify-content:center;margin:0 auto 12px">'+_regIconHtml(d.icon)+'</div>'
+    +'<div style="font-size:20px;font-weight:900;margin-bottom:4px">'+_regT('reg_title')+' '+d.name+'</div>'
+    +'<div style="font-size:13px;color:var(--muted,#8794a3)">'+_regT('reg_subtitle')+'</div></div>'
+    +'<div style="background:var(--card,#0b0e11);border:1px solid rgba(255,215,0,.2);border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">'
+    +'<i class="fas fa-tag" style="color:#ffd700;font-size:14px"></i>'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--muted,#8794a3)">'+_regT('reg_promo_label')+'</div>'
+    +'<div style="font-size:16px;font-weight:900;color:#ffd700">'+d.promo+'</div></div>'
+    +'<button onclick="navigator.clipboard.writeText(\''+d.promo+'\');var b=this;b.textContent=\''+_regT('reg_copied')+'\';setTimeout(function(){b.textContent=\''+_regT('reg_copy')+'\';},1500)" style="background:var(--card,#262e39);border:none;color:var(--muted,#8794a3);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;font-family:Cairo,sans-serif">'+_regT('reg_copy')+'</button></div>'
+    +(d.app?'<a href="'+d.app+'" target="_blank" style="display:flex;align-items:center;gap:10px;background:var(--card,#0b0e11);border:1px solid rgba(59,130,246,.2);border-radius:12px;padding:12px 14px;margin-bottom:14px;text-decoration:none;color:var(--text,#eef2f6)"><i class="fas fa-mobile-alt" style="color:#3b82f6;font-size:16px"></i><div style="flex:1"><div style="font-size:11px;color:var(--muted,#8794a3)">'+_regT('reg_download_app')+'</div><div style="font-size:13px;font-weight:700">'+d.name+' APK</div></div><i class="fas fa-external-link-alt" style="color:var(--muted,#8794a3);font-size:12px"></i></a>':'')
+    +'<button onclick="_regStep=2;_regRenderStep2()" style="width:100%;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--green,#00e701),var(--green2,#00c101));color:var(--bg,#0b0e11);font-size:15px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;margin-bottom:8px"><i class="fas fa-check"></i> '+_regT('reg_confirm')+'</button>'
+    +'<button onclick="_regClose()" style="width:100%;padding:10px;border-radius:12px;border:1px solid var(--border,#262e39);background:transparent;color:var(--muted,#8794a3);font-size:13px;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif">'+_regT('reg_close')+'</button>';
+  document.getElementById('regModalBody').innerHTML=h;
+}
+
+function _regRenderStep2(){
+  var d=_regData;
+  var h='<div style="text-align:center;margin-bottom:18px">'
+    +'<div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,rgba(59,130,246,.12),rgba(59,130,246,.04));display:flex;align-items:center;justify-content:center;margin:0 auto 12px">'+_regIconHtml(d.icon)+'</div>'
+    +'<div style="font-size:18px;font-weight:900;margin-bottom:4px">'+_regT('reg_title')+' '+d.name+'</div>'
+    +'<div style="font-size:13px;color:var(--muted,#8794a3)">'+_regT('reg_info')+'</div></div>'
+    +'<div style="margin-bottom:14px"><label style="font-size:13px;color:var(--muted,#8794a3);margin-bottom:8px;display:block">'+_regT('reg_account_label')+'</label>'
+    +'<input id="regAccNum" style="width:100%;background:var(--card,#0b0e11);border:1px solid var(--border,#262e39);border-radius:12px;padding:12px 16px;color:var(--text,#eef2f6);font-size:14px;font-family:Cairo,sans-serif;outline:none" placeholder="'+_regT('reg_account_placeholder')+'"></div>'
+    +'<div style="margin-bottom:16px"><label style="font-size:13px;color:var(--muted,#8794a3);margin-bottom:8px;display:block">'+_regT('reg_pin_label')+'</label>'
+    +'<input id="regPin" type="password" maxlength="4" inputmode="numeric" style="width:100%;background:var(--card,#0b0e11);border:1px solid var(--border,#262e39);border-radius:12px;padding:12px 16px;color:var(--text,#eef2f6);font-size:14px;font-family:Cairo,sans-serif;outline:none;text-align:center;letter-spacing:8px" placeholder="\u2022\u2022\u2022\u2022"></div>'
+    +'<div id="regError" style="display:none;color:#ff4757;font-size:12px;text-align:center;margin-bottom:10px"></div>'
+    +'<button id="regSubmitBtn" onclick="_regSubmit()" style="width:100%;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;margin-bottom:8px"><i class="fas fa-paper-plane"></i> '+_regT('reg_submit')+'</button>'
+    +'<button onclick="_regStep=1;_regRenderStep1()" style="width:100%;padding:10px;border-radius:12px;border:1px solid var(--border,#262e39);background:transparent;color:var(--muted,#8794a3);font-size:13px;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif">'+_regT('reg_close')+'</button>';
+  document.getElementById('regModalBody').innerHTML=h;
+  var an=document.getElementById('regAccNum');
+  if(an)setTimeout(function(){an.focus();},300);
 }
 
 async function _regSubmit(){
@@ -2129,59 +2514,41 @@ async function _regSubmit(){
       err=document.getElementById('regError'),btn=document.getElementById('regSubmitBtn');
   var accNum=an?an.value.trim():'';
   var pin=pn?pn.value.trim():'';
-  if(!accNum||accNum.length<3){if(err){err.style.display='block';err.textContent='\u0623\u062f\u062e\u0644 \u0631\u0642\u0645 \u0627\u0644\u062d\u0633\u0627\u0628';}return;}
-  if(!pin||pin.length<4){if(err){err.style.display='block';err.textContent='\u0627\u0644\u0631\u0645\u0632 \u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 4 \u0623\u0631\u0642\u0627\u0645';}return;}
-  if(btn){btn.disabled=true;btn.innerHTML='<div style="display:inline-block;width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:regSpin .6s linear infinite"></div> \u062c\u0627\u0631\u064d \u0627\u0644\u062a\u0633\u062c\u064a\u0644...';}
+  if(!accNum||accNum.length<3){if(err){err.style.display='block';err.textContent=_regT('reg_error_empty');}return;}
+  if(!pin||pin.length<4){if(err){err.style.display='block';err.textContent=_regT('reg_error_pin');}return;}
+  if(btn){btn.disabled=true;btn.innerHTML='<div style="display:inline-block;width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:regSpin .6s linear infinite"></div> '+_regT('reg_loading');}
   if(err)err.style.display='none';
   var uid=localStorage.getItem('vex_comp_uid');
   if(!uid){uid='WC'+Date.now().toString(36)+Math.random().toString(36).substr(2,6);localStorage.setItem('vex_comp_uid',uid);}
   try{
     var r=await fetch('/api/comp/public/register',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},body:JSON.stringify({user_id:uid,company_id:_regData.id,company_name:_regData.name,account_number:accNum,pin:pin})});
     var d=await r.json();
-    if(d.error){if(err){err.style.display='block';err.textContent=d.error;}if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> \u062a\u0633\u062c\u064a\u0644';}return;}
+    if(d.error){if(err){err.style.display='block';err.textContent=d.error;}if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> '+_regT('reg_submit');}return;}
     document.getElementById('regModalBody').innerHTML='<div style="text-align:center;padding:30px 0">'
       +'<div style="font-size:56px;margin-bottom:12px">\u2705</div>'
-      +'<div style="font-size:20px;font-weight:900;margin-bottom:6px">\u062a\u0645 \u062a\u0633\u062c\u064a\u0644 \u062d\u0633\u0627\u0628\u0643 \u0628\u0646\u062c\u0627\u062d</div>'
-      +'<div style="font-size:13px;color:#8794a3;line-height:1.8;margin-bottom:20px">\u0631\u0642\u0645 \u0627\u0644\u062d\u0633\u0627\u0628: <b style="color:#eef2f6">'+accNum+'</b><br>\u0627\u0644\u0634\u0631\u0643\u0629: <b style="color:#eef2f6">'+_regData.name+'</b></div>'
-      +'<button onclick="_regClose()" style="width:100%;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,#00e701,#00c101);color:#0b0e11;font-size:14px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif">\u0625\u063a\u0644\u0627\u0642</button></div>';
+      +'<div style="font-size:20px;font-weight:900;margin-bottom:6px">'+_regT('reg_success')+'</div>'
+      +'<div style="font-size:13px;color:var(--muted,#8794a3);line-height:1.8;margin-bottom:20px">'+_regT('reg_account_label')+': <b style="color:var(--text,#eef2f6)">'+accNum+'</b><br>'+_regT('reg_title')+': <b style="color:var(--text,#eef2f6)">'+_regData.name+'</b></div>'
+      +'<button onclick="_regClose()" style="width:100%;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--green,#00e701),var(--green2,#00c101));color:var(--bg,#0b0e11);font-size:14px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif">'+_regT('reg_close')+'</button></div>';
   }catch(e){
-    if(err){err.style.display='block';err.textContent='\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644';}
-    if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> \u062a\u0633\u062c\u064a\u0644';}
+    if(err){err.style.display='block';err.textContent=_regT('reg_connection_error');}
+    if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> '+_regT('reg_submit');}
   }
 }
 
 function openRegModal(id,name,icon,affiliate,app,promo){
   if(_regModal)_regModal.remove();
   _regData={id:id,name:name,icon:icon,affiliate:affiliate,app:app,promo:promo};
-  window.open(affiliate,'_blank');
+  _regStep=1;
   var m=document.createElement('div');
   m.id='regModal';
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
   m.innerHTML='<style>@keyframes regSpin{to{transform:rotate(360deg)}}</style>'
-    +'<div style="background:linear-gradient(180deg,#141920,#0f1318);border:1px solid #262e39;border-radius:20px;padding:24px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.5);animation:regSlideUp .25s ease">'
+    +'<div style="background:linear-gradient(180deg,var(--bg2,#141920),var(--bg,#0f1318));border:1px solid var(--border,#262e39);border-radius:20px;padding:24px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.5);animation:regSlideUp .25s ease">'
     +'<style>@keyframes regSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}</style>'
     +'<div id="regModalBody"></div></div>';
   document.body.appendChild(m);
   _regModal=m;
-  document.getElementById('regModalBody').innerHTML='<div style="text-align:center;margin-bottom:20px">'
-    +'<div style="width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,rgba(0,231,1,.12),rgba(0,231,1,.04));border:1px solid rgba(0,231,1,.2);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">'+_regIconHtml(icon)+'</div>'
-    +'<div style="font-size:20px;font-weight:900;margin-bottom:4px">'+name+'</div>'
-    +'<div style="font-size:13px;color:#8794a3">\u0633\u062c\u0651\u0644 \u062b\u0645 \u0627\u0646\u0633\u062e \u0645\u0639\u0631\u0641 \u0627\u0644\u062d\u0633\u0627\u0628 \u0648\u0627\u0644\u0631\u0645\u0632 \u0647\u0646\u0627</div></div>'
-    +'<div style="background:#0b0e11;border:1px solid rgba(255,215,0,.2);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">'
-    +'<i class="fas fa-tag" style="color:#ffd700;font-size:14px"></i>'
-    +'<div style="flex:1"><div style="font-size:11px;color:#8794a3">\u0643\u0648\u062f \u0627\u0644\u0628\u0631\u0648\u0645\u0648</div>'
-    +'<div style="font-size:16px;font-weight:900;color:#ffd700">'+promo+'</div></div>'
-    +'<button onclick="navigator.clipboard.writeText(\''+promo+'\');this.textContent=\'\u2705\';setTimeout(()=>this.textContent=\'\ud83d\udccb\',1500)" style="background:#262e39;border:none;color:#8794a3;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;font-family:Cairo,sans-serif">\ud83d\udccb \u0646\u0633\u062e</button></div>'
-    +(app?'<a href="'+app+'" target="_blank" style="display:flex;align-items:center;gap:10px;background:#0b0e11;border:1px solid rgba(59,130,246,.2);border-radius:12px;padding:12px 14px;margin-bottom:14px;text-decoration:none;color:#eef2f6"><i class="fas fa-mobile-alt" style="color:#3b82f6;font-size:16px"></i><div style="flex:1"><div style="font-size:11px;color:#8794a3">\u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u062a\u0637\u0628\u064a\u0642</div><div style="font-size:13px;font-weight:700">'+name+' APK</div></div><i class="fas fa-external-link-alt" style="color:#8794a3;font-size:12px"></i></a>':'')
-    +'<div style="margin-bottom:14px"><label style="font-size:13px;color:#8794a3;margin-bottom:8px;display:block">\ud83d\udd11 \u0631\u0642\u0645 \u0627\u0644\u062d\u0633\u0627\u0628 \u0641\u064a '+name+'</label>'
-    +'<input id="regAccNum" style="width:100%;background:#0b0e11;border:1px solid #262e39;border-radius:12px;padding:12px 16px;color:#eef2f6;font-size:14px;font-family:Cairo,sans-serif;outline:none" placeholder="\u0627\u0643\u062a\u0628 \u0645\u0639\u0631\u0641 \u0627\u0644\u062d\u0633\u0627\u0628 \u0647\u0646\u0627"></div>'
-    +'<div style="margin-bottom:16px"><label style="font-size:13px;color:#8794a3;margin-bottom:8px;display:block">\ud83d\udd10 \u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0633\u0631\u064a (4 \u0623\u0631\u0642\u0627\u0645)</label>'
-    +'<input id="regPin" type="password" maxlength="4" inputmode="numeric" style="width:100%;background:#0b0e11;border:1px solid #262e39;border-radius:12px;padding:12px 16px;color:#eef2f6;font-size:14px;font-family:Cairo,sans-serif;outline:none;text-align:center;letter-spacing:8px" placeholder="\u2022\u2022\u2022\u2022"></div>'
-    +'<div id="regError" style="display:none;color:#ff4757;font-size:12px;text-align:center;margin-bottom:10px"></div>'
-    +'<button id="regSubmitBtn" onclick="_regSubmit()" style="width:100%;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;margin-bottom:10px"><i class="fas fa-paper-plane"></i> \u062a\u0633\u062c\u064a\u0644</button>'
-    +'<button onclick="_regClose()" style="width:100%;padding:10px;border-radius:12px;border:1px solid #262e39;background:transparent;color:#8794a3;font-size:13px;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif">\u0625\u063a\u0644\u0627\u0642</button>';
-  var an=document.getElementById('regAccNum');
-  if(an)setTimeout(function(){an.focus();},300);
+  _regRenderStep1();
 }
 
 (function(){
