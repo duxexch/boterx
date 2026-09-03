@@ -2244,6 +2244,7 @@ def sitemap_xml():
     langs = ['ar','en','fr','es','de','it','pt','ru','zh','tr','ur','hi','fa','id','ja','ko','th']
     pages = [
         {'url': 'https://vex.deals/', 'priority': '1.0', 'changefreq': 'daily'},
+        {'url': 'https://vex.deals/compensation-info', 'priority': '0.9', 'changefreq': 'monthly'},
         {'url': 'https://vex.deals/webapp/games', 'priority': '0.9', 'changefreq': 'daily'},
         {'url': 'https://vex.deals/webapp/aviator', 'priority': '0.8', 'changefreq': 'weekly'},
         {'url': 'https://vex.deals/webapp/crash', 'priority': '0.8', 'changefreq': 'weekly'},
