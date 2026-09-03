@@ -11,658 +11,364 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
     <script defer src="{{ url_for('static', filename='vendor/alpine.min.js') }}"></script>
     <style>
-        :root{--bg:#0b0e11;--bg2:#141920;--card:#1a2028;--border:#262e39;--green:#00e701;--green2:#00c101;--green-dim:#0d3a18;--gold:#ffd700;--text:#eef2f6;--muted:#8794a3;--red:#ff4757;--blue:#3b82f6;--purple:#a855f7;--amber:#f59e0b}
-        *{font-family:'Cairo',sans-serif;-webkit-tap-highlight-color:transparent;box-sizing:border-box;margin:0;padding:0}
-        body{background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden}
-        .bg-fx{position:fixed;inset:0;z-index:0;pointer-events:none}
-        .bg-fx::before{content:'';position:absolute;inset:-50%;background:radial-gradient(circle at 20% 30%,rgba(0,231,1,.07),transparent 40%),radial-gradient(circle at 80% 70%,rgba(255,215,0,.04),transparent 45%);animation:bgD 18s ease-in-out infinite alternate}
-        @keyframes bgD{0%{transform:translate(0,0)}50%{transform:translate(4%,3%)}100%{transform:translate(-3%,-4%)}}
-        .app{position:relative;z-index:1;max-width:520px;margin:0 auto;padding:0 14px 24px}
-        .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0;position:sticky;top:0;z-index:20;background:rgba(6,16,12,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
-        .logo-row{display:flex;align-items:center;gap:8px}
-        .logo-img{width:36px;height:36px;border-radius:10px;object-fit:cover}
-        .logo-text{font-size:20px;font-weight:900;background:linear-gradient(135deg,var(--green),#69f0ae);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-        .tbtn{width:36px;height:36px;border-radius:10px;background:var(--card);border:1px solid var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;text-decoration:none}
-        .tbtn:active{transform:scale(.9)}
-        .hero{text-align:center;padding:28px 0 20px;position:relative}
-        .hero-icon{font-size:48px;margin-bottom:10px;display:block}
-        .hero-title{font-size:22px;font-weight:900;background:linear-gradient(135deg,var(--green),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
-        .hero-sub{font-size:13px;color:var(--muted);line-height:1.6}
-        .step-indicator{display:flex;align-items:center;justify-content:center;gap:6px;margin:16px 0}
-        .step-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:all .3s}
-        .step-dot.active{background:var(--green);box-shadow:0 0 10px rgba(0,231,1,.5)}
-        .step-dot.done{background:var(--green)}
-        .step-line{width:24px;height:2px;background:var(--border);transition:background .3s}
-        .step-line.done{background:var(--green)}
-        .section-title{font-size:15px;font-weight:800;margin:18px 0 10px;display:flex;align-items:center;gap:8px}
-        .company-card{background:linear-gradient(135deg,var(--card),#10141a);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px;transition:all .25s;position:relative;overflow:hidden}
-        .company-card:hover{border-color:var(--green);box-shadow:0 4px 20px rgba(0,231,1,.08)}
-        .company-card.registered{border-color:var(--green);opacity:.75}
-        .company-card.registered::after{content:'✓ مسجل';position:absolute;top:12px;left:12px;background:var(--green);color:#0b0e11;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px}
+        *{font-family:'Cairo',sans-serif;box-sizing:border-box;margin:0;padding:0}
+        body{background:#0b0e11;color:#eef2f6;min-height:100dvh}
+        .app{max-width:520px;margin:0 auto;padding:14px}
+        .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0;margin-bottom:16px}
+        .logo{font-size:22px;font-weight:900;background:linear-gradient(135deg,#00e701,#69f0ae);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .back-btn{color:#8794a3;text-decoration:none;font-size:14px}
+        .hero{text-align:center;padding:20px 0}
+        .hero-icon{font-size:48px;margin-bottom:10px}
+        .hero-title{font-size:20px;font-weight:900;margin-bottom:6px}
+        .hero-sub{font-size:13px;color:#8794a3;line-height:1.6}
+        .company-card{background:#1a2028;border:1px solid #262e39;border-radius:16px;padding:16px;margin-bottom:12px;transition:all .25s}
+        .company-card:active{transform:scale(.98)}
         .company-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-        .company-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+        .company-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;background:#262e39}
         .company-name{font-size:16px;font-weight:800}
-        .company-desc{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-        .promo-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.3);color:var(--gold);font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;margin-bottom:10px}
-        .company-actions{display:flex;gap:8px}
-        .btn{padding:10px 18px;border-radius:10px;border:none;font-size:13px;font-weight:800;cursor:pointer;transition:all .15s;font-family:'Cairo',sans-serif}
+        .company-desc{font-size:12px;color:#8794a3;line-height:1.5;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .promo-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.3);color:#ffd700;font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;margin-bottom:10px}
+        .btn{padding:12px 20px;border-radius:12px;border:none;font-size:14px;font-weight:800;cursor:pointer;transition:all .15s;font-family:'Cairo',sans-serif;width:100%}
         .btn:active{transform:scale(.95)}
-        .btn-green{background:linear-gradient(135deg,var(--green),var(--green2));color:#0b0e11}
-        .btn-green:hover{box-shadow:0 4px 15px rgba(0,231,1,.3)}
-        .btn-outline{background:transparent;border:1px solid var(--border);color:var(--muted)}
-        .btn-outline:hover{border-color:var(--green);color:var(--green)}
-        .btn-gold{background:linear-gradient(135deg,var(--gold),#e6b800);color:#0b0e11}
-        .btn-red{background:var(--red);color:white}
-        .btn-blue{background:var(--blue);color:white}
-        .btn-purple{background:var(--purple);color:white}
-        .btn-sm{padding:7px 14px;font-size:12px}
-        .btn-full{width:100%}
-        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
-        .modal{background:var(--bg2);border:1px solid var(--border);border-radius:20px;width:100%;max-width:420px;padding:24px;position:relative;animation:modalIn .25s ease}
-        @keyframes modalIn{from{opacity:0;transform:scale(.92) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
-        .modal-close{position:absolute;top:12px;left:12px;width:32px;height:32px;border-radius:8px;background:var(--card);border:1px solid var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px}
+        .btn-green{background:linear-gradient(135deg,#00e701,#00c101);color:#0b0e11}
+        .btn-blue{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff}
+        .btn-outline{background:transparent;border:1px solid #262e39;color:#8794a3}
+        .btn-outline:active{background:#262e39}
+        .btn-amber{background:linear-gradient(135deg,#f59e0b,#d97706);color:#0b0e11}
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px}
+        .modal{background:#1a2028;border:1px solid #262e39;border-radius:20px;padding:24px;width:100%;max-width:400px}
         .modal-title{font-size:18px;font-weight:900;margin-bottom:16px;text-align:center}
-        .input-group{margin-bottom:14px}
-        .input-label{font-size:12px;color:var(--muted);margin-bottom:6px;display:block;font-weight:600}
-        .input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:14px;font-family:'Cairo',sans-serif;outline:none;transition:border-color .2s}
-        .input:focus{border-color:var(--green)}
-        .input::placeholder{color:var(--muted);opacity:.6}
-        .pin-inputs{display:flex;gap:10px;justify-content:center;margin:16px 0}
-        .pin-box{width:52px;height:56px;background:var(--card);border:2px solid var(--border);border-radius:12px;text-align:center;font-size:24px;font-weight:900;color:var(--green);outline:none;transition:all .2s;font-family:'Courier New',monospace}
-        .pin-box:focus{border-color:var(--green);box-shadow:0 0 15px rgba(0,231,1,.2)}
-        .status-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px}
-        .status-pending{background:rgba(245,158,11,.15);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
-        .status-approved{background:rgba(0,231,1,.15);color:var(--green);border:1px solid rgba(0,231,1,.3)}
-        .status-rejected{background:rgba(255,71,87,.15);color:var(--red);border:1px solid rgba(255,71,87,.3)}
-        .dash-card{background:linear-gradient(135deg,var(--card),#10141a);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
-        .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
-        .stat-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center}
-        .stat-val{font-size:22px;font-weight:900;font-family:'Courier New',monospace}
-        .stat-label{font-size:11px;color:var(--muted);margin-top:2px}
-        .reg-item{display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:8px}
-        .reg-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-        .reg-info{flex:1;min-width:0}
-        .reg-name{font-size:14px;font-weight:700}
-        .reg-acc{font-size:11px;color:var(--muted);font-family:'Courier New',monospace;direction:ltr;text-align:right}
-        .history-item{padding:14px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:8px}
-        .empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
-        .empty-icon{font-size:48px;margin-bottom:10px;opacity:.4}
-        .toast{position:fixed;top:20px;right:50%;transform:translateX(50%);background:var(--card);border:1px solid var(--green);color:var(--green);padding:12px 24px;border-radius:12px;font-size:13px;font-weight:700;z-index:200;animation:toastIn .3s ease,toastOut .3s ease 2.7s forwards;font-family:'Cairo',sans-serif}
-        .toast.error{border-color:var(--red);color:var(--red)}
-        @keyframes toastIn{from{opacity:0;transform:translateX(50%) translateY(-20px)}to{opacity:1;transform:translateX(50%) translateY(0)}}
-        @keyframes toastOut{to{opacity:0;transform:translateX(50%) translateY(-20px)}}
-        .fade-in{animation:fadeIn .4s ease}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-        .upload-zone{border:2px dashed var(--border);border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:all .2s}
-        .upload-zone:hover,.upload-zone.dragover{border-color:var(--green);background:rgba(0,231,1,.05)}
-        .upload-zone i{font-size:32px;color:var(--muted);margin-bottom:8px;display:block}
-        .upload-zone p{font-size:12px;color:var(--muted)}
-        .preview-img{max-width:100%;max-height:200px;border-radius:10px;margin-top:10px;display:none}
-        [dir="ltr"] .reg-acc{text-align:left}
-        @media(max-width:400px){.pin-box{width:44px;height:48px;font-size:20px}.stat-val{font-size:18px}}
+        .input{width:100%;background:#0b0e11;border:1px solid #262e39;border-radius:12px;padding:12px 16px;color:#eef2f6;font-size:14px;font-family:'Cairo',sans-serif;outline:none;text-align:center;letter-spacing:4px}
+        .input:focus{border-color:#00e701}
+        .label{font-size:13px;color:#8794a3;margin-bottom:8px;display:block}
+        .option-btn{display:flex;align-items:center;gap:12px;background:#0b0e11;border:2px solid #262e39;border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all .2s;width:100%;text-align:right}
+        .option-btn:active{transform:scale(.97)}
+        .option-btn.selected{border-color:#00e701;background:rgba(0,231,1,.05)}
+        .option-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+        .option-title{font-size:14px;font-weight:800}
+        .option-desc{font-size:11px;color:#8794a3}
+        .status-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px}
+        .status-pending{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
+        .status-approved{background:rgba(0,231,1,.15);color:#00e701;border:1px solid rgba(0,231,1,.3)}
+        .status-rejected{background:rgba(255,71,87,.15);color:#ff4757;border:1px solid rgba(255,71,87,.3)}
+        .spinner{width:20px;height:20px;border:3px solid #262e39;border-top-color:#00e701;border-radius:50%;animation:spin .6s linear infinite;margin:0 auto}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a2028;border:1px solid #262e39;border-radius:12px;padding:12px 20px;font-size:13px;z-index:100;animation:slideUp .3s ease}
+        .toast.success{border-color:#00e701;color:#00e701}
+        .toast.error{border-color:#ff4757;color:#ff4757}
+        @keyframes slideUp{from{opacity:0;transform:translate(-50%,20px)}to{opacity:1;transform:translate(-50%,0)}}
     </style>
 </head>
 <body>
-<div class="bg-fx"></div>
-
-<div x-data="compApp()" x-init="init()" class="app">
-    <!-- Toast -->
-    <div x-show="toastMsg" x-transition class="toast" :class="toastType" x-text="toastMsg"></div>
-
+<div class="app" x-data="compApp()" x-init="init()">
     <!-- Top Bar -->
     <div class="topbar">
-        <div class="logo-row">
-            <a href="/home" class="tbtn"><i class="fas fa-arrow-right"></i></a>
-            <span class="logo-text">VEX</span>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-            <span x-show="phase==='dashboard'" style="font-size:12px;color:var(--muted)" x-text="userName"></span>
-            <button x-show="phase==='dashboard'" @click="logout()" class="tbtn" title="خروج"><i class="fas fa-right-from-bracket"></i></button>
-        </div>
+        <a href="/" class="back-btn"><i class="fas fa-arrow-right"></i> الرئيسية</a>
+        <div class="logo">VEX</div>
+        <a href="/webapp/account" class="back-btn">حسابي <i class="fas fa-user"></i></a>
     </div>
 
-    <!-- =================== PHASE: LANDING (Companies List) =================== -->
-    <div x-show="phase==='landing'" x-transition class="fade-in">
-        <div class="hero">
-            <span class="hero-icon">💰</span>
-            <h1 class="hero-title">نظام التعويضات VEX</h1>
-            <p class="hero-sub">سجّل في الشركات التابعة واحصل على تعويض عند الخسارة</p>
-        </div>
+    <!-- STEP 1: Company Selection -->
+    <template x-if="step === 'list'">
+        <div>
+            <div class="hero">
+                <span class="hero-icon">💎</span>
+                <h1 class="hero-title">نظام التعويضات</h1>
+                <p class="hero-sub">سجّل في الشركات واحصل على تعويض كامل عند الخسارة</p>
+            </div>
 
-        <!-- Step indicator -->
-        <div class="step-indicator">
-            <div class="step-dot" :class="step>=1?'active':''"></div>
-            <div class="step-line" :class="step>=2?'done':''"></div>
-            <div class="step-dot" :class="step>=2?'active':''"></div>
-            <div class="step-line" :class="step>=3?'done':''"></div>
-            <div class="step-dot" :class="step>=3?'active':''"></div>
-        </div>
-
-        <!-- Step 1: Register companies -->
-        <template x-if="step===1">
-            <div>
-                <div class="section-title"><i class="fas fa-building" style="color:var(--green)"></i> الشركات المتاحة</div>
-                <template x-for="c in companies" :key="c.id">
-                    <div class="company-card" :class="isRegistered(c.id)?'registered':''">
-                        <div class="company-header">
-                            <div class="company-icon" :style="`background:${c.color||'#334155'}20;border:1px solid ${c.color||'#334155'}40`">
-                                <span x-text="c.icon||'🏢'"></span>
-                            </div>
-                            <div>
-                                <div class="company-name" x-text="c.name"></div>
-                            </div>
-                        </div>
-                        <div class="company-desc" x-text="c.description"></div>
-                        <template x-if="c.promo_code">
-                            <div class="promo-badge"><i class="fas fa-tag"></i> <span x-text="'كود: ' + c.promo_code"></span></div>
-                        </template>
-                        <div class="company-actions">
-                            <template x-if="!isRegistered(c.id)">
-                                <div style="display:flex;gap:8px;width:100%">
-                                    <button class="btn btn-green" style="flex:1" @click="startRegister(c)">
-                                        <i class="fas fa-user-plus" style="margin-left:4px"></i> سجّل الآن
-                                    </button>
-                                    <a :href="c.app_link||c.affiliate_link||'#'" target="_blank" rel="noopener" class="btn btn-outline" style="flex:1;text-decoration:none;text-align:center" @click.stop>
-                                        <i class="fas fa-download" style="margin-left:4px"></i> التطبيق
-                                    </a>
+            <!-- Registered Companies -->
+            <template x-if="myAccounts.length > 0">
+                <div>
+                    <h3 class="section-title" style="font-size:15px;font-weight:800;margin:18px 0 10px;display:flex;align-items:center;gap:8px">
+                        <i class="fas fa-check-circle" style="color:#00e701"></i> شركات مسجل فيها
+                    </h3>
+                    <template x-for="acc in myAccounts" :key="acc.id">
+                        <div class="company-card" style="border-color:#00e701">
+                            <div class="company-header">
+                                <div class="company-icon" x-text="getIcon(acc.company_name)"></div>
+                                <div>
+                                    <div class="company-name" x-text="acc.company_name"></div>
+                                    <div style="font-size:11px;color:#8794a3">رقم الحساب: <span x-text="acc.account_number" style="color:#eef2f6"></span></div>
                                 </div>
-                            </template>
-                            <template x-if="isRegistered(c.id)">
-                                <button class="btn btn-outline btn-full" disabled>
-                                    <i class="fas fa-check" style="margin-left:4px"></i> مسجل
-                                </button>
-                            </template>
-                        </div>
-                    </div>
-                </template>
-                <template x-if="companies.length===0">
-                    <div class="empty-state">
-                        <div class="empty-icon">📭</div>
-                        <p>لا توجد חברות متاحة حالياً</p>
-                    </div>
-                </template>
-            </div>
-        </template>
-
-        <!-- Step 2: Account number entry -->
-        <template x-if="step===2">
-            <div>
-                <div class="section-title"><i class="fas fa-id-card" style="color:var(--gold)"></i> تسجيل حسابك في <span x-text="currentCompany?.name||''"></span></div>
-                <div class="dash-card">
-                    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7">
-                        1. اضغط "فتح الموقع" لتسجيل حساب في <strong x-text="currentCompany?.name||''"></strong><br>
-                        2. استخدم كود البرومو: <strong style="color:var(--gold)" x-text="currentCompany?.promo_code||''"></strong><br>
-                        3. عد هنا وأدخل رقم حسابك
-                    </p>
-                    <a :href="currentCompany?.affiliate_link||'#'" target="_blank" rel="noopener" class="btn btn-gold btn-full" style="margin-bottom:12px;text-decoration:none;display:block;text-align:center">
-                        <i class="fas fa-external-link-alt" style="margin-left:4px"></i> فتح موقع <span x-text="currentCompany?.name||''"></span>
-                    </a>
-                    <div class="input-group">
-                        <label class="input-label">رقم الحساب <span style="color:var(--red)">*</span></label>
-                        <input x-model="accountNumber" type="text" class="input" placeholder="أدخل رقم حسابك" maxlength="64" @keyup.enter="saveAccount()">
-                    </div>
-                    <button class="btn btn-green btn-full" @click="saveAccount()" :disabled="savingAccount">
-                        <template x-if="savingAccount"><i class="fas fa-spinner fa-spin" style="margin-left:4px"></i></template>
-                        <template x-if="!savingAccount"><i class="fas fa-save" style="margin-left:4px"></i></template>
-                        حفظ رقم الحساب
-                    </button>
-                    <button class="btn btn-outline btn-full" style="margin-top:8px" @click="step=1">
-                        <i class="fas fa-arrow-right" style="margin-left:4px"></i> رجوع
-                    </button>
-                </div>
-            </div>
-        </template>
-
-        <!-- Step 3: Upsell other companies -->
-        <template x-if="step===3">
-            <div>
-                <div class="dash-card" style="text-align:center;border-color:var(--green)">
-                    <div style="font-size:36px;margin-bottom:8px">✅</div>
-                    <div style="font-size:16px;font-weight:800;margin-bottom:4px">تم التسجيل بنجاح!</div>
-                    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">حسابك في <strong x-text="currentCompany?.name||''"></strong> بانتظار التأكيد</div>
-                </div>
-
-                <template x-if="otherCompanies.length > 0">
-                    <div>
-                        <div class="section-title"><i class="fas fa-plus-circle" style="color:var(--blue)"></i> سجّل في شركات أخرى</div>
-                        <template x-for="c in otherCompanies" :key="c.id">
-                            <div class="company-card">
-                                <div class="company-header">
-                                    <div class="company-icon" :style="`background:${c.color||'#334155'}20;border:1px solid ${c.color||'#334155'}40`">
-                                        <span x-text="c.icon||'🏢'"></span>
-                                    </div>
-                                    <div class="company-name" x-text="c.name"></div>
+                                <div style="margin-right:auto">
+                                    <span class="status-badge" :class="'status-' + acc.status">
+                                        <template x-if="acc.status==='pending'"><span>⏳ قيد المراجعة</span></template>
+                                        <template x-if="acc.status==='active'"><span>✅ مؤكد</span></template>
+                                        <template x-if="acc.status==='rejected'"><span>❌ مرفوض</span></template>
+                                    </span>
                                 </div>
-                                <template x-if="c.promo_code">
-                                    <div class="promo-badge"><i class="fas fa-tag"></i> <span x-text="'كود: ' + c.promo_code"></span></div>
-                                </template>
-                                <button class="btn btn-green btn-full" @click="startRegister(c)">
-                                    <i class="fas fa-user-plus" style="margin-left:4px"></i> سجّل الآن
-                                </button>
                             </div>
-                        </template>
-                    </div>
-                </template>
-
-                <button class="btn btn-outline btn-full" style="margin-top:12px" @click="goToPinSetup()">
-                    <i class="fas fa-arrow-left" style="margin-left:4px"></i> تخطي → لوحة التعويضات
-                </button>
-            </div>
-        </template>
-
-        <!-- Step 4: PIN Setup -->
-        <template x-if="step===4">
-            <div>
-                <div class="dash-card" style="text-align:center">
-                    <div style="font-size:36px;margin-bottom:8px">🔐</div>
-                    <div style="font-size:16px;font-weight:800;margin-bottom:4px">إنشاء رمز PIN</div>
-                    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">أنشئ رمز PIN من 4 أرقام لحماية حسابك</div>
-                    <div class="pin-inputs">
-                        <input type="tel" maxlength="1" class="pin-box" x-ref="pin1" x-model="pinDigits[0]" @input="pinNext(0)" @keydown.backspace="pinPrev(0)" inputmode="numeric" pattern="[0-9]">
-                        <input type="tel" maxlength="1" class="pin-box" x-ref="pin2" x-model="pinDigits[1]" @input="pinNext(1)" @keydown.backspace="pinPrev(1)" inputmode="numeric" pattern="[0-9]">
-                        <input type="tel" maxlength="1" class="pin-box" x-ref="pin3" x-model="pinDigits[2]" @input="pinNext(2)" @keydown.backspace="pinPrev(2)" inputmode="numeric" pattern="[0-9]">
-                        <input type="tel" maxlength="1" class="pin-box" x-ref="pin4" x-model="pinDigits[3]" @input="pinNext(3)" @keydown.backspace="pinPrev(3)" inputmode="numeric" pattern="[0-9]">
-                    </div>
-                    <div style="font-size:12px;color:var(--muted);margin-bottom:4px">تأكيد الرمز</div>
-                    <div class="pin-inputs">
-                        <input type="tel" maxlength="1" class="pin-box" x-ref="cp1" x-model="confirmPinDigits[0]" @input="confirmPinNext(0)" @keydown.backspace="confirmPinPrev(0)" inputmode="numeric" pattern="[0-9]">
-                        <input type="tel" maxlength="1" class="pin-box" x-ref="cp2" x-model="confirmPinDigits[1]" @input="confirmPinNext(1)" @keydown.backspace="confirmPinPrev(1)" inputmode="numeric" pattern="[0-9]">
-                        <input type="tel" maxlength="1" class="pin-box" x-ref="cp3" x-model="confirmPinDigits[2]" @input="confirmPinNext(2)" @keydown.backspace="confirmPinPrev(2)" inputmode="numeric" pattern="[0-9]">
-                        <input type="tel" maxlength="1" class="pin-box" x-ref="cp4" x-model="confirmPinDigits[3]" @input="confirmPinNext(3)" @keydown.backspace="confirmPinPrev(3)" inputmode="numeric" pattern="[0-9]">
-                    </div>
-                    <button class="btn btn-green btn-full" style="margin-top:12px" @click="savePin()" :disabled="savingPin">
-                        <template x-if="savingPin"><i class="fas fa-spinner fa-spin" style="margin-left:4px"></i></template>
-                        <i class="fas fa-lock" style="margin-left:4px"></i> حفظ الرمز والدخول
-                    </button>
-                </div>
-            </div>
-        </template>
-
-        <!-- Step 5: Dashboard -->
-        <template x-if="step===5">
-            <div>
-                <div class="stat-grid">
-                    <div class="stat-box">
-                        <div class="stat-val" style="color:var(--green)" x-text="myAccounts.length"></div>
-                        <div class="stat-label">شركات مسجلة</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-val" style="color:var(--amber)" x-text="myRequests.length"></div>
-                        <div class="stat-label">طلبات التعويض</div>
-                    </div>
-                </div>
-
-                <!-- Registered companies -->
-                <div class="section-title"><i class="fas fa-building" style="color:var(--green)"></i> حساباتي</div>
-                <template x-for="a in myAccounts" :key="a.id">
-                    <div class="reg-item">
-                        <div class="reg-icon" style="background:rgba(0,231,1,.1);border:1px solid rgba(0,231,1,.3)">
-                            <span x-text="getCompanyIcon(a.company_id)"></span>
                         </div>
-                        <div class="reg-info">
-                            <div class="reg-name" x-text="a.company_name"></div>
-                            <div class="reg-acc" x-text="'#' + a.account_number"></div>
-                        </div>
-                        <span class="status-badge" :class="'status-'+a.status">
-                            <template x-if="a.status==='pending'"><i class="fas fa-clock"></i></template>
-                            <template x-if="a.status==='active' || a.status==='approved'"><i class="fas fa-check"></i></template>
-                            <template x-if="a.status==='rejected'"><i class="fas fa-times"></i></template>
-                            <span x-text="a.status==='pending'?'بانتظار التأكيد':a.status==='active'?'مؤكد':a.status==='approved'?'مؤكد':'مرفوض'"></span>
-                        </span>
-                    </div>
-                </template>
-                <template x-if="myAccounts.length===0">
-                    <div class="dash-card" style="text-align:center">
-                        <p style="color:var(--muted);font-size:13px">لم تسجل في أي شركة بعد</p>
-                    </div>
-                </template>
-
-                <!-- Request Compensation Button -->
-                <template x-if="canRequest()">
-                    <button class="btn btn-green btn-full" style="margin:16px 0" @click="openRequestModal()">
-                        <i class="fas fa-hand-holding-dollar" style="margin-left:4px"></i> طلب تعويض
-                    </button>
-                </template>
-                <template x-if="!canRequest()">
-                    <div class="dash-card" style="text-align:center;border-color:rgba(245,158,11,.3)">
-                        <div style="font-size:13px;color:var(--amber)">
-                            <i class="fas fa-info-circle" style="margin-left:4px"></i>
-                            يجب تأكيد حسابك في شركة واحدة على الأقل لتقديم طلب تعويض
-                        </div>
-                    </div>
-                </template>
-
-                <!-- Add more companies -->
-                <button class="btn btn-outline btn-full" style="margin-bottom:16px" @click="phase='landing';step=1">
-                    <i class="fas fa-plus" style="margin-left:4px"></i> إضافة شركة أخرى
-                </button>
-
-                <!-- History -->
-                <div class="section-title"><i class="fas fa-history" style="color:var(--purple)"></i> سجل الطلبات</div>
-                <template x-for="r in myRequests" :key="r.id">
-                    <div class="history-item">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                            <span style="font-size:14px;font-weight:700" x-text="r.company_name"></span>
-                            <span class="status-badge" :class="'status-'+r.status">
-                                <span x-text="r.status==='pending'?'بانتظار المراجعة':r.status==='approved'?'تم التعويض':'مرفوض'"></span>
-                            </span>
-                        </div>
-                        <div style="font-size:11px;color:var(--muted)">
-                            <span x-text="r.created_at"></span>
-                            <template x-if="r.amount">
-                                <span> — <strong style="color:var(--green)" x-text="r.amount + ' $'"></strong></span>
-                            </template>
-                        </div>
-                        <template x-if="r.note">
-                            <div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic" x-text="r.note"></div>
-                        </template>
-                    </div>
-                </template>
-                <template x-if="myRequests.length===0">
-                    <div class="dash-card" style="text-align:center">
-                        <p style="color:var(--muted);font-size:13px">لا توجد طلبات بعد</p>
-                    </div>
-                </template>
-            </div>
-        </template>
-    </div>
-
-    <!-- =================== MODAL: Account Registration =================== -->
-    <div x-show="showRegisterModal" x-transition class="modal-overlay" @click.self="showRegisterModal=false">
-        <div class="modal">
-            <button class="modal-close" @click="showRegisterModal=false"><i class="fas fa-times"></i></button>
-            <div class="modal-title">تسجيل حساب جديد</div>
-            <p style="font-size:13px;color:var(--muted);margin-bottom:14px;text-align:center;line-height:1.7">
-                اضغط الزر أدناه لفتح موقع <strong x-text="registerCompany?.name||''"></strong><br>
-                سجّل حساباً جديداً بكود البرومو ثم عد هنا
-            </p>
-            <a :href="registerCompany?.affiliate_link||'#'" target="_blank" rel="noopener" class="btn btn-gold btn-full" style="margin-bottom:12px;text-decoration:none;display:block;text-align:center">
-                <i class="fas fa-external-link-alt" style="margin-left:4px"></i> فتح موقع <span x-text="registerCompany?.name||''"></span>
-            </a>
-            <div class="input-group">
-                <label class="input-label">رقم الحساب <span style="color:var(--red)">*</span></label>
-                <input x-model="modalAccountNumber" type="text" class="input" placeholder="أدخل رقم حسابك" maxlength="64">
-            </div>
-            <button class="btn btn-green btn-full" @click="saveModalAccount()" :disabled="savingAccount">
-                <i class="fas fa-save" style="margin-left:4px"></i> حفظ
-            </button>
-        </div>
-    </div>
-
-    <!-- =================== MODAL: Request Compensation =================== -->
-    <div x-show="showRequestModal" x-transition class="modal-overlay" @click.self="showRequestModal=false">
-        <div class="modal">
-            <button class="modal-close" @click="showRequestModal=false"><i class="fas fa-times"></i></button>
-            <div class="modal-title">طلب تعويض</div>
-            <div class="input-group">
-                <label class="input-label">الشركة <span style="color:var(--red)">*</span></label>
-                <select x-model="requestForm.company_id" class="input">
-                    <option value="">اختر الشركة</option>
-                    <template x-for="a in approvedAccounts()" :key="a.company_id">
-                        <option :value="a.company_id" x-text="a.company_name"></option>
                     </template>
-                </select>
-            </div>
-            <div class="input-group">
-                <label class="input-label">لقطة الشاشة <span style="color:var(--red)">*</span></label>
-                <div class="upload-zone" @click="$refs.screenshotInput.click()" @dragover.prevent="$el.classList.add('dragover')" @dragleave="$el.classList.remove('dragover')" @drop.prevent="$el.classList.remove('dragover');handleDrop($event)">
-                    <i class="fas fa-cloud-upload-alt"></i>
-                    <p x-show="!requestForm.screenshot">اضغط أو اسحب صورة هنا</p>
-                    <p x-show="requestForm.screenshot" style="color:var(--green)" x-text="requestForm.screenshot?.name||''"></p>
-                    <img x-ref="previewImg" class="preview-img" style="display:none">
                 </div>
-                <input x-ref="screenshotInput" type="file" accept="image/*" style="display:none" @change="handleScreenshot($event)">
-            </div>
-            <button class="btn btn-green btn-full" @click="submitRequest()" :disabled="submittingRequest">
-                <template x-if="submittingRequest"><i class="fas fa-spinner fa-spin" style="margin-left:4px"></i></template>
-                <i class="fas fa-paper-plane" style="margin-left:4px"></i> إرسال الطلب
-            </button>
-        </div>
-    </div>
+            </template>
 
+            <!-- All Companies -->
+            <h3 class="section-title" style="font-size:15px;font-weight:800;margin:18px 0 10px;display:flex;align-items:center;gap:8px">
+                <i class="fas fa-building" style="color:#f59e0b"></i> جميع الشركات
+            </h3>
+            <template x-for="c in companies" :key="c.id">
+                <div class="company-card">
+                    <div class="company-header">
+                        <div class="company-icon" x-text="c.icon || '🏢'"></div>
+                        <div>
+                            <div class="company-name" x-text="c.name"></div>
+                            <div class="company-desc" x-text="c.desc"></div>
+                        </div>
+                    </div>
+                    <div class="promo-badge" x-show="c.promo_code">
+                        <i class="fas fa-tag"></i> <span x-text="c.promo_code"></span>
+                    </div>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-green" style="flex:1" @click="chooseCompany(c, 'direct')">
+                            <i class="fas fa-bolt"></i> تسجيل مباشر
+                        </button>
+                        <button class="btn btn-blue" style="flex:1" @click="chooseCompany(c, 'compensation')">
+                            <i class="fas fa-shield-alt"></i> تسجيل بالتعويض
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <!-- STEP 2: Choose Registration Type -->
+    <template x-if="step === 'choose'">
+        <div>
+            <div class="hero">
+                <span class="hero-icon" x-text="selectedCompany.icon || '🏢'"></span>
+                <h1 class="hero-title" x-text="selectedCompany.name"></h1>
+                <p class="hero-sub">اختر طريقة التسجيل</p>
+            </div>
+
+            <div class="option-btn" @click="startDirect()">
+                <div class="option-icon" style="background:rgba(0,231,1,.1);color:#00e701"><i class="fas fa-bolt"></i></div>
+                <div>
+                    <div class="option-title">تسجيل مباشر</div>
+                    <div class="option-desc">افتح رابط التسجيل وسجّل حساب جديد في الشركة</div>
+                </div>
+            </div>
+
+            <div class="option-btn" @click="startCompensation()">
+                <div class="option-icon" style="background:rgba(59,130,246,.1);color:#3b82f6"><i class="fas fa-shield-alt"></i></div>
+                <div>
+                    <div class="option-title">تسجيل بنظام التعويض</div>
+                    <div class="option-desc">سجّل وادخل رقم حسابك — عند الخسارة هنعدلك 100%</div>
+                </div>
+            </div>
+
+            <button class="btn btn-outline" style="margin-top:16px" @click="step='list'">رجوع</button>
+        </div>
+    </template>
+
+    <!-- STEP 3A: Direct Registration -->
+    <template x-if="step === 'direct'">
+        <div>
+            <div class="hero">
+                <span class="hero-icon">🔗</span>
+                <h1 class="hero-title">تسجيل مباشر</h1>
+                <p class="hero-sub">افتح الرابط وسجّل حسابك في الشركة</p>
+            </div>
+
+            <div style="text-align:center;margin-bottom:16px">
+                <div style="font-size:12px;color:#8794a3;margin-bottom:8px">كود البرومو الخاص بك</div>
+                <div style="background:#1a2028;border:1px solid #262e39;border-radius:12px;padding:12px 20px;display:inline-flex;align-items:center;gap:10px">
+                    <span style="font-size:18px;font-weight:900;color:#ffd700" x-text="selectedCompany.promo_code"></span>
+                    <button style="background:#262e39;border:none;color:#8794a3;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px" @click="copyPromo()">نسخ</button>
+                </div>
+            </div>
+
+            <a :href="selectedCompany.affiliate_link" target="_blank" class="btn btn-green" style="display:block;text-decoration:none;text-align:center;margin-bottom:10px">
+                <i class="fas fa-external-link-alt"></i> فتح رابط التسجيل
+            </a>
+
+            <div style="background:#1a2028;border:1px solid #262e39;border-radius:12px;padding:14px;margin-bottom:16px">
+                <div style="font-size:13px;font-weight:800;margin-bottom:8px">الخطوات:</div>
+                <div style="font-size:12px;color:#8794a3;line-height:1.8">
+                    1. اضغط "فتح رابط التسجيل" أعلاه<br>
+                    2. سجّل حساب جديد في الشركة<br>
+                    3. استخدم كود البرومو: <span style="color:#ffd700" x-text="selectedCompany.promo_code"></span><br>
+                    4. ارجع هنا بعد التسجيل
+                </div>
+            </div>
+
+            <button class="btn btn-outline" @click="step='list'">رجوع</button>
+        </div>
+    </template>
+
+    <!-- STEP 3B: Compensation Registration - Enter Account Number + PIN -->
+    <template x-if="step === 'compensation'">
+        <div>
+            <div class="hero">
+                <span class="hero-icon">🛡️</span>
+                <h1 class="hero-title">تسجيل بنظام التعويض</h1>
+                <p class="hero-sub" x-text="selectedCompany.name + ' — أدخل رقم حسابك والرمز'"></p>
+            </div>
+
+            <a :href="selectedCompany.affiliate_link" target="_blank" class="btn btn-green" style="display:block;text-decoration:none;text-align:center;margin-bottom:16px">
+                <i class="fas fa-external-link-alt"></i> 1. فتح رابط التسجيل والسجّل أولاً
+            </a>
+
+            <div style="background:#1a2028;border:1px solid #262e39;border-radius:12px;padding:14px;margin-bottom:16px">
+                <div style="font-size:12px;color:#8794a3;line-height:1.8">
+                    <i class="fas fa-info-circle" style="color:#f59e0b"></i>
+                    سجّل أولاً عبر الرابط أعلاه ثم عد هنا وأدخل بياناتك
+                </div>
+            </div>
+
+            <div style="margin-bottom:14px">
+                <label class="label">رقم الحساب في <span x-text="selectedCompany.name"></span></label>
+                <input class="input" x-model="accNumber" placeholder="أدخل رقم حسابك" style="letter-spacing:0;text-align:right">
+            </div>
+
+            <div style="margin-bottom:16px">
+                <label class="label">الرمز السري (4 أرقام)</label>
+                <input class="input" x-model="accPin" type="password" maxlength="4" placeholder="••••" inputmode="numeric" style="letter-spacing:8px">
+            </div>
+
+            <button class="btn btn-blue" @click="submitAccount()" :disabled="submitting" :style="submitting && 'opacity:.6'">
+                <template x-if="!submitting"><span><i class="fas fa-paper-plane"></i> تسجيل الحساب</span></template>
+                <template x-if="submitting"><span><div class="spinner" style="display:inline-block;width:16px;height:16px;border-width:2px"></div> جارٍ التسجيل...</span></template>
+            </button>
+
+            <button class="btn btn-outline" style="margin-top:10px" @click="step='list'">رجوع</button>
+        </div>
+    </template>
+
+    <!-- STEP 4: Success / Pending -->
+    <template x-if="step === 'pending'">
+        <div style="text-align:center;padding:40px 0">
+            <div style="font-size:64px;margin-bottom:16px">⏳</div>
+            <h1 style="font-size:22px;font-weight:900;margin-bottom:8px">طلبك قيد المعالجة</h1>
+            <p style="font-size:14px;color:#8794a3;line-height:1.8;margin-bottom:24px">
+                تم استلام طلبك بنجاح<br>
+                سيتم مراجعة حسابك من قبل الإدارة<br>
+                وستتلقى إشعاراً عند التأكيد
+            </p>
+
+            <div style="background:#1a2028;border:1px solid #262e39;border-radius:12px;padding:14px;margin-bottom:20px;text-align:right">
+                <div style="font-size:12px;color:#8794a3;margin-bottom:4px">الشركة</div>
+                <div style="font-size:14px;font-weight:800" x-text="selectedCompany.name"></div>
+                <div style="font-size:12px;color:#8794a3;margin-top:8px;margin-bottom:4px">رقم الحساب</div>
+                <div style="font-size:14px;font-weight:800" x-text="lastAccountNumber"></div>
+            </div>
+
+            <button class="btn btn-green" @click="step='list'; selectedCompany=null" style="margin-bottom:10px">
+                <i class="fas fa-plus"></i> سجّل في شركة أخرى
+            </button>
+            <button class="btn btn-outline" @click="window.location.href='/'">الرئيسية</button>
+        </div>
+    </template>
+
+    <!-- Toast -->
+    <div x-show="toast.show" x-transition class="toast" :class="toast.type" x-text="toast.msg"></div>
 </div>
 
 <script>
 function compApp() {
     return {
-        phase: 'landing',
-        step: 1,
-        userName: '{{ user_name }}',
-        userId: '{{ uid }}',
+        step: 'list',
         companies: [],
         myAccounts: [],
-        myRequests: [],
-        currentCompany: null,
-        accountNumber: '',
-        savingAccount: false,
-        savingPin: false,
-        pinDigits: ['','','',''],
-        confirmPinDigits: ['','','',''],
-        hasPin: false,
-        toastMsg: '',
-        toastType: '',
-        showRegisterModal: false,
-        registerCompany: null,
-        modalAccountNumber: '',
-        showRequestModal: false,
-        requestForm: { company_id: '', screenshot: null },
-        submittingRequest: false,
+        selectedCompany: null,
+        accNumber: '',
+        accPin: '',
+        submitting: false,
+        toast: { show: false, msg: '', type: 'success' },
 
         async init() {
-            await this.loadStatus();
-        },
-
-        toast(msg, type = 'success') {
-            this.toastMsg = msg;
-            this.toastType = type;
-            setTimeout(() => { this.toastMsg = ''; }, 3000);
+            await this.loadCompanies();
+            await this.loadMyAccounts();
         },
 
         async api(url, opts = {}) {
-            const resp = await fetch(url, {
-                headers: { 'Content-Type': 'application/json', ...opts.headers },
-                ...opts,
-                body: opts.body ? (typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body)) : undefined
+            const r = await fetch(url, {
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                ...opts
             });
-            const data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || 'Request failed');
-            return data;
+            return r.json();
         },
 
-        async loadStatus() {
+        async loadCompanies() {
             try {
                 const data = await this.api('/api/comp/status');
-                this.companies = data.companies || [];
-                this.myAccounts = data.accounts || [];
-                this.myRequests = data.requests || [];
-                this.hasPin = data.has_pin || false;
-
-                if (this.hasPin) {
-                    this.phase = 'landing';
-                    this.step = 5;
-                } else if (this.myAccounts.length > 0) {
-                    this.phase = 'landing';
-                    this.step = 3;
-                } else {
-                    this.phase = 'landing';
-                    this.step = 1;
-                }
-            } catch (e) {
-                this.toast('فشل تحميل البيانات', 'error');
-            }
+                this.companies = (data.companies || []).map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    icon: c.icon || '🏢',
+                    desc: c.description || c.name + ' — شركة مراهنة مرخصة',
+                    promo_code: c.promo_code || '',
+                    affiliate_link: c.affiliate_link || '#',
+                    app_link: c.app_link || '',
+                }));
+            } catch(e) { console.error(e); }
         },
 
-        isRegistered(companyId) {
-            return this.myAccounts.some(a => a.company_id === companyId && ['pending','active','approved'].includes(a.status));
-        },
-
-        getCompanyIcon(companyId) {
-            const c = this.companies.find(c => c.id === companyId);
-            return c ? (c.icon || '🏢') : '🏢';
-        },
-
-        startRegister(company) {
-            this.currentCompany = company;
-            this.accountNumber = '';
-            this.step = 2;
-        },
-
-        async saveAccount() {
-            if (!this.accountNumber.trim()) {
-                this.toast('أدخل رقم الحساب', 'error');
-                return;
-            }
-            if (this.accountNumber.trim().length < 3) {
-                this.toast('رقم الحساب قصير جداً', 'error');
-                return;
-            }
-            this.savingAccount = true;
+        async loadMyAccounts() {
             try {
-                await this.api('/api/comp/register', {
-                    method: 'POST',
-                    body: { company_id: this.currentCompany.id, account_number: this.accountNumber.trim() }
-                });
-                this.toast('تم التسجيل بنجاح!');
-                // Refresh accounts
                 const data = await this.api('/api/comp/status');
                 this.myAccounts = data.accounts || [];
-                this.step = 3;
-            } catch (e) {
-                this.toast(e.message || 'فشل التسجيل', 'error');
-            } finally {
-                this.savingAccount = false;
-            }
+            } catch(e) { console.error(e); }
         },
 
-        get otherCompanies() {
-            return this.companies.filter(c => !this.isRegistered(c.id));
+        getIcon(name) {
+            const icons = {'1XBET':'⚽','MELBET':'🎯','BETJAM':'🎲','MOSTBET':'🏆','BIZBET':'⚡','XPARI':'🌟','LINEBET':'📈','GOOOBET':'🎮'};
+            return icons[name] || '🏢';
         },
 
-        goToPinSetup() {
-            if (this.hasPin) {
-                this.step = 5;
+        chooseCompany(c, type) {
+            this.selectedCompany = c;
+            if (type === 'direct') {
+                this.step = 'choose';
             } else {
-                this.step = 4;
-                this.$nextTick(() => { this.$refs.pin1?.focus(); });
+                this.step = 'choose';
             }
         },
 
-        pinNext(idx) {
-            if (this.pinDigits[idx] && idx < 3) {
-                this.$refs['pin' + (idx + 2)]?.focus();
-            }
-        },
-        pinPrev(idx) {
-            if (!this.pinDigits[idx] && idx > 0) {
-                this.$refs['pin' + idx]?.focus();
-            }
-        },
-        confirmPinNext(idx) {
-            if (this.confirmPinDigits[idx] && idx < 3) {
-                this.$refs['cp' + (idx + 2)]?.focus();
-            }
-        },
-        confirmPinPrev(idx) {
-            if (!this.confirmPinDigits[idx] && idx > 0) {
-                this.$refs['cp' + idx]?.focus();
-            }
+        startDirect() {
+            this.step = 'direct';
         },
 
-        async savePin() {
-            const pin = this.pinDigits.join('');
-            const confirmPin = this.confirmPinDigits.join('');
-            if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
-                this.toast('أدخل 4 أرقام', 'error');
-                return;
-            }
-            if (pin !== confirmPin) {
-                this.toast('الرمز غير متطابق', 'error');
-                return;
-            }
-            this.savingPin = true;
+        startCompensation() {
+            this.step = 'compensation';
+        },
+
+        copyPromo() {
+            navigator.clipboard.writeText(this.selectedCompany.promo_code);
+            this.showToast('تم نسخ كود البرومو', 'success');
+        },
+
+        async submitAccount() {
+            if (!this.accNumber.trim()) { this.showToast('أدخل رقم الحساب', 'error'); return; }
+            if (!this.accPin || this.accPin.length < 4) { this.showToast('أدخل الرمز (4 أرقام)', 'error'); return; }
+            this.submitting = true;
             try {
                 await this.api('/api/comp/pin', {
                     method: 'POST',
-                    body: { pin }
+                    body: JSON.stringify({ pin: this.accPin })
                 });
-                this.toast('تم حفظ الرمز!');
-                this.hasPin = true;
-                this.step = 5;
-            } catch (e) {
-                this.toast(e.message || 'فشل الحفظ', 'error');
-            } finally {
-                this.savingPin = false;
-            }
-        },
-
-        canRequest() {
-            return this.myAccounts.some(a => a.status === 'active' || a.status === 'approved');
-        },
-
-        approvedAccounts() {
-            return this.myAccounts.filter(a => a.status === 'active' || a.status === 'approved');
-        },
-
-        openRequestModal() {
-            this.requestForm = { company_id: '', screenshot: null };
-            this.showRequestModal = true;
-        },
-
-        handleScreenshot(event) {
-            const file = event.target.files[0];
-            if (file) {
-                this.requestForm.screenshot = file;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = this.$refs.previewImg;
-                    img.src = e.target.result;
-                    img.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            }
-        },
-
-        handleDrop(event) {
-            const file = event.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                this.requestForm.screenshot = file;
-            }
-        },
-
-        async submitRequest() {
-            if (!this.requestForm.company_id) {
-                this.toast('اختر الشركة', 'error');
-                return;
-            }
-            if (!this.requestForm.screenshot) {
-                this.toast('أرفق لقطة الشاشة', 'error');
-                return;
-            }
-            this.submittingRequest = true;
-            try {
-                const formData = new FormData();
-                formData.append('company_id', this.requestForm.company_id);
-                formData.append('screenshot', this.requestForm.screenshot);
-                const resp = await fetch('/api/comp/request', {
+                await this.api('/api/comp/register', {
                     method: 'POST',
-                    body: formData
+                    body: JSON.stringify({
+                        company_id: this.selectedCompany.id,
+                        company_name: this.selectedCompany.name,
+                        account_number: this.accNumber.trim()
+                    })
                 });
-                const data = await resp.json();
-                if (!resp.ok) throw new Error(data.error || 'Failed');
-                this.toast('تم إرسال الطلب!');
-                this.showRequestModal = false;
-                const status = await this.api('/api/comp/status');
-                this.myRequests = status.requests || [];
-            } catch (e) {
-                this.toast(e.message || 'فشل الإرسال', 'error');
-            } finally {
-                this.submittingRequest = false;
+                this.lastAccountNumber = this.accNumber;
+                this.step = 'pending';
+                this.accNumber = '';
+                this.accPin = '';
+            } catch(e) {
+                this.showToast('خطأ في التسجيل', 'error');
             }
+            this.submitting = false;
         },
 
-        async logout() {
-            try { await fetch('/logout'); } catch(e) {}
-            window.location.href = '/login';
+        showToast(msg, type = 'success') {
+            this.toast = { show: true, msg, type };
+            setTimeout(() => { this.toast.show = false; }, 3000);
         }
     };
 }
