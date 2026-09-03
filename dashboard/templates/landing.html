@@ -2525,26 +2525,28 @@ function _regClose(){
   _regData={};_regStep=0;
 }
 
-var _regBtnStyle='width:100%;padding:14px 20px;border-radius:0;border:none;font-size:15px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;text-decoration:none;text-align:center;position:relative;overflow:hidden';
-var _regBtnGreen=_regBtnStyle+';background:linear-gradient(180deg,#22c55e 0%,#16a34a 50%,#15803d 100%);color:#fff;box-shadow:0 2px 8px rgba(22,163,74,.35),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)';
-var _regBtnBlue=_regBtnStyle+';background:linear-gradient(180deg,#60a5fa 0%,#3b82f6 50%,#2563eb 100%);color:#fff;box-shadow:0 2px 8px rgba(59,130,246,.35),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)';
+var _regBtnStyle='width:100%;padding:13px 20px;border-radius:0;border:none;font-size:14px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;text-decoration:none;text-align:center;position:relative;overflow:hidden';
+var _regBtnGreen=_regBtnStyle+';background:linear-gradient(180deg,#22c55e 0%,#16a34a 50%,#15803d 100%);color:#fff;box-shadow:0 2px 8px rgba(22,163,74,.3),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)';
+var _regBtnBlue=_regBtnStyle+';background:linear-gradient(180deg,#60a5fa 0%,#3b82f6 50%,#2563eb 100%);color:#fff;box-shadow:0 2px 8px rgba(59,130,246,.3),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)';
 var _regBtnOutline=_regBtnStyle+';background:linear-gradient(180deg,rgba(255,255,255,.95) 0%,rgba(248,250,252,.9) 50%,rgba(241,245,249,.95) 100%);border:1.5px solid #e2e8f0;color:#475569;box-shadow:0 2px 8px rgba(0,0,0,.05),inset 0 1px 0 rgba(255,255,255,.8),inset 0 -1px 0 rgba(0,0,0,.03)';
-var _regBtnGold=_regBtnStyle+';background:linear-gradient(180deg,#fbbf24 0%,#f59e0b 50%,#d97706 100%);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,.35),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)';
+var _regBtnGold=_regBtnStyle+';background:linear-gradient(180deg,#fbbf24 0%,#f59e0b 50%,#d97706 100%);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,.3),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)';
+var _regInputStyle='width:100%;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:0;padding:13px 14px;color:#0f172a;font-size:14px;font-family:Cairo,sans-serif;outline:none;transition:border-color .2s';
+var _regLabelStyle='font-size:12px;color:#475569;margin-bottom:6px;display:block;font-weight:700';
 
 function _regRenderStep1(){
   var d=_regData;
-  var h='<div style="text-align:center;margin-bottom:20px">'
-    +'<div style="margin:0 auto 14px">'+_regIconHtml(d.icon,72)+'</div>'
-    +'<div style="font-size:22px;font-weight:900;color:#0f172a;margin-bottom:4px">'+d.name+'</div>'
+  var h='<div style="text-align:center;margin-bottom:18px">'
+    +'<div style="margin:0 auto 12px">'+_regIconHtml(d.icon,64)+'</div>'
+    +'<div style="font-size:20px;font-weight:900;color:#0f172a;margin-bottom:4px">'+d.name+'</div>'
     +'<div style="font-size:13px;color:#475569;line-height:1.6">'+_regT('reg_subtitle')+'</div></div>'
-    +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">'
-    +'<div style="width:40px;height:40px;border-radius:0;background:rgba(217,119,6,.1);display:flex;align-items:center;justify-content:center"><i class="fas fa-tag" style="color:#d97706;font-size:16px"></i></div>'
-    +'<div style="flex:1"><div style="font-size:11px;color:#475569;font-weight:600">'+_regT('reg_promo_label')+'</div>'
-    +'<div style="font-size:18px;font-weight:900;color:#d97706;letter-spacing:.5px">'+d.promo+'</div></div>'
-    +'<button onclick="navigator.clipboard.writeText(\''+d.promo+'\');var b=this;b.textContent=\'\u2705\';setTimeout(function(){b.textContent=\'\ud83d\udccb\';},1500)" style="background:#fff;border:1.5px solid #e2e8f0;color:#475569;padding:8px 12px;border-radius:0;cursor:pointer;font-size:13px;font-weight:700;font-family:Cairo,sans-serif">\ud83d\udccb</button></div>'
-    +(d.app?'<a href="'+d.app+'" target="_blank" style="'+_regBtnOutline+'margin-bottom:10px"><i class="fas fa-mobile-alt" style="color:#3b82f6"></i> '+_regT('reg_download_app')+'</a>':'')
-    +'<a href="'+d.affiliate+'" target="_blank" onclick="_regStep=2" style="'+_regBtnGreen+'margin-bottom:8px" onmouseover="this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.transform=\'none\'"><i class="fas fa-check-circle"></i> '+_regT('reg_confirm')+'</a>'
-    +'<button onclick="_regRenderStep2()" style="'+_regBtnBlue+'margin-bottom:10px"><i class="fas fa-sign-in-alt"></i> '+_regT('reg_login')+'</button>'
+    +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:0;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">'
+    +'<div style="width:36px;height:36px;border-radius:0;background:rgba(217,119,6,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-tag" style="color:#d97706;font-size:14px"></i></div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:10px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.5px">'+_regT('reg_promo_label')+'</div>'
+    +'<div style="font-size:16px;font-weight:900;color:#d97706;letter-spacing:.5px">'+d.promo+'</div></div>'
+    +'<button onclick="navigator.clipboard.writeText(\''+d.promo+'\');var b=this;b.textContent=\'\u2705\';setTimeout(function(){b.textContent=\'\ud83d\udccb\';},1500)" style="background:#fff;border:1.5px solid #e2e8f0;color:#475569;padding:7px 10px;border-radius:0;cursor:pointer;font-size:12px;font-weight:700;font-family:Cairo,sans-serif;flex-shrink:0">\ud83d\udccb</button></div>'
+    +(d.app?'<a href="'+d.app+'" target="_blank" style="'+_regBtnOutline+'margin-bottom:8px;font-size:12px;padding:11px 16px"><i class="fas fa-mobile-alt" style="color:#3b82f6"></i> '+_regT('reg_download_app')+'</a>':'')
+    +'<a href="'+d.affiliate+'" target="_blank" onclick="_regStep=2" style="'+_regBtnGreen+'margin-bottom:6px" onmouseover="this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.transform=\'none\'"><i class="fas fa-user-plus"></i> '+_regT('reg_confirm')+'</a>'
+    +'<button onclick="_regRenderStep2()" style="'+_regBtnBlue+'margin-bottom:8px"><i class="fas fa-sign-in-alt"></i> '+_regT('reg_login')+'</button>'
     +'<button onclick="_regClose()" style="'+_regBtnOutline+'">'+_regT('reg_close')+'</button>';
   document.getElementById('regModalBody').innerHTML=h;
 }
@@ -2558,17 +2560,17 @@ function _regIconHtml(icon,size){
 
 function _regRenderStep2(){
   var d=_regData;
-  var h='<div style="text-align:center;margin-bottom:20px">'
-    +'<div style="margin:0 auto 12px">'+_regIconHtml(d.icon,64)+'</div>'
-    +'<div style="font-size:18px;font-weight:900;color:#0f172a;margin-bottom:4px">'+_regT('reg_title')+' '+d.name+'</div>'
-    +'<div style="font-size:13px;color:#475569;line-height:1.6">'+_regT('reg_info')+'</div></div>'
-    +'<div style="margin-bottom:14px"><label style="font-size:13px;color:#475569;margin-bottom:8px;display:block;font-weight:700">'+_regT('reg_account_label')+'</label>'
-    +'<input id="regAccNum" style="width:100%;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:0;padding:14px 16px;color:#0f172a;font-size:14px;font-family:Cairo,sans-serif;outline:none;transition:border-color .2s" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="'+_regT('reg_account_placeholder')+'"></div>'
-    +'<div style="margin-bottom:16px"><label style="font-size:13px;color:#475569;margin-bottom:8px;display:block;font-weight:700">'+_regT('reg_pin_label')+'</label>'
-    +'<input id="regPin" type="password" maxlength="4" inputmode="numeric" style="width:100%;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:0;padding:14px 16px;color:#0f172a;font-size:14px;font-family:Cairo,sans-serif;outline:none;text-align:center;letter-spacing:8px;transition:border-color .2s" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="\u2022\u2022\u2022\u2022"></div>'
+  var h='<div style="text-align:center;margin-bottom:18px">'
+    +'<div style="margin:0 auto 10px">'+_regIconHtml(d.icon,56)+'</div>'
+    +'<div style="font-size:18px;font-weight:900;color:#0f172a;margin-bottom:3px">'+_regT('reg_title')+' '+d.name+'</div>'
+    +'<div style="font-size:12px;color:#475569;line-height:1.6">'+_regT('reg_info')+'</div></div>'
+    +'<div style="margin-bottom:12px"><label style="'+_regLabelStyle+'">'+_regT('reg_account_label')+'</label>'
+    +'<input id="regAccNum" style="'+_regInputStyle+'" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="'+_regT('reg_account_placeholder')+'"></div>'
+    +'<div style="margin-bottom:14px"><label style="'+_regLabelStyle+'">'+_regT('reg_pin_label')+'</label>'
+    +'<input id="regPin" type="password" maxlength="4" inputmode="numeric" style="'+_regInputStyle+';text-align:center;letter-spacing:8px" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="\u2022\u2022\u2022\u2022"></div>'
     +'<div id="regError" style="display:none;color:#dc2626;font-size:12px;text-align:center;margin-bottom:10px;font-weight:600"></div>'
-    +'<button id="regSubmitBtn" onclick="_regSubmit()" style="'+_regBtnBlue+'margin-bottom:10px"><i class="fas fa-paper-plane"></i> '+_regT('reg_submit')+'</button>'
-    +'<button onclick="_regStep=1;_regRenderStep1()" style="'+_regBtnOutline+'">'+_regT('reg_close')+'</button>';
+    +'<button id="regSubmitBtn" onclick="_regSubmit()" style="'+_regBtnBlue+'margin-bottom:8px"><i class="fas fa-paper-plane"></i> '+_regT('reg_submit')+'</button>'
+    +'<button onclick="_regStep=1;_regRenderStep1()" style="'+_regBtnOutline+'">'+_regT('reg_back')+'</button>';
   document.getElementById('regModalBody').innerHTML=h;
   var an=document.getElementById('regAccNum');
   if(an)setTimeout(function(){an.focus();},300);
@@ -2589,11 +2591,11 @@ async function _regSubmit(){
     var r=await fetch('/api/comp/public/register',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},body:JSON.stringify({user_id:uid,company_id:_regData.id,company_name:_regData.name,account_number:accNum,pin:pin})});
     var d=await r.json();
     if(d.error){if(err){err.style.display='block';err.textContent=d.error;}if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> '+_regT('reg_submit');}return;}
-    document.getElementById('regModalBody').innerHTML='<div style="text-align:center;padding:30px 0">'
-      +'<div style="width:72px;height:72px;border-radius:0;background:rgba(22,163,74,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><i class="fas fa-check-circle" style="font-size:36px;color:#16a34a"></i></div>'
-      +'<div style="font-size:22px;font-weight:900;color:#0f172a;margin-bottom:8px">'+_regT('reg_success')+'</div>'
-      +'<div style="font-size:13px;color:#475569;line-height:1.8;margin-bottom:20px">'+_regT('reg_account_label')+': <b style="color:#0f172a">'+accNum+'</b><br>'+d.name+'</div>'
-      +'<a href="/compensation" style="'+_regBtnGreen+'margin-bottom:10px">'+_regT('reg_go_compensation')+'</a>'
+    document.getElementById('regModalBody').innerHTML='<div style="text-align:center;padding:24px 0">'
+      +'<div style="width:64px;height:64px;border-radius:0;background:rgba(22,163,74,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i class="fas fa-check-circle" style="font-size:32px;color:#16a34a"></i></div>'
+      +'<div style="font-size:20px;font-weight:900;color:#0f172a;margin-bottom:6px">'+_regT('reg_success')+'</div>'
+      +'<div style="font-size:12px;color:#475569;line-height:1.8;margin-bottom:18px">'+_regT('reg_account_label')+': <b style="color:#0f172a">'+accNum+'</b><br>'+d.name+'</div>'
+      +'<a href="/compensation" style="'+_regBtnGreen+'margin-bottom:8px">'+_regT('reg_go_compensation')+'</a>'
       +'<button onclick="_regClose()" style="'+_regBtnOutline+'">'+_regT('reg_close')+'</button></div>';
   }catch(e){
     if(err){err.style.display='block';err.textContent=_regT('reg_connection_error');}
@@ -2609,10 +2611,10 @@ function openRegModal(id,name,icon,affiliate,app,promo){
   if(affiliate&&affiliate!=='#'){window.open(affiliate,'_blank');}
   var m=document.createElement('div');
   m.id='regModal';
-  m.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
   m.innerHTML='<style>@keyframes regSpin{to{transform:rotate(360deg)}}</style>'
-    +'<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:0;padding:24px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.12);animation:regSlideUp .25s ease">'
-    +'<style>@keyframes regSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}</style>'
+    +'<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:0;padding:22px;width:100%;max-width:380px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.08),0 25px 60px rgba(0,0,0,.06);animation:regSlideUp .25s ease">'
+    +'<style>@keyframes regSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}</style>'
     +'<div id="regModalBody"></div></div>';
   document.body.appendChild(m);
   _regModal=m;
