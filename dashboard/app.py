@@ -8390,8 +8390,8 @@ def api_add_company():
 @permission_required('manage_companies')
 def api_edit_company(company_id):
     companies = read_csv('companies.csv')
-    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link','bot_icon','promo_code','show_in_comp'])
-    for _f in ('bot_icon', 'promo_code', 'show_in_comp'):
+    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link','app_link','bot_icon','promo_code','show_in_comp'])
+    for _f in ('bot_icon', 'promo_code', 'show_in_comp', 'app_link'):
         if _f not in fieldnames:
             fieldnames.append(_f)
 
@@ -8408,6 +8408,8 @@ def api_edit_company(company_id):
             if c.get('id') == company_id:
                 for k, v in data.items():
                     if k in fieldnames:
+                        if k == 'icon' and (not v or not str(v).strip()):
+                            continue
                         c[k] = v
                 break
         write_csv('companies.csv', companies, fieldnames)
@@ -8889,6 +8891,11 @@ def api_comp_public_my_accounts():
     if not user_id:
         return jsonify({'accounts': []})
     accounts = [r for r in _comp_read_accounts() if str(r.get('user_id', '')) == user_id]
+    company_icons = {}
+    for c in read_csv('companies.csv'):
+        company_icons[c.get('name', '')] = c.get('icon', '')
+    for acc in accounts:
+        acc['icon'] = company_icons.get(acc.get('company_name', ''), '')
     return jsonify({'accounts': accounts})
 
 

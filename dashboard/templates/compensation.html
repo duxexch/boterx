@@ -1,342 +1,402 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="ltr" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VEX — التعويضات</title>
-    <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#0b0e11">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.build.css') }}?v=20260831">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
-    <script defer src="{{ url_for('static', filename='vendor/alpine.min.js') }}"></script>
-    <style>
-        *{font-family:'Cairo',sans-serif;box-sizing:border-box;margin:0;padding:0}
-        body{background:#0b0e11;color:#eef2f6;min-height:100dvh}
-        .app{max-width:520px;margin:0 auto;padding:14px}
-        .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0;margin-bottom:16px}
-        .logo{font-size:22px;font-weight:900;background:linear-gradient(135deg,#00e701,#69f0ae);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-        .back-btn{color:#8794a3;text-decoration:none;font-size:14px}
-        .hero{text-align:center;padding:20px 0}
-        .hero-icon{font-size:48px;margin-bottom:10px}
-        .hero-title{font-size:20px;font-weight:900;margin-bottom:6px}
-        .hero-sub{font-size:13px;color:#8794a3;line-height:1.6}
-        .card{background:#1a2028;border:1px solid #262e39;border-radius:16px;padding:16px;margin-bottom:12px}
-        .card-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-        .card-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;background:#262e39}
-        .card-name{font-size:16px;font-weight:800}
-        .card-desc{font-size:12px;color:#8794a3;line-height:1.5;margin-bottom:10px}
-        .promo-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.3);color:#ffd700;font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;margin-bottom:10px}
-        .btn{padding:12px 20px;border-radius:12px;border:none;font-size:14px;font-weight:800;cursor:pointer;transition:all .15s;font-family:'Cairo',sans-serif;width:100%}
-        .btn:active{transform:scale(.95)}
-        .btn-green{background:linear-gradient(135deg,#00e701,#00c101);color:#0b0e11}
-        .btn-blue{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff}
-        .btn-outline{background:transparent;border:1px solid #262e39;color:#8794a3}
-        .input{width:100%;background:#0b0e11;border:1px solid #262e39;border-radius:12px;padding:12px 16px;color:#eef2f6;font-size:14px;font-family:'Cairo',sans-serif;outline:none}
-        .input:focus{border-color:#00e701}
-        .label{font-size:13px;color:#8794a3;margin-bottom:8px;display:block}
-        .section-title{font-size:15px;font-weight:800;margin:18px 0 10px;display:flex;align-items:center;gap:8px}
-        .option-btn{display:flex;align-items:center;gap:12px;background:#0b0e11;border:2px solid #262e39;border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all .2s;width:100%;text-align:right}
-        .option-btn:active{transform:scale(.97)}
-        .option-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-        .option-title{font-size:14px;font-weight:800}
-        .option-desc{font-size:11px;color:#8794a3}
-        .status-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px}
-        .status-pending{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
-        .status-approved{background:rgba(0,231,1,.15);color:#00e701;border:1px solid rgba(0,231,1,.3)}
-        .status-rejected{background:rgba(255,71,87,.15);color:#ff4757;border:1px solid rgba(255,71,87,.3)}
-        .spinner{width:20px;height:20px;border:3px solid #262e39;border-top-color:#00e701;border-radius:50%;animation:spin .6s linear infinite;margin:0 auto}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a2028;border:1px solid #262e39;border-radius:12px;padding:12px 20px;font-size:13px;z-index:100;animation:slideUp .3s ease}
-        .toast.success{border-color:#00e701;color:#00e701}
-        .toast.error{border-color:#ff4757;color:#ff4757}
-        @keyframes slideUp{from{opacity:0;transform:translate(-50%,20px)}to{opacity:1;transform:translate(-50%,0)}}
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>VEX — التعويضات</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#f8fafc">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script defer src="{{ url_for('static', filename='vendor/alpine.min.js') }}"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --green:#16a34a;--green2:#15803d;--gold:#d97706;
+  --bg:#f8fafc;--surface:#ffffff;--surface2:#f1f5f9;
+  --border:#e2e8f0;--text:#0f172a;--muted:#475569;
+  --accent-1xbet:#E31937;--accent-melbet:#1565C0;--accent-betjam:#FF6D00;
+  --accent-mostbet:#2E7D32;--accent-xpari:#00838F;--accent-bizbet:#7B1FA2;
+  --accent-linebet:#3949AB;--accent-gooobet:#C2185B;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+  --radius:0;
+}
+body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+a{color:inherit;text-decoration:none}
+
+.topbar{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto}
+.topbar-brand{font-size:20px;font-weight:900;display:flex;align-items:center;gap:6px}
+.topbar-brand span{background:linear-gradient(135deg,var(--green),#4ade80);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar-back{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);font-weight:700;font-size:14px;cursor:pointer;transition:all .15s}
+.topbar-back:hover{border-color:var(--green)}
+
+.container{max-width:1200px;margin:0 auto;padding:0 24px 80px}
+.hero{text-align:center;padding:40px 0 32px}
+.hero-icon{width:72px;height:72px;border-radius:var(--radius);background:linear-gradient(135deg,color-mix(in srgb,var(--green) 12%,transparent),color-mix(in srgb,var(--green) 6%,transparent));display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;border:1.5px solid color-mix(in srgb,var(--green) 20%,transparent)}
+.hero-title{font-size:28px;font-weight:900;margin-bottom:8px}
+.hero-title span{background:linear-gradient(135deg,var(--green),var(--green2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{font-size:15px;color:var(--muted);line-height:1.7;max-width:520px;margin:0 auto}
+
+.section-head{display:flex;align-items:center;gap:10px;margin:32px 0 16px}
+.section-head i{font-size:18px}
+.section-head h2{font-size:18px;font-weight:800}
+.section-head .count{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:2px 10px;font-size:12px;font-weight:700;color:var(--muted)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+@media(max-width:420px){.grid{grid-template-columns:1fr}}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:all .2s;position:relative;overflow:hidden}
+.card:hover{box-shadow:var(--shadow);border-color:color-mix(in srgb,var(--card-accent,var(--green)) 30%,var(--border))}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--card-accent,var(--green));opacity:0;transition:opacity .2s}
+.card:hover::before{opacity:1}
+
+.card-head{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.card-icon{width:52px;height:52px;border-radius:var(--radius);background:var(--surface2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;transition:border-color .2s}
+.card:hover .card-icon{border-color:var(--card-accent,var(--green))}
+.card-icon img{width:100%;height:100%;object-fit:cover}
+.card-icon .emoji{font-size:24px}
+.card-name{font-size:17px;font-weight:900}
+.card-desc{font-size:13px;color:var(--muted);line-height:1.5;margin-top:2px}
+
+.promo-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.promo-badge{display:inline-flex;align-items:center;gap:5px;background:color-mix(in srgb,var(--gold) 8%,transparent);border:1px dashed color-mix(in srgb,var(--gold) 30%,transparent);color:var(--gold);font-size:12px;font-weight:800;padding:5px 12px;border-radius:var(--radius);letter-spacing:.5px}
+.promo-badge i{font-size:11px}
+.copy-btn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);transition:all .15s;font-family:'Cairo',sans-serif}
+.copy-btn:hover{background:var(--green);border-color:var(--green);color:#fff}
+
+.card-actions{display:flex;gap:10px}
+.card-actions a,.card-actions button{flex:1}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 18px;border-radius:var(--radius);border:none;font-size:14px;font-weight:800;cursor:pointer;transition:all .2s;font-family:'Cairo',sans-serif;text-decoration:none;position:relative;overflow:hidden}
+.btn:active{transform:scale(.97)}
+.btn::after{content:'';position:absolute;top:0;left:0;right:0;height:50%;background:linear-gradient(180deg,rgba(255,255,255,.2) 0%,rgba(255,255,255,0) 100%);pointer-events:none}
+.btn-green{background:linear-gradient(180deg,color-mix(in srgb,var(--green) 100%,#fff) 0%,var(--green) 50%,color-mix(in srgb,var(--green) 100%,#000 10%) 100%);color:#fff;box-shadow:0 2px 8px rgba(22,163,74,.2),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.1)}
+.btn-green:hover{box-shadow:0 4px 16px rgba(22,163,74,.3),inset 0 1px 0 rgba(255,255,255,.3)}
+.btn-outline{background:var(--surface);color:var(--text);border:1.5px solid var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
+.btn-outline:hover{border-color:var(--green);color:var(--green)}
+.btn-back{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.btn-back:hover{color:var(--text);border-color:var(--border)}
+
+.status-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:var(--radius);white-space:nowrap}
+.status-pending{background:color-mix(in srgb,var(--gold) 10%,transparent);color:var(--gold);border:1px solid color-mix(in srgb,var(--gold) 25%,transparent)}
+.status-active,.status-approved{background:color-mix(in srgb,var(--green) 10%,transparent);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 25%,transparent)}
+.status-rejected{background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2)}
+
+.account-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;gap:14px;transition:all .2s}
+.account-card:hover{box-shadow:var(--shadow)}
+.account-icon{width:44px;height:44px;border-radius:var(--radius);background:var(--surface2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
+.account-icon img{width:100%;height:100%;object-fit:cover}
+.account-info{flex:1;min-width:0}
+.account-name{font-size:14px;font-weight:800}
+.account-num{font-size:12px;color:var(--muted);margin-top:2px}
+.account-num b{color:var(--text)}
+
+.input-group{margin-bottom:16px}
+.input-label{font-size:13px;color:var(--muted);margin-bottom:8px;display:block;font-weight:700}
+.input{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:13px 16px;color:var(--text);font-size:14px;font-family:'Cairo',sans-serif;outline:none;transition:border-color .2s}
+.input:focus{border-color:var(--green)}
+.input::placeholder{color:var(--muted);opacity:.6}
+
+.info-box{background:color-mix(in srgb,var(--gold) 5%,var(--surface));border:1px solid color-mix(in srgb,var(--gold) 20%,var(--border));border-radius:var(--radius);padding:14px 18px;margin-bottom:16px;font-size:13px;color:var(--muted);line-height:1.7}
+.info-box i{color:var(--gold);margin-right:6px}
+
+.steps-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px}
+.steps-box h3{font-size:14px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.steps-box ol{padding-right:18px;font-size:13px;color:var(--muted);line-height:2}
+.steps-box ol li::marker{color:var(--green);font-weight:800}
+.steps-box b{color:var(--gold)}
+
+.result-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px}
+.result-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--surface2)}
+.result-row:last-child{border:none}
+.result-label{font-size:13px;color:var(--muted)}
+.result-value{font-size:14px;font-weight:800}
+
+.spinner{width:18px;height:18px;border:2.5px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 24px;font-size:13px;font-weight:700;z-index:100;animation:toastIn .3s ease;box-shadow:0 8px 32px rgba(0,0,0,.08)}
+.toast.success{border-color:var(--green);color:var(--green)}
+.toast.error{border-color:#dc2626;color:#dc2626}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,16px)}to{opacity:1;transform:translate(-50%,0)}}
+
+@media(max-width:640px){
+  .topbar{padding:10px 16px}
+  .container{padding:0 16px 60px}
+  .hero{padding:28px 0 24px}
+  .hero-title{font-size:22px}
+  .card{padding:16px}
+  .card-actions{flex-direction:column}
+}
+</style>
 </head>
 <body>
-<div class="app" x-data="compApp()" x-init="init()">
-    <!-- Top Bar -->
-    <div class="topbar">
-        <a href="/" class="back-btn"><i class="fas fa-arrow-right"></i> الرئيسية</a>
-        <div class="logo">VEX</div>
-        <div style="width:60px"></div>
+<div x-data="compApp()" x-init="init()">
+
+<!-- Top Bar -->
+<div class="topbar">
+  <a href="/" class="topbar-back"><i class="fas fa-arrow-right"></i> <span data-i18n="back">الرئيسية</span></a>
+  <div class="topbar-brand"><span>V</span> VEX</div>
+  <div style="width:80px"></div>
+</div>
+
+<div class="container">
+
+<!-- STEP: Company List -->
+<template x-if="step === 'list'">
+  <div>
+    <div class="hero">
+      <div class="hero-icon"><i class="fas fa-shield-halved" style="color:var(--green)"></i></div>
+      <h1 class="hero-title"><span>نظام التعويضات</span></h1>
+      <p class="hero-sub">سجّل حساباتك في الشركات المعتمدة واحصل على تعويض كامل عند الخسارة — شراكة مباشرة مع VEX</p>
     </div>
 
-    <!-- STEP 1: Company Selection -->
-    <template x-if="step === 'list'">
-        <div>
-            <div class="hero">
-                <span class="hero-icon">💎</span>
-                <h1 class="hero-title">نظام التعويضات</h1>
-                <p class="hero-sub">سجّل في الشركات واحصل على تعويض كامل عند الخسارة</p>
-            </div>
-
-            <!-- Registered Companies -->
-            <template x-if="myAccounts.length > 0">
-                <div>
-                    <h3 class="section-title"><i class="fas fa-check-circle" style="color:#00e701"></i> شركات مسجل فيها</h3>
-                    <template x-for="acc in myAccounts" :key="acc.id">
-                        <div class="card" style="border-color:rgba(0,231,1,.3)">
-                            <div class="card-header">
-                                <div class="card-icon" x-text="getIcon(acc.company_name)"></div>
-                                <div>
-                                    <div class="card-name" x-text="acc.company_name"></div>
-                                    <div style="font-size:11px;color:#8794a3">رقم الحساب: <span x-text="acc.account_number" style="color:#eef2f6"></span></div>
-                                </div>
-                                <div style="margin-right:auto">
-                                    <span class="status-badge" :class="'status-' + acc.status">
-                                        <template x-if="acc.status==='pending'"><span>⏳ قيد المراجعة</span></template>
-                                        <template x-if="acc.status==='active'||acc.status==='approved'"><span>✅ مؤكد</span></template>
-                                        <template x-if="acc.status==='rejected'"><span>❌ مرفوض</span></template>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </template>
-
-            <!-- All Companies -->
-            <h3 class="section-title"><i class="fas fa-building" style="color:#f59e0b"></i> جميع الشركات</h3>
-            <template x-for="c in companies" :key="c.id">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-icon" x-text="c.icon || '🏢'"></div>
-                        <div>
-                            <div class="card-name" x-text="c.name"></div>
-                            <div class="card-desc" x-text="c.desc"></div>
-                        </div>
-                    </div>
-                    <div class="promo-badge" x-show="c.promo_code">
-                        <i class="fas fa-tag"></i> <span x-text="c.promo_code"></span>
-                    </div>
-                    <div style="display:flex;gap:8px">
-                        <button class="btn btn-green" style="flex:1" @click="chooseCompany(c, 'direct')">
-                            <i class="fas fa-bolt"></i> تسجيل مباشر
-                        </button>
-                        <button class="btn btn-blue" style="flex:1" @click="chooseCompany(c, 'compensation')">
-                            <i class="fas fa-shield-alt"></i> تسجيل بالتعويض
-                        </button>
-                    </div>
-                </div>
-            </template>
+    <!-- Registered Accounts -->
+    <template x-if="myAccounts.length > 0">
+      <div>
+        <div class="section-head">
+          <i class="fas fa-check-circle" style="color:var(--green)"></i>
+          <h2>حساباتك المسجلة</h2>
+          <span class="count" x-text="myAccounts.length"></span>
         </div>
+        <template x-for="acc in myAccounts" :key="acc.id">
+          <div class="account-card">
+            <div class="account-icon">
+              <template x-if="acc.icon && acc.icon.startsWith('/static')">
+                <img :src="acc.icon" :alt="acc.company_name">
+              </template>
+              <template x-if="!acc.icon || !acc.icon.startsWith('/static')">
+                <span class="emoji" x-text="getIcon(acc.company_name)"></span>
+              </template>
+            </div>
+            <div class="account-info">
+              <div class="account-name" x-text="acc.company_name"></div>
+              <div class="account-num">رقم الحساب: <b x-text="acc.account_number"></b></div>
+            </div>
+            <span class="status-badge" :class="'status-' + acc.status">
+              <template x-if="acc.status==='pending'"><span><i class="fas fa-clock"></i> قيد المراجعة</span></template>
+              <template x-if="acc.status==='active'||acc.status==='approved'"><span><i class="fas fa-check"></i> مؤكد</span></template>
+              <template x-if="acc.status==='rejected'"><span><i class="fas fa-times"></i> مرفوض</span></template>
+            </span>
+          </div>
+        </template>
+      </div>
     </template>
 
-    <!-- STEP 2: Direct Registration -->
-    <template x-if="step === 'direct'">
-        <div>
-            <div class="hero">
-                <span class="hero-icon" x-text="selectedCompany.icon || '🏢'"></span>
-                <h1 class="hero-title" x-text="selectedCompany.name"></h1>
-                <p class="hero-sub">تسجيل مباشر في الشركة</p>
+    <!-- All Companies -->
+    <div class="section-head">
+      <i class="fas fa-building" style="color:var(--gold)"></i>
+      <h2>جميع الشركات المتاحة</h2>
+      <span class="count" x-text="companies.length"></span>
+    </div>
+    <div class="grid">
+      <template x-for="c in companies" :key="c.id">
+        <div class="card" :style="'--card-accent:' + c.color">
+          <div class="card-head">
+            <div class="card-icon">
+              <template x-if="c.icon && c.icon.startsWith('/static')">
+                <img :src="c.icon" :alt="c.name" loading="lazy">
+              </template>
+              <template x-if="!c.icon || !c.icon.startsWith('/static')">
+                <span class="emoji" x-text="c.icon || '🏢'"></span>
+              </template>
             </div>
-
-            <div style="text-align:center;margin-bottom:16px">
-                <div style="font-size:12px;color:#8794a3;margin-bottom:8px">كود البرومو</div>
-                <div style="background:#1a2028;border:1px solid #262e39;border-radius:12px;padding:12px 20px;display:inline-flex;align-items:center;gap:10px">
-                    <span style="font-size:18px;font-weight:900;color:#ffd700" x-text="selectedCompany.promo_code"></span>
-                    <button style="background:#262e39;border:none;color:#8794a3;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px" @click="copyPromo()">نسخ</button>
-                </div>
+            <div style="flex:1;min-width:0">
+              <div class="card-name" x-text="c.name"></div>
+              <div class="card-desc" x-text="c.desc"></div>
             </div>
-
-            <a :href="selectedCompany.affiliate_link" target="_blank" class="btn btn-green" style="display:block;text-decoration:none;text-align:center;margin-bottom:10px">
-                <i class="fas fa-external-link-alt"></i> فتح رابط التسجيل
-            </a>
-
-            <div class="card">
-                <div style="font-size:13px;font-weight:800;margin-bottom:8px">الخطوات:</div>
-                <div style="font-size:12px;color:#8794a3;line-height:1.8">
-                    1. اضغط "فتح رابط التسجيل" أعلاه<br>
-                    2. سجّل حساب جديد في الشركة<br>
-                    3. استخدم كود البرومو: <span style="color:#ffd700" x-text="selectedCompany.promo_code"></span><br>
-                    4. ارجع هنا بعد التسجيل
-                </div>
+          </div>
+          <div class="promo-row" x-show="c.promo_code">
+            <div class="promo-badge">
+              <i class="fas fa-tag"></i> <span x-text="c.promo_code"></span>
             </div>
-
-            <button class="btn btn-outline" @click="step='list'">رجوع</button>
-        </div>
-    </template>
-
-    <!-- STEP 3: Compensation Registration -->
-    <template x-if="step === 'compensation'">
-        <div>
-            <div class="hero">
-                <span class="hero-icon">🛡️</span>
-                <h1 class="hero-title">تسجيل بالتعويض</h1>
-                <p class="hero-sub" x-text="selectedCompany.name + ' — أدخل رقم حسابك والرمز'"></p>
-            </div>
-
-            <a :href="selectedCompany.affiliate_link" target="_blank" class="btn btn-green" style="display:block;text-decoration:none;text-align:center;margin-bottom:16px">
-                <i class="fas fa-external-link-alt"></i> 1. فتح رابط التسجيل والسجّل أولاً
-            </a>
-
-            <div class="card">
-                <div style="font-size:12px;color:#8794a3;line-height:1.8">
-                    <i class="fas fa-info-circle" style="color:#f59e0b"></i>
-                    سجّل أولاً عبر الرابط أعلاه ثم عد هنا وأدخل بياناتك
-                </div>
-            </div>
-
-            <div style="margin-bottom:14px">
-                <label class="label">رقم الحساب في <span x-text="selectedCompany.name"></span></label>
-                <input class="input" x-model="accNumber" placeholder="أدخل رقم حسابك" style="letter-spacing:0">
-            </div>
-
-            <div style="margin-bottom:16px">
-                <label class="label">الرمز السري (4 أرقام)</label>
-                <input class="input" x-model="accPin" type="password" maxlength="4" placeholder="••••" inputmode="numeric" style="letter-spacing:8px">
-            </div>
-
-            <button class="btn btn-blue" @click="submitAccount()" :disabled="submitting" :style="submitting && 'opacity:.6'">
-                <template x-if="!submitting"><span><i class="fas fa-paper-plane"></i> تسجيل الحساب</span></template>
-                <template x-if="submitting"><span><div class="spinner" style="display:inline-block;width:16px;height:16px;border-width:2px"></div> جارٍ التسجيل...</span></template>
+            <button class="copy-btn" @click="copyPromo(c.promo_code)"><i class="fas fa-copy"></i> نسخ</button>
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-green" @click="chooseCompany(c, 'compensation')">
+              <i class="fas fa-shield-halved"></i> تسجيل بالتعويض
             </button>
-
-            <button class="btn btn-outline" style="margin-top:10px" @click="step='list'">رجوع</button>
+            <a :href="c.affiliate_link" target="_blank" class="btn btn-outline">
+              <i class="fas fa-external-link-alt"></i> تسجيل مباشر
+            </a>
+          </div>
         </div>
-    </template>
+      </template>
+    </div>
+  </div>
+</template>
 
-    <!-- STEP 4: Success -->
-    <template x-if="step === 'pending'">
-        <div style="text-align:center;padding:40px 0">
-            <div style="font-size:64px;margin-bottom:16px">⏳</div>
-            <h1 style="font-size:22px;font-weight:900;margin-bottom:8px">طلبك قيد المعالجة</h1>
-            <p style="font-size:14px;color:#8794a3;line-height:1.8;margin-bottom:24px">
-                تم استلام طلبك بنجاح<br>
-                سيتم مراجعة حسابك من قبل الإدارة<br>
-                وستتلقى إشعاراً عند التأكيد
-            </p>
+<!-- STEP: Compensation Registration -->
+<template x-if="step === 'compensation'">
+  <div>
+    <div class="hero">
+      <div class="hero-icon" :style="'border-color:' + selectedCompany.color">
+        <template x-if="selectedCompany.icon && selectedCompany.icon.startsWith('/static')">
+          <img :src="selectedCompany.icon" :alt="selectedCompany.name" style="width:40px;height:40px;object-fit:cover;border-radius:0">
+        </template>
+        <template x-if="!selectedCompany.icon || !selectedCompany.icon.startsWith('/static')">
+          <span x-text="selectedCompany.icon || '🏢'" style="font-size:32px"></span>
+        </template>
+      </div>
+      <h1 class="hero-title">تسجيل بالتعويض في <span x-text="selectedCompany.name"></span></h1>
+      <p class="hero-sub">سجّل حسابك عبر الرابط ثم أدخل بياناته هنا للحصول على التعويض</p>
+    </div>
 
-            <div class="card" style="text-align:right;margin-bottom:20px">
-                <div style="font-size:12px;color:#8794a3;margin-bottom:4px">الشركة</div>
-                <div style="font-size:14px;font-weight:800" x-text="selectedCompany.name"></div>
-                <div style="font-size:12px;color:#8794a3;margin-top:8px;margin-bottom:4px">رقم الحساب</div>
-                <div style="font-size:14px;font-weight:800" x-text="lastAccountNumber"></div>
-            </div>
+    <a :href="selectedCompany.affiliate_link" target="_blank" class="btn btn-green" style="display:flex;width:100%;margin-bottom:16px">
+      <i class="fas fa-external-link-alt"></i> 1. افتح رابط التسجيل وسجّل أولاً
+    </a>
 
-            <button class="btn btn-green" @click="step='list'; selectedCompany=null" style="margin-bottom:10px">
-                <i class="fas fa-plus"></i> سجّل في شركة أخرى
-            </button>
-            <button class="btn btn-outline" @click="window.location.href='/'">الرئيسية</button>
-        </div>
-    </template>
+    <div class="info-box">
+      <i class="fas fa-info-circle"></i>
+      سجّل أولاً عبر الرابط أعلاه ثم عد هنا وأدخل بيانات حسابك
+    </div>
 
-    <!-- Toast -->
-    <div x-show="toast.show" x-transition class="toast" :class="toast.type" x-text="toast.msg"></div>
+    <div class="input-group">
+      <label class="input-label">رقم الحساب في <span x-text="selectedCompany.name" style="color:var(--text)"></span></label>
+      <input class="input" x-model="accNumber" placeholder="أدخل رقم حسابك" style="letter-spacing:0">
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">الرمز السري (4 أرقام)</label>
+      <input class="input" x-model="accPin" type="password" maxlength="4" placeholder="••••" inputmode="numeric" style="text-align:center;letter-spacing:8px">
+    </div>
+
+    <button class="btn btn-green" style="width:100%" @click="submitAccount()" :disabled="submitting" :style="submitting && 'opacity:.6'">
+      <template x-if="!submitting"><span><i class="fas fa-paper-plane"></i> تسجيل الحساب</span></template>
+      <template x-if="submitting"><span><div class="spinner"></div> جارٍ التسجيل...</span></template>
+    </button>
+
+    <button class="btn btn-back" style="width:100%;margin-top:10px" @click="step='list'; selectedCompany=null">
+      <i class="fas fa-arrow-right"></i> رجوع
+    </button>
+  </div>
+</template>
+
+<!-- STEP: Pending -->
+<template x-if="step === 'pending'">
+  <div>
+    <div class="hero">
+      <div class="hero-icon" style="border-color:var(--gold)">
+        <i class="fas fa-clock" style="color:var(--gold);font-size:32px"></i>
+      </div>
+      <h1 class="hero-title">طلبك <span>قيد المعالجة</span></h1>
+      <p class="hero-sub">تم استلام طلبك بنجاح — سيتم مراجعة حسابك من قبل الإدارة وستتلقى إشعاراً عند التأكيد</p>
+    </div>
+
+    <div class="result-box">
+      <div class="result-row">
+        <span class="result-label">الشركة</span>
+        <span class="result-value" x-text="selectedCompany.name"></span>
+      </div>
+      <div class="result-row">
+        <span class="result-label">رقم الحساب</span>
+        <span class="result-value" x-text="lastAccountNumber"></span>
+      </div>
+      <div class="result-row">
+        <span class="result-label">الحالة</span>
+        <span class="status-badge status-pending"><i class="fas fa-clock"></i> قيد المراجعة</span>
+      </div>
+    </div>
+
+    <button class="btn btn-green" style="width:100%;margin-bottom:10px" @click="step='list'; selectedCompany=null">
+      <i class="fas fa-plus"></i> سجّل في شركة أخرى
+    </button>
+    <a href="/" class="btn btn-back" style="display:flex;width:100%">
+      <i class="fas fa-home"></i> الرئيسية
+    </a>
+  </div>
+</template>
+
+</div>
+
+<!-- Toast -->
+<div x-show="toast.show" x-transition class="toast" :class="toast.type" x-text="toast.msg"></div>
+
 </div>
 
 <script>
-function compApp() {
-    return {
-        step: 'list',
-        companies: [],
-        myAccounts: [],
-        selectedCompany: null,
-        accNumber: '',
-        accPin: '',
-        lastAccountNumber: '',
-        submitting: false,
-        toast: { show: false, msg: '', type: 'success' },
-        userId: '',
+function compApp(){
+  return {
+    step:'list', companies:[], myAccounts:[], selectedCompany:null,
+    accNumber:'', accPin:'', lastAccountNumber:'', submitting:false,
+    toast:{show:false,msg:'',type:'success'}, userId:'',
 
-        async init() {
-            this.userId = this.getOrCreateUserId();
-            await this.loadCompanies();
-            await this.loadMyAccounts();
-            // Check if URL has company param for direct navigation
-            const params = new URLSearchParams(window.location.search);
-            const companyId = params.get('company');
-            if (companyId) {
-                const c = this.companies.find(x => String(x.id) === String(companyId));
-                if (c) { this.selectedCompany = c; this.step = 'compensation'; }
-            }
-        },
+    async init(){
+      this.userId = this.getOrCreateUserId();
+      await this.loadCompanies();
+      await this.loadMyAccounts();
+      const params = new URLSearchParams(location.search);
+      const cid = params.get('company');
+      if(cid){
+        const c = this.companies.find(x=>String(x.id)===String(cid));
+        if(c){this.selectedCompany=c;this.step='compensation';}
+      }
+    },
 
-        getOrCreateUserId() {
-            let uid = localStorage.getItem('vex_comp_uid');
-            if (!uid) {
-                uid = 'WC' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
-                localStorage.setItem('vex_comp_uid', uid);
-            }
-            return uid;
-        },
+    getOrCreateUserId(){
+      let uid = localStorage.getItem('vex_comp_uid');
+      if(!uid){uid='WC'+Date.now().toString(36)+Math.random().toString(36).substr(2,6);localStorage.setItem('vex_comp_uid',uid);}
+      return uid;
+    },
 
-        async api(url, opts = {}) {
-            const r = await fetch(url, {
-                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                ...opts
-            });
-            return r.json();
-        },
+    async api(url,opts={}){
+      const r = await fetch(url,{headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},...opts});
+      return r.json();
+    },
 
-        async loadCompanies() {
-            try {
-                const data = await this.api('/api/comp/public/companies');
-                this.companies = (data.companies || []).map(c => ({
-                    id: c.id,
-                    name: c.name,
-                    icon: c.icon || '🏢',
-                    desc: c.description || c.name + ' — شركة مراهنة مرخصة',
-                    promo_code: c.promo_code || '',
-                    affiliate_link: c.affiliate_link || '#',
-                }));
-            } catch(e) { console.error(e); }
-        },
+    async loadCompanies(){
+      try{
+        const d = await this.api('/api/comp/public/companies');
+        this.companies = (d.companies||[]).map(c=>({
+          id:c.id, name:c.name, icon:c.icon||'',
+          desc:c.description||c.name+' — شركة مراهنة مرخصة',
+          promo_code:c.promo_code||'', affiliate_link:c.affiliate_link||'#',
+          color:c.color||'#334155'
+        }));
+      }catch(e){console.error(e);}
+    },
 
-        async loadMyAccounts() {
-            try {
-                const data = await this.api('/api/comp/public/my-accounts?user_id=' + this.userId);
-                this.myAccounts = data.accounts || [];
-            } catch(e) { console.error(e); }
-        },
+    async loadMyAccounts(){
+      try{
+        const d = await this.api('/api/comp/public/my-accounts?user_id='+this.userId);
+        this.myAccounts = d.accounts||[];
+      }catch(e){console.error(e);}
+    },
 
-        getIcon(name) {
-            const icons = {'1XBET':'⚽','MELBET':'🎯','BETJAM':'🎲','MOSTBET':'🏆','BIZBET':'⚡','XPARI':'🌟','LINEBET':'📈','GOOOBET':'🎮'};
-            return icons[name] || '🏢';
-        },
+    getIcon(name){
+      const m={'1XBET':'⚽','MELBET':'🏀','BETJAM':'🎯','MOSTBET':'🏅','BIZBET':'💼','XPARI':'🎰','LINEBET':'📈','GOOOBET':'⭐'};
+      return m[name]||'🏢';
+    },
 
-        chooseCompany(c, type) {
-            this.selectedCompany = c;
-            this.step = type;
-        },
+    chooseCompany(c,type){this.selectedCompany=c;this.step=type;},
 
-        copyPromo() {
-            navigator.clipboard.writeText(this.selectedCompany.promo_code);
-            this.showToast('تم نسخ كود البرومو', 'success');
-        },
+    copyPromo(code){
+      navigator.clipboard.writeText(code);
+      this.showToast('تم نسخ كود البرومو','success');
+    },
 
-        async submitAccount() {
-            if (!this.accNumber.trim()) { this.showToast('أدخل رقم الحساب', 'error'); return; }
-            if (!this.accPin || this.accPin.length < 4) { this.showToast('أدخل الرمز (4 أرقام)', 'error'); return; }
-            this.submitting = true;
-            try {
-                const data = await this.api('/api/comp/public/register', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        user_id: this.userId,
-                        company_id: this.selectedCompany.id,
-                        company_name: this.selectedCompany.name,
-                        account_number: this.accNumber.trim(),
-                        pin: this.accPin
-                    })
-                });
-                if (data.error) { this.showToast(data.error, 'error'); this.submitting = false; return; }
-                this.lastAccountNumber = this.accNumber;
-                this.step = 'pending';
-                this.accNumber = '';
-                this.accPin = '';
-            } catch(e) {
-                this.showToast('خطأ في التسجيل', 'error');
-            }
-            this.submitting = false;
-        },
+    async submitAccount(){
+      if(!this.accNumber.trim()){this.showToast('أدخل رقم الحساب','error');return;}
+      if(!this.accPin||this.accPin.length<4){this.showToast('أدخل الرمز (4 أرقام)','error');return;}
+      this.submitting=true;
+      try{
+        const d = await this.api('/api/comp/public/register',{
+          method:'POST',
+          body:JSON.stringify({user_id:this.userId,company_id:this.selectedCompany.id,company_name:this.selectedCompany.name,account_number:this.accNumber.trim(),pin:this.accPin})
+        });
+        if(d.error){this.showToast(d.error,'error');this.submitting=false;return;}
+        this.lastAccountNumber=this.accNumber;
+        this.step='pending';
+        this.accNumber='';this.accPin='';
+      }catch(e){this.showToast('خطأ في الاتصال','error');}
+      this.submitting=false;
+    },
 
-        showToast(msg, type = 'success') {
-            this.toast = { show: true, msg, type };
-            setTimeout(() => { this.toast.show = false; }, 3000);
-        }
-    };
+    showToast(msg,type='success'){
+      this.toast={show:true,msg,type};
+      setTimeout(()=>{this.toast.show=false;},3000);
+    }
+  };
 }
 </script>
 </body>
