@@ -1897,8 +1897,10 @@ footer a:hover{text-decoration:underline}
         </div>
       </div>
       <div class="comp-cta">
-        <a href="javascript:void(0)" class="cta-main" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}',true)" data-i18n="comp_cta_register" data-company-name="{{ c.name }}">سجّل في {{ c.name }}</a>
-        <a href="javascript:void(0)" class="cta-app" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}',false)"><i class="fas fa-sign-in-alt"></i> <span data-i18n="comp_cta_login">تسجيل دخول</span></a>
+        <a href="javascript:void(0)" class="cta-main" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')" data-i18n="comp_cta_register" data-company-name="{{ c.name }}">سجّل في {{ c.name }}</a>
+        {% if c.app_link %}
+        <a href="{{ c.app_link }}" class="cta-app" target="_blank" rel="noopener" data-i18n="download_app">تحميل التطبيق</a>
+        {% endif %}
         <a href="/company/{{ c.id }}" class="cta-sec" data-i18n="comp_cta_details">تفاصيل</a>
       </div>
       <meta itemprop="author" content="VEX Games">
@@ -2582,11 +2584,12 @@ async function _regSubmit(){
   }
 }
 
-function openRegModal(id,name,icon,affiliate,app,promo,openAffiliate){
+function openRegModal(id,name,icon,affiliate,app,promo){
   if(_regModal)_regModal.remove();
   var colors={'1XBET':'#E31937','MELBET':'#1565C0','BETJAM':'#FF6D00','MOSTBET':'#2E7D32','BIZBET':'#7B1FA2','XPARI':'#00838F','LINEBET':'#3949AB','GOOOBET':'#C2185B'};
   _regData={id:id,name:name,icon:icon,affiliate:affiliate,app:app,promo:promo,color:colors[name]||'#16a34a'};
   _regStep=1;
+  if(affiliate&&affiliate!=='#'){window.open(affiliate,'_blank');}
   var m=document.createElement('div');
   m.id='regModal';
   m.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
@@ -2596,11 +2599,6 @@ function openRegModal(id,name,icon,affiliate,app,promo,openAffiliate){
     +'<div id="regModalBody"></div></div>';
   document.body.appendChild(m);
   _regModal=m;
-  if(openAffiliate===false){
-    _regRenderStep2();
-  }else{
-    if(affiliate&&affiliate!=='#'){window.open(affiliate,'_blank');}
-    _regRenderStep1();
-  }
+  _regRenderStep1();
 }
 </script>
