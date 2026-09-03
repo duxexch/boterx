@@ -704,6 +704,10 @@ function companiesPage() {
         async autoTranslate() {
             this.transLoading = true;
             try {
+                await api(`/api/companies/${this.transCompanyId}/translations`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ color: this.transData.color, translations: this.transData }),
+                });
                 const data = await api(`/api/companies/${this.transCompanyId}/translate`, {
                     method: 'POST',
                     body: JSON.stringify({ source_lang: 'ar' }),
