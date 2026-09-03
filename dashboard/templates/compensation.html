@@ -11,214 +11,133 @@
 <script defer src="{{ url_for('static', filename='vendor/alpine.min.js') }}"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --green:#16a34a;--green2:#15803d;--gold:#d97706;
-  --bg:#f8fafc;--surface:#ffffff;--surface2:#f1f5f9;
-  --border:#e2e8f0;--text:#0f172a;--muted:#475569;
-  --accent-1xbet:#E31937;--accent-melbet:#1565C0;--accent-betjam:#FF6D00;
-  --accent-mostbet:#2E7D32;--accent-xpari:#00838F;--accent-bizbet:#7B1FA2;
-  --accent-linebet:#3949AB;--accent-gooobet:#C2185B;
-  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
-  --radius:0;
-}
+:root{--green:#16a34a;--green2:#15803d;--gold:#d97706;--red:#dc2626;--bg:#f8fafc;--surface:#ffffff;--surface2:#f1f5f9;--border:#e2e8f0;--text:#0f172a;--muted:#475569;--shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);--radius:0}
 body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
 a{color:inherit;text-decoration:none}
-
 .topbar{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto}
-.topbar-brand{font-size:20px;font-weight:900;display:flex;align-items:center;gap:6px}
-.topbar-brand span{background:linear-gradient(135deg,var(--green),#4ade80);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar-brand{font-size:20px;font-weight:900}.topbar-brand span{background:linear-gradient(135deg,var(--green),#4ade80);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .topbar-back{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);font-weight:700;font-size:14px;cursor:pointer;transition:all .15s}
 .topbar-back:hover{border-color:var(--green)}
-
 .container{max-width:1200px;margin:0 auto;padding:0 24px 80px}
-.hero{text-align:center;padding:40px 0 32px}
+.hero{text-align:center;padding:40px 0 24px}
 .hero-icon{width:72px;height:72px;border-radius:var(--radius);background:linear-gradient(135deg,color-mix(in srgb,var(--green) 12%,transparent),color-mix(in srgb,var(--green) 6%,transparent));display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;border:1.5px solid color-mix(in srgb,var(--green) 20%,transparent)}
-.hero-title{font-size:28px;font-weight:900;margin-bottom:8px}
-.hero-title span{background:linear-gradient(135deg,var(--green),var(--green2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.hero-sub{font-size:15px;color:var(--muted);line-height:1.7;max-width:520px;margin:0 auto}
-
-.section-head{display:flex;align-items:center;gap:10px;margin:32px 0 16px}
-.section-head i{font-size:18px}
-.section-head h2{font-size:18px;font-weight:800}
-.section-head .count{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:2px 10px;font-size:12px;font-weight:700;color:var(--muted)}
-
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.hero-title{font-size:26px;font-weight:900;margin-bottom:6px}.hero-title span{background:linear-gradient(135deg,var(--green),var(--green2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{font-size:14px;color:var(--muted);line-height:1.7;max-width:500px;margin:0 auto}
+.section-head{display:flex;align-items:center;gap:10px;margin:28px 0 14px}.section-head i{font-size:16px}.section-head h2{font-size:17px;font-weight:800}.section-head .count{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:2px 10px;font-size:11px;font-weight:700;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
 @media(max-width:420px){.grid{grid-template-columns:1fr}}
-
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:all .2s;position:relative;overflow:hidden}
-.card:hover{box-shadow:var(--shadow);border-color:color-mix(in srgb,var(--card-accent,var(--green)) 30%,var(--border))}
-.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--card-accent,var(--green));opacity:0;transition:opacity .2s}
-.card:hover::before{opacity:1}
-
-.card-head{display:flex;align-items:center;gap:14px;margin-bottom:14px}
-.card-icon{width:52px;height:52px;border-radius:var(--radius);background:var(--surface2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;transition:border-color .2s}
-.card:hover .card-icon{border-color:var(--card-accent,var(--green))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;transition:all .2s;position:relative;overflow:hidden}
+.card:hover{box-shadow:var(--shadow)}.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--card-accent,var(--green));opacity:0;transition:opacity .2s}.card:hover::before{opacity:1}
+.card-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.card-icon{width:48px;height:48px;border-radius:var(--radius);background:var(--surface2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;transition:border-color .2s}.card:hover .card-icon{border-color:var(--card-accent,var(--green))}
 .card-icon img{width:100%;height:100%;object-fit:cover}
-.card-icon .emoji{font-size:24px}
-.card-name{font-size:17px;font-weight:900}
-.card-desc{font-size:13px;color:var(--muted);line-height:1.5;margin-top:2px}
-
-.promo-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}
-.promo-badge{display:inline-flex;align-items:center;gap:5px;background:color-mix(in srgb,var(--gold) 8%,transparent);border:1px dashed color-mix(in srgb,var(--gold) 30%,transparent);color:var(--gold);font-size:12px;font-weight:800;padding:5px 12px;border-radius:var(--radius);letter-spacing:.5px}
-.promo-badge i{font-size:11px}
-.copy-btn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);transition:all .15s;font-family:'Cairo',sans-serif}
+.card-name{font-size:16px;font-weight:900}.card-desc{font-size:12px;color:var(--muted);line-height:1.5;margin-top:2px}
+.promo-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.promo-badge{display:inline-flex;align-items:center;gap:5px;background:color-mix(in srgb,var(--gold) 8%,transparent);border:1px dashed color-mix(in srgb,var(--gold) 30%,transparent);color:var(--gold);font-size:11px;font-weight:800;padding:5px 12px;border-radius:var(--radius);letter-spacing:.5px}
+.copy-btn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;cursor:pointer;font-size:11px;font-weight:700;color:var(--muted);transition:all .15s;font-family:'Cairo',sans-serif}
 .copy-btn:hover{background:var(--green);border-color:var(--green);color:#fff}
-
-.card-actions{display:flex;gap:10px}
-.card-actions a,.card-actions button{flex:1}
-
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 18px;border-radius:var(--radius);border:none;font-size:14px;font-weight:800;cursor:pointer;transition:all .2s;font-family:'Cairo',sans-serif;text-decoration:none;position:relative;overflow:hidden}
+.card-actions{display:flex;gap:8px}.card-actions a,.card-actions button{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 16px;border-radius:var(--radius);border:none;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;font-family:'Cairo',sans-serif;text-decoration:none;position:relative;overflow:hidden}
 .btn:active{transform:scale(.97)}
-.btn::after{content:'';position:absolute;top:0;left:0;right:0;height:50%;background:linear-gradient(180deg,rgba(255,255,255,.2) 0%,rgba(255,255,255,0) 100%);pointer-events:none}
-.btn-green{background:linear-gradient(180deg,color-mix(in srgb,var(--green) 100%,#fff) 0%,var(--green) 50%,color-mix(in srgb,var(--green) 100%,#000 10%) 100%);color:#fff;box-shadow:0 2px 8px rgba(22,163,74,.2),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.1)}
-.btn-green:hover{box-shadow:0 4px 16px rgba(22,163,74,.3),inset 0 1px 0 rgba(255,255,255,.3)}
+.btn::after{content:'';position:absolute;top:0;left:0;right:0;height:50%;background:linear-gradient(180deg,rgba(255,255,255,.2),transparent);pointer-events:none}
+.btn-green{background:linear-gradient(180deg,color-mix(in srgb,var(--green) 100%,#fff),var(--green) 50%,color-mix(in srgb,var(--green) 100%,#000 10%));color:#fff;box-shadow:0 2px 8px rgba(22,163,74,.2),inset 0 1px 0 rgba(255,255,255,.2)}
+.btn-gold{background:linear-gradient(180deg,#fbbf24,#f59e0b 50%,#d97706);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,.2),inset 0 1px 0 rgba(255,255,255,.2)}
 .btn-outline{background:var(--surface);color:var(--text);border:1.5px solid var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
 .btn-outline:hover{border-color:var(--green);color:var(--green)}
 .btn-back{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
-.btn-back:hover{color:var(--text);border-color:var(--border)}
-
-.status-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:var(--radius);white-space:nowrap}
+.btn-back:hover{color:var(--text)}
+.btn-red{background:linear-gradient(180deg,#f87171,#ef4444 50%,#dc2626);color:#fff;box-shadow:0 2px 8px rgba(220,38,38,.2),inset 0 1px 0 rgba(255,255,255,.2)}
+.status-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:var(--radius);white-space:nowrap}
 .status-pending{background:color-mix(in srgb,var(--gold) 10%,transparent);color:var(--gold);border:1px solid color-mix(in srgb,var(--gold) 25%,transparent)}
-.status-active,.status-approved{background:color-mix(in srgb,var(--green) 10%,transparent);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 25%,transparent)}
-.status-rejected{background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2)}
-
-.account-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;gap:14px;transition:all .2s}
-.account-card:hover{box-shadow:var(--shadow)}
-.account-icon{width:44px;height:44px;border-radius:var(--radius);background:var(--surface2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
-.account-icon img{width:100%;height:100%;object-fit:cover}
-.account-info{flex:1;min-width:0}
-.account-name{font-size:14px;font-weight:800}
-.account-num{font-size:12px;color:var(--muted);margin-top:2px}
-.account-num b{color:var(--text)}
-
-.input-group{margin-bottom:16px}
-.input-label{font-size:13px;color:var(--muted);margin-bottom:8px;display:block;font-weight:700}
-.input{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:13px 16px;color:var(--text);font-size:14px;font-family:'Cairo',sans-serif;outline:none;transition:border-color .2s}
-.input:focus{border-color:var(--green)}
-.input::placeholder{color:var(--muted);opacity:.6}
-
-.info-box{background:color-mix(in srgb,var(--gold) 5%,var(--surface));border:1px solid color-mix(in srgb,var(--gold) 20%,var(--border));border-radius:var(--radius);padding:14px 18px;margin-bottom:16px;font-size:13px;color:var(--muted);line-height:1.7}
-.info-box i{color:var(--gold);margin-right:6px}
-
-.steps-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px}
-.steps-box h3{font-size:14px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.steps-box ol{padding-right:18px;font-size:13px;color:var(--muted);line-height:2}
-.steps-box ol li::marker{color:var(--green);font-weight:800}
-.steps-box b{color:var(--gold)}
-
-.result-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px}
-.result-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--surface2)}
-.result-row:last-child{border:none}
-.result-label{font-size:13px;color:var(--muted)}
-.result-value{font-size:14px;font-weight:800}
-
-.spinner{width:18px;height:18px;border:2.5px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle}
+.status-active,.status-approved,.status-completed{background:color-mix(in srgb,var(--green) 10%,transparent);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 25%,transparent)}
+.status-rejected{background:rgba(220,38,38,.08);color:var(--red);border:1px solid rgba(220,38,38,.2)}
+.account-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:12px;transition:all .2s}.account-card:hover{box-shadow:var(--shadow)}
+.account-icon{width:42px;height:42px;border-radius:var(--radius);background:var(--surface2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}.account-icon img{width:100%;height:100%;object-fit:cover}
+.account-info{flex:1;min-width:0}.account-name{font-size:13px;font-weight:800}.account-num{font-size:11px;color:var(--muted);margin-top:1px}.account-num b{color:var(--text)}
+.wallet-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px}
+.wallet-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.wallet-icon{width:36px;height:36px;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}.wallet-icon img{width:100%;height:100%;object-fit:cover}
+.wallet-name{font-size:14px;font-weight:800}
+.wallet-balances{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.wallet-bal{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px}
+.wallet-bal-label{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.wallet-bal-value{font-size:18px;font-weight:900;margin-top:2px}
+.wallet-bal-value.frozen{color:var(--gold)}.wallet-bal-value.available{color:var(--green)}
+.wallet-actions{display:flex;gap:8px;margin-top:12px}.wallet-actions button{flex:1}
+.input-group{margin-bottom:14px}
+.input-label{font-size:12px;color:var(--muted);margin-bottom:6px;display:block;font-weight:700}
+.input{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;color:var(--text);font-size:14px;font-family:'Cairo',sans-serif;outline:none;transition:border-color .2s}
+.input:focus{border-color:var(--green)}.input::placeholder{color:var(--muted);opacity:.6}
+.info-box{background:color-mix(in srgb,var(--gold) 5%,var(--surface));border:1px solid color-mix(in srgb,var(--gold) 20%,var(--border));border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7}
+.info-box i{color:var(--gold);margin-right:4px}
+.steps-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.steps-box h3{font-size:13px;font-weight:800;margin-bottom:8px}.steps-box ol{padding-right:16px;font-size:12px;color:var(--muted);line-height:2}.steps-box ol li::marker{color:var(--green);font-weight:800}.steps-box b{color:var(--gold)}
+.result-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.result-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--surface2)}.result-row:last-child{border:none}
+.result-label{font-size:12px;color:var(--muted)}.result-value{font-size:13px;font-weight:800}
+.link-box{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:10px;word-break:break-all;font-size:12px;color:var(--muted);margin-bottom:12px}
+.link-box code{color:var(--text);font-weight:700;flex:1}
+.spinner{width:16px;height:16px;border:2.5px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
-
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 24px;font-size:13px;font-weight:700;z-index:100;animation:toastIn .3s ease;box-shadow:0 8px 32px rgba(0,0,0,.08)}
-.toast.success{border-color:var(--green);color:var(--green)}
-.toast.error{border-color:#dc2626;color:#dc2626}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 24px;font-size:12px;font-weight:700;z-index:100;animation:toastIn .3s ease;box-shadow:0 8px 32px rgba(0,0,0,.08)}
+.toast.success{border-color:var(--green);color:var(--green)}.toast.error{border-color:var(--red);color:var(--red)}
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,16px)}to{opacity:1;transform:translate(-50%,0)}}
-
-@media(max-width:640px){
-  .topbar{padding:10px 16px}
-  .container{padding:0 16px 60px}
-  .hero{padding:28px 0 24px}
-  .hero-title{font-size:22px}
-  .card{padding:16px}
-  .card-actions{flex-direction:column}
-}
+.tabs{display:flex;gap:6px;margin:20px 0 14px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tab{padding:8px 16px;border-radius:var(--radius);font-size:12px;font-weight:800;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--muted);transition:all .15s;white-space:nowrap}
+.tab.active{background:var(--green);color:#fff;border-color:var(--green)}
+@media(max-width:640px){.topbar{padding:10px 16px}.container{padding:0 14px 60px}.hero{padding:24px 0 16px}.hero-title{font-size:20px}.card,.wallet-card{padding:14px}.card-actions,.wallet-actions{flex-direction:column}}
 </style>
 </head>
 <body>
-<div x-data="compApp()" x-init="init()">
-
-<!-- Top Bar -->
+<div x-data="app()" x-init="init()">
 <div class="topbar">
-  <a href="/" class="topbar-back"><i class="fas fa-arrow-right"></i> <span data-i18n="back">الرئيسية</span></a>
+  <a href="/" class="topbar-back"><i class="fas fa-arrow-right"></i> الرئيسية</a>
   <div class="topbar-brand"><span>V</span> VEX</div>
   <div style="width:80px"></div>
 </div>
-
 <div class="container">
 
-<!-- STEP: Company List -->
-<template x-if="step === 'list'">
+<!-- ═══ TABS ═══ -->
+<template x-if="step==='list'||step==='wallet'||step==='referrals'">
+  <div class="tabs">
+    <div class="tab" :class="step==='list'&&'active'" @click="step='list';selectedCompany=null"><i class="fas fa-building"></i> الشركات</div>
+    <div class="tab" :class="step==='wallet'&&'active'" @click="loadWallet();step='wallet'"><i class="fas fa-wallet"></i> المحفظة</div>
+    <div class="tab" :class="step==='referrals'&&'active'" @click="loadReferrals();step='referrals'"><i class="fas fa-user-plus"></i> الدعوات</div>
+  </div>
+</template>
+
+<!-- ═══ STEP: Company List ═══ -->
+<template x-if="step==='list'">
   <div>
     <div class="hero">
       <div class="hero-icon"><i class="fas fa-shield-halved" style="color:var(--green)"></i></div>
       <h1 class="hero-title"><span>نظام التعويضات</span></h1>
-      <p class="hero-sub">سجّل حساباتك في الشركات المعتمدة واحصل على تعويض كامل عند الخسارة — شراكة مباشرة مع VEX</p>
+      <p class="hero-sub">سجّل حساباتك في الشركات المعتمدة واحصل على تعويض كامل عند الخسارة</p>
     </div>
-
-    <!-- Registered Accounts -->
-    <template x-if="myAccounts.length > 0">
+    <template x-if="myAccounts.length>0">
       <div>
-        <div class="section-head">
-          <i class="fas fa-check-circle" style="color:var(--green)"></i>
-          <h2>حساباتك المسجلة</h2>
-          <span class="count" x-text="myAccounts.length"></span>
-        </div>
-        <template x-for="acc in myAccounts" :key="acc.id">
+        <div class="section-head"><i class="fas fa-check-circle" style="color:var(--green)"></i><h2>حساباتك</h2><span class="count" x-text="myAccounts.length"></span></div>
+        <template x-for="a in myAccounts" :key="a.id">
           <div class="account-card">
-            <div class="account-icon">
-              <template x-if="acc.icon && acc.icon.startsWith('/static')">
-                <img :src="acc.icon" :alt="acc.company_name">
-              </template>
-              <template x-if="!acc.icon || !acc.icon.startsWith('/static')">
-                <span class="emoji" x-text="getIcon(acc.company_name)"></span>
-              </template>
-            </div>
-            <div class="account-info">
-              <div class="account-name" x-text="acc.company_name"></div>
-              <div class="account-num">رقم الحساب: <b x-text="acc.account_number"></b></div>
-            </div>
-            <span class="status-badge" :class="'status-' + acc.status">
-              <template x-if="acc.status==='pending'"><span><i class="fas fa-clock"></i> قيد المراجعة</span></template>
-              <template x-if="acc.status==='active'||acc.status==='approved'"><span><i class="fas fa-check"></i> مؤكد</span></template>
-              <template x-if="acc.status==='rejected'"><span><i class="fas fa-times"></i> مرفوض</span></template>
-            </span>
+            <div class="account-icon"><template x-if="a.icon&&a.icon.startsWith('/static')"><img :src="a.icon" :alt="a.company_name"></template><template x-if="!a.icon||!a.icon.startsWith('/static')"><span x-text="getIcon(a.company_name)"></span></template></div>
+            <div class="account-info"><div class="account-name" x-text="a.company_name"></div><div class="account-num">رقم الحساب: <b x-text="a.account_number"></b></div></div>
+            <span class="status-badge" :class="'status-'+a.status"><template x-if="a.status==='pending'"><span><i class="fas fa-clock"></i> قيد المراجعة</span></template><template x-if="a.status==='active'||a.status==='approved'"><span><i class="fas fa-check"></i> مؤكد</span></template><template x-if="a.status==='rejected'"><span><i class="fas fa-times"></i> مرفوض</span></template></span>
           </div>
         </template>
       </div>
     </template>
-
-    <!-- All Companies -->
-    <div class="section-head">
-      <i class="fas fa-building" style="color:var(--gold)"></i>
-      <h2>جميع الشركات المتاحة</h2>
-      <span class="count" x-text="companies.length"></span>
-    </div>
+    <div class="section-head"><i class="fas fa-building" style="color:var(--gold)"></i><h2>جميع الشركات</h2><span class="count" x-text="companies.length"></span></div>
     <div class="grid">
       <template x-for="c in companies" :key="c.id">
-        <div class="card" :style="'--card-accent:' + c.color">
+        <div class="card" :style="'--card-accent:'+c.color">
           <div class="card-head">
-            <div class="card-icon">
-              <template x-if="c.icon && c.icon.startsWith('/static')">
-                <img :src="c.icon" :alt="c.name" loading="lazy">
-              </template>
-              <template x-if="!c.icon || !c.icon.startsWith('/static')">
-                <span class="emoji" x-text="c.icon || '🏢'"></span>
-              </template>
-            </div>
-            <div style="flex:1;min-width:0">
-              <div class="card-name" x-text="c.name"></div>
-              <div class="card-desc" x-text="c.desc"></div>
-            </div>
+            <div class="card-icon"><template x-if="c.icon&&c.icon.startsWith('/static')"><img :src="c.icon" :alt="c.name" loading="lazy"></template><template x-if="!c.icon||!c.icon.startsWith('/static')"><span x-text="c.icon||'🏢'" style="font-size:22px"></span></template></div>
+            <div style="flex:1;min-width:0"><div class="card-name" x-text="c.name"></div><div class="card-desc" x-text="c.desc"></div></div>
           </div>
-          <div class="promo-row" x-show="c.promo_code">
-            <div class="promo-badge">
-              <i class="fas fa-tag"></i> <span x-text="c.promo_code"></span>
-            </div>
-            <button class="copy-btn" @click="copyPromo(c.promo_code)"><i class="fas fa-copy"></i> نسخ</button>
-          </div>
+          <div class="promo-row" x-show="c.promo_code"><div class="promo-badge"><i class="fas fa-tag"></i> <span x-text="c.promo_code"></span></div><button class="copy-btn" @click="copyText(c.promo_code)"><i class="fas fa-copy"></i> نسخ</button></div>
           <div class="card-actions">
-            <button class="btn btn-green" @click="chooseCompany(c, 'compensation')">
-              <i class="fas fa-shield-halved"></i> تسجيل بالتعويض
-            </button>
-            <a :href="c.affiliate_link" target="_blank" class="btn btn-outline">
-              <i class="fas fa-external-link-alt"></i> تسجيل مباشر
-            </a>
+            <button class="btn btn-green" @click="selectedCompany=c;step='compensation'"><i class="fas fa-shield-halved"></i> تسجيل بالتعويض</button>
+            <a :href="c.affiliate_link" target="_blank" class="btn btn-outline"><i class="fas fa-external-link-alt"></i> مباشر</a>
           </div>
         </div>
       </template>
@@ -226,176 +145,181 @@ a{color:inherit;text-decoration:none}
   </div>
 </template>
 
-<!-- STEP: Compensation Registration -->
-<template x-if="step === 'compensation'">
+<!-- ═══ STEP: Compensation Request ═══ -->
+<template x-if="step==='compensation'">
   <div>
     <div class="hero">
-      <div class="hero-icon" :style="'border-color:' + selectedCompany.color">
-        <template x-if="selectedCompany.icon && selectedCompany.icon.startsWith('/static')">
-          <img :src="selectedCompany.icon" :alt="selectedCompany.name" style="width:40px;height:40px;object-fit:cover;border-radius:0">
-        </template>
-        <template x-if="!selectedCompany.icon || !selectedCompany.icon.startsWith('/static')">
-          <span x-text="selectedCompany.icon || '🏢'" style="font-size:32px"></span>
-        </template>
-      </div>
-      <h1 class="hero-title">تسجيل بالتعويض في <span x-text="selectedCompany.name"></span></h1>
-      <p class="hero-sub">سجّل حسابك عبر الرابط ثم أدخل بياناته هنا للحصول على التعويض</p>
+      <div class="hero-icon"><template x-if="selectedCompany.icon&&selectedCompany.icon.startsWith('/static')"><img :src="selectedCompany.icon" :alt="selectedCompany.name" style="width:40px;height:40px;object-fit:cover"></template><template x-if="!selectedCompany.icon||!selectedCompany.icon.startsWith('/static')"><span x-text="selectedCompany.icon||'🏢'" style="font-size:32px"></span></template></div>
+      <h1 class="hero-title">تعويض في <span x-text="selectedCompany.name"></span></h1>
     </div>
-
-    <a :href="selectedCompany.affiliate_link" target="_blank" class="btn btn-green" style="display:flex;width:100%;margin-bottom:16px">
-      <i class="fas fa-external-link-alt"></i> 1. افتح رابط التسجيل وسجّل أولاً
-    </a>
-
-    <div class="info-box">
-      <i class="fas fa-info-circle"></i>
-      سجّل أولاً عبر الرابط أعلاه ثم عد هنا وأدخل بيانات حسابك
-    </div>
-
-    <div class="input-group">
-      <label class="input-label">رقم الحساب في <span x-text="selectedCompany.name" style="color:var(--text)"></span></label>
-      <input class="input" x-model="accNumber" placeholder="أدخل رقم حسابك" style="letter-spacing:0">
-    </div>
-
-    <div class="input-group">
-      <label class="input-label">الرمز السري (4 أرقام)</label>
-      <input class="input" x-model="accPin" type="password" maxlength="4" placeholder="••••" inputmode="numeric" style="text-align:center;letter-spacing:8px">
-    </div>
-
-    <button class="btn btn-green" style="width:100%" @click="submitAccount()" :disabled="submitting" :style="submitting && 'opacity:.6'">
-      <template x-if="!submitting"><span><i class="fas fa-paper-plane"></i> تسجيل الحساب</span></template>
-      <template x-if="submitting"><span><div class="spinner"></div> جارٍ التسجيل...</span></template>
-    </button>
-
-    <button class="btn btn-back" style="width:100%;margin-top:10px" @click="step='list'; selectedCompany=null">
-      <i class="fas fa-arrow-right"></i> رجوع
-    </button>
+    <a :href="selectedCompany.affiliate_link" target="_blank" class="btn btn-green" style="display:flex;width:100%;margin-bottom:14px"><i class="fas fa-external-link-alt"></i> 1. سجّل عبر الرابط أولاً</a>
+    <div class="info-box"><i class="fas fa-info-circle"></i> سجّل أولاً ثم أدخل مبلغ التعويض المطلوب</div>
+    <div class="input-group"><label class="input-label">مبلغ التعويض (USD)</label><input class="input" x-model="compAmount" type="number" min="1" placeholder="مثال: 50"></div>
+    <button class="btn btn-green" style="width:100%" @click="submitCompensation()" :disabled="submitting"><template x-if="!submitting"><span><i class="fas fa-paper-plane"></i> إرسال طلب التعويض</span></template><template x-if="submitting"><span><div class="spinner"></div> جارٍ الإرسال...</span></template></button>
+    <button class="btn btn-back" style="width:100%;margin-top:8px" @click="step='list';selectedCompany=null"><i class="fas fa-arrow-right"></i> رجوع</button>
   </div>
 </template>
 
-<!-- STEP: Pending -->
-<template x-if="step === 'pending'">
+<!-- ═══ STEP: Wallet ═══ -->
+<template x-if="step==='wallet'">
   <div>
-    <div class="hero">
-      <div class="hero-icon" style="border-color:var(--gold)">
-        <i class="fas fa-clock" style="color:var(--gold);font-size:32px"></i>
+    <div class="hero"><div class="hero-icon"><i class="fas fa-wallet" style="color:var(--green)"></i></div><h1 class="hero-title"><span>المحفظة</span></h1><p class="hero-sub">رصيدك المجمد والمتاح في كل شركة</p></div>
+    <template x-if="wallets.length===0">
+      <div class="card" style="text-align:center;padding:30px"><i class="fas fa-inbox" style="font-size:32px;color:var(--border);margin-bottom:8px;display:block"></i><div style="font-size:14px;color:var(--muted)">لا توجد أرصدة بعد</div></div>
+    </template>
+    <template x-for="w in wallets" :key="w.company_id">
+      <div class="wallet-card">
+        <div class="wallet-header">
+          <div class="wallet-icon"><template x-if="w.icon&&w.icon.startsWith('/static')"><img :src="w.icon" :alt="w.company_name"></template><template x-if="!w.icon||!w.icon.startsWith('/static')"><span x-text="getIcon(w.company_name)"></span></template></div>
+          <div class="wallet-name" x-text="w.company_name"></div>
+        </div>
+        <div class="wallet-balances">
+          <div class="wallet-bal"><div class="wallet-bal-label"><i class="fas fa-lock"></i> رصيد مجمد</div><div class="wallet-bal-value frozen" x-text="Number(w.frozen||0).toFixed(2)+' USD'"></div></div>
+          <div class="wallet-bal"><div class="wallet-bal-label"><i class="fas fa-unlock"></i> رصيد متاح</div><div class="wallet-bal-value available" x-text="Number(w.available||0).toFixed(2)+' USD'"></div></div>
+        </div>
+        <div class="wallet-actions">
+          <button class="btn btn-gold" @click="selectedWallet=w;step='transfer'" x-show="Number(w.frozen||0)>0"><i class="fas fa-exchange-alt"></i> تحويل لصديق</button>
+          <button class="btn btn-green" @click="selectedWallet=w;genRefLink(w)" x-show="Number(w.frozen||0)>0"><i class="fas fa-user-plus"></i> دعوة صديق</button>
+        </div>
       </div>
-      <h1 class="hero-title">طلبك <span>قيد المعالجة</span></h1>
-      <p class="hero-sub">تم استلام طلبك بنجاح — سيتم مراجعة حسابك من قبل الإدارة وستتلقى إشعاراً عند التأكيد</p>
-    </div>
+    </template>
+  </div>
+</template>
 
+<!-- ═══ STEP: Transfer ═══ -->
+<template x-if="step==='transfer'">
+  <div>
+    <div class="hero"><div class="hero-icon" style="border-color:var(--gold)"><i class="fas fa-exchange-alt" style="color:var(--gold);font-size:28px"></i></div><h1 class="hero-title">تحويل لصديق</h1><p class="hero-sub" x-text="selectedWallet?selectedWallet.company_name:''"></p></div>
+    <div class="wallet-balances" style="margin-bottom:16px" x-show="selectedWallet">
+      <div class="wallet-bal"><div class="wallet-bal-label"><i class="fas fa-lock"></i> الرصيد المجمد</div><div class="wallet-bal-value frozen" x-text="selectedWallet?Number(selectedWallet.frozen||0).toFixed(2)+' USD':''"></div></div>
+      <div class="wallet-bal"><div class="wallet-bal-label"><i class="fas fa-percentage"></i> الحد الأقصى</div><div class="wallet-bal-value" x-text="selectedWallet?Number(selectedWallet.frozen||0)*0.10>0?(Number(selectedWallet.frozen||0)*0.10).toFixed(2)+' USD':'0 USD':'0 USD'" style="color:var(--text)"></div></div>
+    </div>
+    <template x-if="!transferPending">
+      <div>
+        <div class="info-box"><i class="fas fa-info-circle"></i> يمكنك تحويل حتى 10% من رصيدك المجمد لصديق واحد مرة واحدة فقط</div>
+        <div class="input-group"><label class="input-label">رقم حساب الصديق في <span x-text="selectedWallet?selectedWallet.company_name:''" style="color:var(--text)"></span></label><input class="input" x-model="transferTo" placeholder="رقم الحساب"></div>
+        <div class="input-group"><label class="input-label">المبلغ (USD) — الحد: <span x-text="selectedWallet?(Number(selectedWallet.frozen||0)*0.10).toFixed(2):'0'"></span></label><input class="input" x-model="transferAmount" type="number" min="1"></div>
+        <button class="btn btn-gold" style="width:100%" @click="initTransfer()" :disabled="submitting"><template x-if="!submitting"><span><i class="fas fa-paper-plane"></i> إرسال طلب التحويل</span></template><template x-if="submitting"><span><div class="spinner"></div> جارٍ الإرسال...</span></template></button>
+      </div>
+    </template>
+    <template x-if="transferPending">
+      <div>
+        <div class="info-box"><i class="fas fa-info-circle"></i> تم إرسال رمز التحقق على التليجرام — أدخله لتأكيد التحويل</div>
+        <div class="input-group"><label class="input-label">رمز التحقق (4 أرقام)</label><input class="input" x-model="transferOtp" maxlength="4" inputmode="numeric" placeholder="••••" style="text-align:center;letter-spacing:8px"></div>
+        <button class="btn btn-green" style="width:100%" @click="verifyTransfer()" :disabled="submitting"><template x-if="!submitting"><span><i class="fas fa-check-circle"></i> تأكيد التحويل</span></template><template x-if="submitting"><span><div class="spinner"></div> جارٍ التأكيد...</span></template></button>
+      </div>
+    </template>
+    <button class="btn btn-back" style="width:100%;margin-top:8px" @click="step='wallet';transferPending=null;transferOtp=''"><i class="fas fa-arrow-right"></i> رجوع</button>
+  </div>
+</template>
+
+<!-- ═══ STEP: Referrals ═══ -->
+<template x-if="step==='referrals'">
+  <div>
+    <div class="hero"><div class="hero-icon" style="border-color:var(--gold)"><i class="fas fa-user-plus" style="color:var(--gold);font-size:28px"></i></div><h1 class="hero-title"><span>الدعوات</span></h1><p class="hero-sub">ادعُ أصدقاءك واحصل على تعويض عند تسجيلهم</p></div>
+    <template x-if="referrals.length===0">
+      <div class="card" style="text-align:center;padding:30px"><i class="fas fa-inbox" style="font-size:32px;color:var(--border);margin-bottom:8px;display:block"></i><div style="font-size:14px;color:var(--muted)">لا توجد دعوات بعد</div></div>
+    </template>
+    <template x-for="r in referrals" :key="r.id">
+      <div class="account-card">
+        <div class="account-icon"><template x-if="r.icon&&r.icon.startsWith('/static')"><img :src="r.icon" :alt="r.company_name"></template><template x-if="!r.icon||!r.icon.startsWith('/static')"><span x-text="getIcon(r.company_name)"></span></template></div>
+        <div class="account-info"><div class="account-name" x-text="r.company_name"></div><div class="account-num">الكود: <b x-text="r.referral_code"></b></div></div>
+        <span class="status-badge" :class="r.status==='registered'?'status-approved':'status-pending'"><template x-if="r.status==='registered'"><span><i class="fas fa-check"></i> مسجل</span></template><template x-if="r.status!=='registered'"><span><i class="fas fa-clock"></i> في الانتظار</span></template></span>
+      </div>
+    </template>
+  </div>
+</template>
+
+<!-- ═══ STEP: Success ═══ -->
+<template x-if="step==='pending'">
+  <div>
+    <div class="hero"><div class="hero-icon" style="border-color:var(--gold)"><i class="fas fa-clock" style="color:var(--gold);font-size:28px"></i></div><h1 class="hero-title">طلبك <span>قيد المعالجة</span></h1><p class="hero-sub">تم استلام طلبك — سيتم مراجعته من قبل الإدارة</p></div>
     <div class="result-box">
-      <div class="result-row">
-        <span class="result-label">الشركة</span>
-        <span class="result-value" x-text="selectedCompany.name"></span>
-      </div>
-      <div class="result-row">
-        <span class="result-label">رقم الحساب</span>
-        <span class="result-value" x-text="lastAccountNumber"></span>
-      </div>
-      <div class="result-row">
-        <span class="result-label">الحالة</span>
-        <span class="status-badge status-pending"><i class="fas fa-clock"></i> قيد المراجعة</span>
-      </div>
+      <div class="result-row"><span class="result-label">الشركة</span><span class="result-value" x-text="lastSubmitted.company"></span></div>
+      <div class="result-row"><span class="result-label">المبلغ</span><span class="result-value" x-text="lastSubmitted.amount+' USD'"></span></div>
+      <div class="result-row"><span class="result-label">الحالة</span><span class="status-badge status-pending"><i class="fas fa-clock"></i> قيد المراجعة</span></div>
     </div>
-
-    <button class="btn btn-green" style="width:100%;margin-bottom:10px" @click="step='list'; selectedCompany=null">
-      <i class="fas fa-plus"></i> سجّل في شركة أخرى
-    </button>
-    <a href="/" class="btn btn-back" style="display:flex;width:100%">
-      <i class="fas fa-home"></i> الرئيسية
-    </a>
+    <button class="btn btn-green" style="width:100%;margin-bottom:8px" @click="step='list';selectedCompany=null"><i class="fas fa-plus"></i> طلب تعويض آخر</button>
+    <a href="/" class="btn btn-back" style="display:flex;width:100%"><i class="fas fa-home"></i> الرئيسية</a>
   </div>
 </template>
 
 </div>
-
-<!-- Toast -->
 <div x-show="toast.show" x-transition class="toast" :class="toast.type" x-text="toast.msg"></div>
-
 </div>
 
 <script>
-function compApp(){
+function app(){
   return {
-    step:'list', companies:[], myAccounts:[], selectedCompany:null,
-    accNumber:'', accPin:'', lastAccountNumber:'', submitting:false,
-    toast:{show:false,msg:'',type:'success'}, userId:'',
+    step:'list',companies:[],myAccounts:[],wallets:[],referrals:[],
+    selectedCompany:null,selectedWallet:null,
+    compAmount:'',transferTo:'',transferAmount:'',transferOtp:'',transferPending:null,
+    lastSubmitted:{company:'',amount:''},
+    submitting:false,toast:{show:false,msg:'',type:'success'},userId:'',
 
     async init(){
-      this.userId = this.getOrCreateUserId();
-      await this.loadCompanies();
-      await this.loadMyAccounts();
-      const params = new URLSearchParams(location.search);
-      const cid = params.get('company');
-      if(cid){
-        const c = this.companies.find(x=>String(x.id)===String(cid));
-        if(c){this.selectedCompany=c;this.step='compensation';}
-      }
+      this.userId=this.getUid();
+      await Promise.all([this.loadCompanies(),this.loadAccounts()]);
+      const p=new URLSearchParams(location.search);
+      const ref=p.get('ref');
+      if(ref){try{await this.api('/api/comp/public/referral/apply',{method:'POST',body:JSON.stringify({code:ref,user_id:this.userId})});}catch(e){}}
+      const cid=p.get('company');
+      if(cid){const c=this.companies.find(x=>String(x.id)===String(cid));if(c){this.selectedCompany=c;this.step='compensation';}}
     },
 
-    getOrCreateUserId(){
-      let uid = localStorage.getItem('vex_comp_uid');
-      if(!uid){uid='WC'+Date.now().toString(36)+Math.random().toString(36).substr(2,6);localStorage.setItem('vex_comp_uid',uid);}
-      return uid;
-    },
+    getUid(){let u=localStorage.getItem('vex_comp_uid');if(!u){u='WC'+Date.now().toString(36)+Math.random().toString(36).substr(2,6);localStorage.setItem('vex_comp_uid',u);}return u;},
 
     async api(url,opts={}){
-      const r = await fetch(url,{headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},...opts});
+      const r=await fetch(url,{headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},...opts});
       return r.json();
     },
 
-    async loadCompanies(){
-      try{
-        const d = await this.api('/api/comp/public/companies');
-        this.companies = (d.companies||[]).map(c=>({
-          id:c.id, name:c.name, icon:c.icon||'',
-          desc:c.description||c.name+' — شركة مراهنة مرخصة',
-          promo_code:c.promo_code||'', affiliate_link:c.affiliate_link||'#',
-          color:c.color||'#334155'
-        }));
-      }catch(e){console.error(e);}
-    },
+    async loadCompanies(){try{const d=await this.api('/api/comp/public/companies');this.companies=(d.companies||[]).map(c=>({id:c.id,name:c.name,icon:c.icon||'',desc:c.description||c.name+' — شركة مراهنة مرخصة',promo_code:c.promo_code||'',affiliate_link:c.affiliate_link||'#',color:c.color||'#334155'}));}catch(e){}},
+    async loadAccounts(){try{const d=await this.api('/api/comp/public/my-accounts?user_id='+this.userId);this.myAccounts=d.accounts||[];}catch(e){}},
+    async loadWallet(){try{const d=await this.api('/api/comp/public/wallet?user_id='+this.userId);this.wallets=d.wallets||[];}catch(e){}},
+    async loadReferrals(){try{const d=await this.api('/api/comp/public/referrals?user_id='+this.userId);this.referrals=d.referrals||[];}catch(e){}},
 
-    async loadMyAccounts(){
-      try{
-        const d = await this.api('/api/comp/public/my-accounts?user_id='+this.userId);
-        this.myAccounts = d.accounts||[];
-      }catch(e){console.error(e);}
-    },
+    getIcon(n){const m={'1XBET':'⚽','MELBET':'🏀','BETJAM':'🎯','MOSTBET':'🏅','BIZBET':'💼','XPARI':'🎰','LINEBET':'📈','GOOOBET':'⭐'};return m[n]||'🏢';},
+    copyText(t){navigator.clipboard.writeText(t);this.show('تم النسخ','success');},
 
-    getIcon(name){
-      const m={'1XBET':'⚽','MELBET':'🏀','BETJAM':'🎯','MOSTBET':'🏅','BIZBET':'💼','XPARI':'🎰','LINEBET':'📈','GOOOBET':'⭐'};
-      return m[name]||'🏢';
-    },
-
-    chooseCompany(c,type){this.selectedCompany=c;this.step=type;},
-
-    copyPromo(code){
-      navigator.clipboard.writeText(code);
-      this.showToast('تم نسخ كود البرومو','success');
-    },
-
-    async submitAccount(){
-      if(!this.accNumber.trim()){this.showToast('أدخل رقم الحساب','error');return;}
-      if(!this.accPin||this.accPin.length<4){this.showToast('أدخل الرمز (4 أرقام)','error');return;}
+    async submitCompensation(){
+      if(!this.compAmount||Number(this.compAmount)<=0){this.show('أدخل مبلغ صحيح','error');return;}
       this.submitting=true;
-      try{
-        const d = await this.api('/api/comp/public/register',{
-          method:'POST',
-          body:JSON.stringify({user_id:this.userId,company_id:this.selectedCompany.id,company_name:this.selectedCompany.name,account_number:this.accNumber.trim(),pin:this.accPin})
-        });
-        if(d.error){this.showToast(d.error,'error');this.submitting=false;return;}
-        this.lastAccountNumber=this.accNumber;
-        this.step='pending';
-        this.accNumber='';this.accPin='';
-      }catch(e){this.showToast('خطأ في الاتصال','error');}
+      try{const d=await this.api('/api/comp/public/request',{method:'POST',body:JSON.stringify({user_id:this.userId,company_id:this.selectedCompany.id,company_name:this.selectedCompany.name,amount:this.compAmount})});
+        if(d.error){this.show(d.error,'error');this.submitting=false;return;}
+        this.lastSubmitted={company:this.selectedCompany.name,amount:this.compAmount};this.step='pending';this.compAmount='';
+      }catch(e){this.show('خطأ في الاتصال','error');}
       this.submitting=false;
     },
 
-    showToast(msg,type='success'){
-      this.toast={show:true,msg,type};
-      setTimeout(()=>{this.toast.show=false;},3000);
-    }
+    async initTransfer(){
+      if(!this.transferTo){this.show('أدخل رقم حساب الصديق','error');return;}
+      if(!this.transferAmount||Number(this.transferAmount)<=0){this.show('أدخل مبلغ صحيح','error');return;}
+      this.submitting=true;
+      try{const d=await this.api('/api/comp/public/transfer/init',{method:'POST',body:JSON.stringify({user_id:this.userId,company_id:this.selectedWallet.company_id,company_name:this.selectedWallet.company_name,amount:this.transferAmount,to_account:this.transferTo})});
+        if(d.error){this.show(d.error,'error');this.submitting=false;return;}
+        this.transferPending=d.pending_id;this.show(d.msg,'success');
+      }catch(e){this.show('خطأ في الاتصال','error');}
+      this.submitting=false;
+    },
+
+    async verifyTransfer(){
+      if(!this.transferOtp||this.transferOtp.length<4){this.show('أدخل الرمز','error');return;}
+      this.submitting=true;
+      try{const d=await this.api('/api/comp/public/transfer/verify',{method:'POST',body:JSON.stringify({pending_id:this.transferPending,otp:this.transferOtp,user_id:this.userId})});
+        if(d.error){this.show(d.error,'error');this.submitting=false;return;}
+        this.show('تم التحويل بنجاح','success');this.transferPending=null;this.transferOtp='';this.transferTo='';this.transferAmount='';await this.loadWallet();this.step='wallet';
+      }catch(e){this.show('خطأ في الاتصال','error');}
+      this.submitting=false;
+    },
+
+    async genRefLink(w){
+      try{const d=await this.api('/api/comp/public/referral/link?user_id='+this.userId+'&company_id='+w.company_id+'&company_name='+encodeURIComponent(w.company_name));
+        if(d.link){navigator.clipboard.writeText(d.link);this.show('تم نسخ رابط الدعوة','success');}
+      }catch(e){this.show('خطأ','error');}
+    },
+
+    show(msg,type='success'){this.toast={show:true,msg,type};setTimeout(()=>{this.toast.show=false;},3000);}
   };
 }
 </script>

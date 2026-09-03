@@ -8832,6 +8832,95 @@ def _comp_get_user_pin(uid):
             return p
     return None
 
+# ── Wallet helpers ──
+def _comp_read_wallets():
+    return read_csv('compensation_wallets.csv')
+
+def _comp_write_wallets(rows):
+    write_csv('compensation_wallets.csv', rows,
+              ['user_id','company_id','company_name','frozen','available','created_at'])
+
+def _comp_get_wallet(user_id, company_id):
+    for w in _comp_read_wallets():
+        if str(w.get('user_id',''))==str(user_id) and str(w.get('company_id',''))==str(company_id):
+            return w
+    return None
+
+def _comp_update_wallet(user_id, company_id, company_name, frozen_add=0, available_add=0):
+    rows = _comp_read_wallets()
+    found = False
+    for w in rows:
+        if str(w.get('user_id',''))==str(user_id) and str(w.get('company_id',''))==str(company_id):
+            w['frozen'] = str(float(w.get('frozen',0)) + frozen_add)
+            w['available'] = str(float(w.get('available',0)) + available_add)
+            found = True
+            break
+    if not found:
+        rows.append({'user_id':str(user_id),'company_id':str(company_id),'company_name':str(company_name),
+                      'frozen':str(max(0,frozen_add)),'available':str(max(0,available_add)),
+                      'created_at':datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
+    _comp_write_wallets(rows)
+
+def _comp_get_user_wallets(user_id):
+    return [w for w in _comp_read_wallets() if str(w.get('user_id',''))==str(user_id)]
+
+# ── Referral helpers ──
+def _comp_read_referrals():
+    return read_csv('compensation_referrals.csv')
+
+def _comp_write_referrals(rows):
+    write_csv('compensation_referrals.csv', rows,
+              ['id','referrer_id','referred_id','company_id','company_name',
+               'referral_code','referred_account','status','created_at'])
+
+def _comp_gen_referral_code(user_id, company_id):
+    import hashlib as _hl
+    return _hl.md5(f'{user_id}:{company_id}:vex'.encode()).hexdigest()[:8].upper()
+
+def _comp_get_referral(code):
+    for r in _comp_read_referrals():
+        if r.get('referral_code','')==code:
+            return r
+    return None
+
+def _comp_get_referrals_by_referrer(user_id):
+    return [r for r in _comp_read_referrals() if str(r.get('referrer_id',''))==str(user_id)]
+
+def _comp_get_referrals_by_referred(user_id):
+    return [r for r in _comp_read_referrals() if str(r.get('referred_id',''))==str(user_id)]
+
+def _comp_has_referrer_referred(referrer_id, referred_id, company_id):
+    for r in _comp_read_referrals():
+        if str(r.get('referrer_id',''))==str(referrer_id) and str(r.get('referred_id',''))==str(referred_id) and str(r.get('company_id',''))==str(company_id):
+            return True
+    return False
+
+# ── Transfer helpers ──
+def _comp_read_transfers():
+    return read_csv('compensation_transfers.csv')
+
+def _comp_write_transfers(rows):
+    write_csv('compensation_transfers.csv', rows,
+              ['id','from_user','to_account','company_id','company_name',
+               'amount','status','otp_phone','created_at'])
+
+# ── OTP helpers ──
+def _comp_read_otp():
+    return read_csv('compensation_otp.csv')
+
+def _comp_write_otp(rows):
+    write_csv('compensation_otp.csv', rows,
+              ['user_id','phone','code','used','created_at'])
+
+def _comp_generate_otp():
+    return str(int.from_bytes(os.urandom(2), 'big') % 10000).zfill(4)
+
+def _comp_get_user_phone(user_id):
+    for p in _comp_read_pins():
+        if str(p.get('user_id',''))==str(user_id):
+            return p.get('phone','')
+    return ''
+
 def _comp_get_user_accounts(uid):
     return [a for a in _comp_read_accounts()
             if str(a.get('user_id', '')) == str(uid)]
@@ -23052,6 +23141,12 @@ except Exception as _otp_err:
 
 
 # ===== Main =====
+
+try:
+    from comp_v2 import register_comp_v2_routes
+    register_comp_v2_routes(app, globals())
+except Exception as _e:
+    print(f"[comp-v2] failed to load: {_e}")
 
 if __name__ == '__main__':
     print(f"🚀 Boterx Dashboard v2 — http://{DASHBOARD_HOST}:{DASHBOARD_PORT}")
