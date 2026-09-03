@@ -2544,10 +2544,12 @@ function _regRenderStep1(){
     +'<div style="flex:1;min-width:0"><div style="font-size:10px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.5px">'+_regT('reg_promo_label')+'</div>'
     +'<div style="font-size:16px;font-weight:900;color:#d97706;letter-spacing:.5px">'+d.promo+'</div></div>'
     +'<button onclick="navigator.clipboard.writeText(\''+d.promo+'\');var b=this;b.textContent=\'\u2705\';setTimeout(function(){b.textContent=\'\ud83d\udccb\';},1500)" style="background:#fff;border:1.5px solid #e2e8f0;color:#475569;padding:7px 10px;border-radius:0;cursor:pointer;font-size:12px;font-weight:700;font-family:Cairo,sans-serif;flex-shrink:0">\ud83d\udccb</button></div>'
-    +(d.app?'<a href="'+d.app+'" target="_blank" style="'+_regBtnOutline+'margin-bottom:8px;font-size:12px;padding:11px 16px"><i class="fas fa-mobile-alt" style="color:#3b82f6"></i> '+_regT('reg_download_app')+'</a>':'')
-    +'<a href="'+d.affiliate+'" target="_blank" onclick="_regStep=2" style="'+_regBtnGreen+'margin-bottom:6px" onmouseover="this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.transform=\'none\'"><i class="fas fa-user-plus"></i> '+_regT('reg_confirm')+'</a>'
-    +'<button onclick="_regRenderStep2()" style="'+_regBtnBlue+'margin-bottom:8px"><i class="fas fa-sign-in-alt"></i> '+_regT('reg_login')+'</button>'
-    +'<button onclick="_regClose()" style="'+_regBtnOutline+'">'+_regT('reg_close')+'</button>';
+    +(d.app?'<a href="'+d.app+'" target="_blank" style="'+_regBtnOutline+'margin-bottom:10px;font-size:12px;padding:11px 16px"><i class="fas fa-mobile-alt" style="color:#3b82f6"></i> '+_regT('reg_download_app')+'</a>':'')
+    +'<div style="display:flex;gap:6px">'
+    +'<a href="'+d.affiliate+'" target="_blank" onclick="_regStep=2" style="'+_regBtnGreen.replace('width:100%','flex:1')+'font-size:13px;padding:11px 8px" onmouseover="this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.transform=\'none\'"><i class="fas fa-user-plus"></i> '+_regT('reg_confirm')+'</a>'
+    +'<button onclick="_regRenderStep2()" style="'+_regBtnBlue.replace('width:100%','flex:1')+'font-size:13px;padding:11px 8px"><i class="fas fa-sign-in-alt"></i> '+_regT('reg_login')+'</button>'
+    +'<button onclick="_regClose()" style="'+_regBtnOutline.replace('width:100%','flex:1')+'font-size:13px;padding:11px 8px">'+_regT('reg_close')+'</button>'
+    +'</div>';
   document.getElementById('regModalBody').innerHTML=h;
 }
 
@@ -2569,8 +2571,10 @@ function _regRenderStep2(){
     +'<div style="margin-bottom:14px"><label style="'+_regLabelStyle+'">'+_regT('reg_pin_label')+'</label>'
     +'<input id="regPin" type="password" maxlength="4" inputmode="numeric" style="'+_regInputStyle+';text-align:center;letter-spacing:8px" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="\u2022\u2022\u2022\u2022"></div>'
     +'<div id="regError" style="display:none;color:#dc2626;font-size:12px;text-align:center;margin-bottom:10px;font-weight:600"></div>'
-    +'<button id="regSubmitBtn" onclick="_regSubmit()" style="'+_regBtnBlue+'margin-bottom:8px"><i class="fas fa-paper-plane"></i> '+_regT('reg_submit')+'</button>'
-    +'<button onclick="_regStep=1;_regRenderStep1()" style="'+_regBtnOutline+'">'+_regT('reg_back')+'</button>';
+    +'<div style="display:flex;gap:6px">'
+    +'<button id="regSubmitBtn" onclick="_regSubmit()" style="'+_regBtnBlue.replace('width:100%','flex:1')+'font-size:13px;padding:11px 8px"><i class="fas fa-paper-plane"></i> '+_regT('reg_submit')+'</button>'
+    +'<button onclick="_regStep=1;_regRenderStep1()" style="'+_regBtnOutline.replace('width:100%','flex:1')+'font-size:13px;padding:11px 8px">'+_regT('reg_back')+'</button>'
+    +'</div>';
   document.getElementById('regModalBody').innerHTML=h;
   var an=document.getElementById('regAccNum');
   if(an)setTimeout(function(){an.focus();},300);
