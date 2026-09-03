@@ -169,11 +169,11 @@ window.I18N_TRANSLATIONS = {
     comp_headquarters: "\u0627\u0644\u0645\u0642\u0631",
     comp_founded: "\u0627\u0644\u062a\u0623\u0633\u064a\u0633",
     comp_promo: "\u0643\u0648\u062f \u0627\u0644\u0628\u0631\u0648\u0645\u0648",
-    comp_cta_register: "\u0633\u062c\u0651\u0644 \u0641\u064a",
+    comp_cta_register: "\u0633\u062c\u0651\u0644",
     comp_cta_login: "\\u062a\\u0633\\u062c\\u064a\\u0644 \\u062f\\u062e\\u0648\\u0644",
-    comp_cta_details: "\u062a\u0641\u0627\u0635\u064a\u0644",
+    comp_cta_details: "\u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644",
     badge_trusted: "\u0645\u0648\u062b\u0648\u0642",
-    download_app: "\u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u062a\u0637\u0628\u064a\u0642",
+    download_app: "\u0627\u0644\u062a\u0637\u0628\u064a\u0642",
     features_title: "\u0627\u0644\u0645\u0645\u064a\u0632\u0627\u062a",
     why_vex_title: "\u0644\u0645\u0627\u0630\u0627 VEX\u061f",
     vex_title: "VEX Games \u2014 \u0634\u0631\u064a\u0643\u0643 \u0627\u0644\u0645\u0639\u062a\u0645\u062f",
@@ -246,11 +246,11 @@ window.I18N_TRANSLATIONS = {
     comp_headquarters: "Headquarters",
     comp_founded: "Founded",
     comp_promo: "Promo Code",
-    comp_cta_register: "Register at",
+    comp_cta_register: "Register",
     comp_cta_login: "Login",
     comp_cta_details: "Details",
     badge_trusted: "Trusted",
-    download_app: "Download App",
+    download_app: "App",
     features_title: "Features",
     why_vex_title: "Why VEX?",
     vex_title: "VEX Games \u2014 Your Verified Partner",
@@ -323,7 +323,7 @@ window.I18N_TRANSLATIONS = {
     comp_headquarters: "Si\u00e8ge",
     comp_founded: "Fond\u00e9e",
     comp_promo: "Code Promo",
-    comp_cta_register: "S'inscrire sur",
+    comp_cta_register: "S'inscrire",
     comp_cta_login: "Connexion",
     comp_cta_details: "D\u00e9tails",
     badge_trusted: "V\u00e9rifi\u00e9",
@@ -400,11 +400,11 @@ window.I18N_TRANSLATIONS = {
     comp_headquarters: "Sede",
     comp_founded: "Fundaci\u00f3n",
     comp_promo: "C\u00f3digo Promo",
-    comp_cta_register: "Registrarse en",
+    comp_cta_register: "Registrarse",
     comp_cta_login: "Iniciar sesi\\u00f3n",
     comp_cta_details: "Detalles",
     badge_trusted: "Verificado",
-    download_app: "Descargar App",
+    download_app: "App",
     features_title: "Caracter\u00edsticas",
     why_vex_title: "\u00bfPor qu\u00e9 VEX\u061f",
     vex_title: "VEX Games \u2014 Tu Socio Verificado",
@@ -481,7 +481,7 @@ window.I18N_TRANSLATIONS = {
     comp_cta_login: "Anmelden",
     comp_cta_details: "Details",
     badge_trusted: "Vertrauenswürdig",
-    download_app: "App herunterladen",
+    download_app: "App",
     features_title: "Funktionen",
     why_vex_title: "Warum VEX?",
     vex_title: "VEX Games",
@@ -558,7 +558,7 @@ window.I18N_TRANSLATIONS = {
     comp_cta_login: "Accedi",
     comp_cta_details: "Dettagli",
     badge_trusted: "Affidabile",
-    download_app: "Scarica App",
+    download_app: "App",
     features_title: "Funzionalità",
     why_vex_title: "Perché VEX?",
     vex_title: "VEX Games",
@@ -1533,8 +1533,8 @@ body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--t
 .pros-cons li{font-size:13px;padding:3px 0;display:flex;gap:5px;color:var(--muted)}
 
 /* Card CTA */
-.comp-cta{padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap;background:color-mix(in srgb,var(--card-accent,var(--green)) 3%,var(--surface2));border-top:1px solid var(--border)}
-.comp-cta a{flex:1;min-width:0;text-align:center;padding:12px;border-radius:0;font-weight:800;font-size:14px;text-decoration:none;transition:all .2s;position:relative;overflow:hidden;border:none}
+.comp-cta{padding:12px 14px;display:flex;gap:6px;background:color-mix(in srgb,var(--card-accent,var(--green)) 3%,var(--surface2));border-top:1px solid var(--border)}
+.comp-cta a{flex:1;min-width:0;text-align:center;padding:10px 6px;border-radius:0;font-weight:800;font-size:12px;text-decoration:none;transition:all .2s;position:relative;overflow:hidden;border:none;white-space:nowrap}
 .comp-cta a:active{transform:scale(.97)}
 .comp-cta a::after{content:'';position:absolute;top:0;left:0;right:0;height:50%;background:linear-gradient(180deg,rgba(255,255,255,.25) 0%,rgba(255,255,255,.05) 100%);pointer-events:none}
 .cta-main{background:linear-gradient(180deg,color-mix(in srgb,var(--card-accent,var(--green)) 100%,#fff 0%) 0%,var(--card-accent,var(--green)) 50%,color-mix(in srgb,var(--card-accent,var(--green)) 100%,#000 10%) 100%);color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--card-accent,var(--green)) 35%,transparent),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)}
@@ -1543,6 +1543,7 @@ body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--t
 .cta-app:hover{box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 35%,transparent),inset 0 1px 0 rgba(255,255,255,.3),inset 0 -1px 0 rgba(0,0,0,.2);transform:translateY(-1px)}
 .cta-sec{background:linear-gradient(180deg,color-mix(in srgb,var(--card-accent,var(--green)) 12%,#fff 88%) 0%,color-mix(in srgb,var(--card-accent,var(--green)) 8%,#fff 92%) 50%,color-mix(in srgb,var(--card-accent,var(--green)) 15%,#fff 85%) 100%);color:var(--card-accent,var(--green));border:1.5px solid color-mix(in srgb,var(--card-accent,var(--green)) 40%,transparent);box-shadow:0 2px 8px color-mix(in srgb,var(--card-accent,var(--green)) 10%,transparent),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(0,0,0,.05)}
 .cta-sec:hover{border-color:var(--card-accent,var(--green));box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 20%,transparent),inset 0 1px 0 rgba(255,255,255,.6),inset 0 -1px 0 rgba(0,0,0,.08);transform:translateY(-1px)}
+@media(max-width:420px){.comp-cta a{font-size:11px;padding:9px 4px}}
 
 /* Promo Code Copy */
 .promo-code-row{display:flex;align-items:center;gap:6px}
@@ -1897,11 +1898,11 @@ footer a:hover{text-decoration:underline}
         </div>
       </div>
       <div class="comp-cta">
-        <a href="javascript:void(0)" class="cta-main" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')" data-i18n="comp_cta_register" data-company-name="{{ c.name }}">سجّل في {{ c.name }}</a>
+        <a href="javascript:void(0)" class="cta-main" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')"><i class="fas fa-user-plus"></i> <span data-i18n="comp_cta_register" data-company-name="{{ c.name }}">سجّل</span></a>
         {% if c.app_link %}
-        <a href="{{ c.app_link }}" class="cta-app" target="_blank" rel="noopener" data-i18n="download_app">تحميل التطبيق</a>
+        <a href="{{ c.app_link }}" class="cta-app" target="_blank" rel="noopener"><i class="fas fa-download"></i> <span data-i18n="download_app">التطبيق</span></a>
         {% endif %}
-        <a href="/company/{{ c.id }}" class="cta-sec" data-i18n="comp_cta_details">تفاصيل</a>
+        <a href="/company/{{ c.id }}" class="cta-sec"><i class="fas fa-info-circle"></i> <span data-i18n="comp_cta_details">التفاصيل</span></a>
       </div>
       <meta itemprop="author" content="VEX Games">
     </article>
