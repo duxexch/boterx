@@ -141,6 +141,7 @@
         {{ sidebar_link(url_for('page_payment_methods'), 'payment_methods', 'fas fa-credit-card', 'payment_methods', perm='manage_companies', section='payment_methods') }}
         {{ sidebar_link(url_for('page_apps'), 'apps', 'fas fa-mobile-screen', 'apps', perm='manage_companies', section='apps') }}
         {{ sidebar_link(url_for('page_referrals'), 'referrals', 'fas fa-gift', 'referrals', perm='manage_companies', section='referrals') }}
+        {{ sidebar_link(url_for('page_compensation'), 'compensation', 'fas fa-hand-holding-dollar', 'compensation', perm='view_financial', section='referrals') }}
         {{ sidebar_link(url_for('page_channels'), 'channels', 'fas fa-bullhorn', 'channels', perm='send_broadcast', section='channels') }}
         {{ sidebar_link(url_for('page_browser'), 'browser', 'fas fa-globe', 'browser', perm='manage_bots', section='browser') }}
         {{ sidebar_link(url_for('page_rental'), 'rental', 'fas fa-building', 'rental', perm='manage_bots', section='clients') }}

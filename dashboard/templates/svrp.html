@@ -26,6 +26,10 @@
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
             <i class="fas fa-id-card ml-1"></i> حسابات الشركات
         </button>
+        <button @click="switchTab('web_comp')" :class="activeTab === 'web_comp' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-hand-holding-dollar ml-1"></i> تعويضات الويب
+        </button>
     </div>
 
     <!-- ==================== TAB 1: Wallets ==================== -->
@@ -430,6 +434,106 @@
             </div>
         </div>
     </div>
+
+    <!-- ==================== TAB 6: Web Compensation Requests ==================== -->
+    <div x-show="activeTab === 'web_comp'">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">#</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المستخدم</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الشركة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">رقم الحساب</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الحالة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">التاريخ</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="r in webCompRequests" :key="r.id">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="px-4 py-3 text-slate-500 text-xs" x-text="r.id"></td>
+                                <td class="px-4 py-3 font-medium">
+                                    <span x-text="r.user_id"></span>
+                                </td>
+                                <td class="px-4 py-3 text-xs" x-text="r.company_name || '-'"></td>
+                                <td class="px-4 py-3 text-xs font-mono" x-text="r.account_number || '-'"></td>
+                                <td class="px-4 py-3">
+                                    <span x-show="r.status==='pending'" class="inline-flex items-center gap-1 bg-yellow-500/20 text-yellow-400 text-xs font-semibold px-2.5 py-1 rounded-full">
+                                        <i class="fas fa-clock"></i> بانتظار المراجعة
+                                    </span>
+                                    <span x-show="r.status==='approved'" class="inline-flex items-center gap-1 bg-green-500/20 text-green-400 text-xs font-semibold px-2.5 py-1 rounded-full">
+                                        <i class="fas fa-check"></i> تم التعويض
+                                    </span>
+                                    <span x-show="r.status==='rejected'" class="inline-flex items-center gap-1 bg-red-500/20 text-red-400 text-xs font-semibold px-2.5 py-1 rounded-full">
+                                        <i class="fas fa-times"></i> مرفوض
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-xs text-slate-400" x-text="r.created_at"></td>
+                                <td class="px-4 py-3">
+                                    <template x-if="r.status==='pending'">
+                                        <div class="flex items-center gap-2">
+                                            <template x-if="r.screenshot">
+                                                <a :href="'/api/comp/admin/requests/' + r.id + '/screenshot'" target="_blank"
+                                                   class="text-amber-400 hover:text-amber-300" title="لقطة الشاشة">
+                                                    <i class="fas fa-image text-sm"></i>
+                                                </a>
+                                            </template>
+                                            <button @click="approveWebComp(r)" class="text-green-400 hover:text-green-300 text-xs font-semibold px-2 py-1 rounded bg-green-500/10">
+                                                <i class="fas fa-check ml-1"></i> قبول
+                                            </button>
+                                            <button @click="rejectWebComp(r)" class="text-red-400 hover:text-red-300 text-xs font-semibold px-2 py-1 rounded bg-red-500/10">
+                                                <i class="fas fa-times ml-1"></i> رفض
+                                            </button>
+                                        </div>
+                                    </template>
+                                    <template x-if="r.status!=='pending'">
+                                        <span class="text-xs text-slate-500" x-text="r.reviewed_at || '-'"></span>
+                                    </template>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="webCompRequests.length === 0">
+                            <td colspan="7" class="px-4 py-10 text-center text-slate-500">
+                                <i class="fas fa-hand-holding-dollar text-4xl mb-3 block opacity-30"></i>
+                                <p>لا توجد طلبات تعويض من الويب</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Approve Modal -->
+        <div x-show="showWebCompApproveModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showWebCompApproveModal = false">
+            <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg shadow-2xl" @click.stop="">
+                <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                    <h3 class="text-lg font-bold">الموافقة على التعويض</h3>
+                    <button @click="showWebCompApproveModal = false" class="text-slate-400 hover:text-white transition">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
+                </div>
+                <div class="p-5 space-y-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">المبلغ (USD) <span class="text-red-400">*</span></label>
+                        <input x-model="webCompApproveAmount" type="number" step="any" min="0" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="0.00">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">ملاحظة (اختياري)</label>
+                        <input x-model="webCompApproveNote" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="ملاحظة...">
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button @click="confirmWebCompApprove()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">
+                            <i class="fas fa-check ml-1"></i> تأكيد الموافقة
+                        </button>
+                        <button @click="showWebCompApproveModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -456,6 +560,12 @@ function svrpPage() {
         approvalTarget: null,
         approvalType: null,
         compAccounts: [],
+        // Web Compensation
+        webCompRequests: [],
+        showWebCompApproveModal: false,
+        webCompApproveAmount: '',
+        webCompApproveNote: '',
+        webCompApproveTarget: null,
 
         get filteredWallets() {
             const q = (this.walletSearch || '').toLowerCase();
@@ -632,6 +742,54 @@ function svrpPage() {
             if (tab === 'bonus') await this.loadBonus();
             if (tab === 'promo') await this.loadPromo();
             if (tab === 'accounts') await this.loadAccounts();
+            if (tab === 'web_comp') await this.loadWebCompRequests();
+        },
+
+        // ─── Web Compensation Requests ───
+        async loadWebCompRequests() {
+            try {
+                const data = await api('/api/comp/admin/requests');
+                this.webCompRequests = data.requests || [];
+            } catch (e) {
+                toast('فشل تحميل طلبات التعويض', 'error');
+            }
+        },
+
+        approveWebComp(r) {
+            this.webCompApproveTarget = r;
+            this.webCompApproveAmount = '';
+            this.webCompApproveNote = '';
+            this.showWebCompApproveModal = true;
+        },
+
+        async confirmWebCompApprove() {
+            if (!this.webCompApproveTarget) return;
+            try {
+                await api(`/api/comp/admin/requests/${this.webCompApproveTarget.id}/approve`, {
+                    method: 'POST',
+                    body: JSON.stringify({ amount: this.webCompApproveAmount, note: this.webCompApproveNote }),
+                });
+                toast('تمت الموافقة على التعويض', 'success');
+                this.showWebCompApproveModal = false;
+                this.webCompApproveTarget = null;
+                await this.loadWebCompRequests();
+            } catch (e) {
+                toast('فشلت الموافقة', 'error');
+            }
+        },
+
+        async rejectWebComp(r) {
+            if (!confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
+            try {
+                await api(`/api/comp/admin/requests/${r.id}/reject`, {
+                    method: 'POST',
+                    body: JSON.stringify({ note: 'مرفوض' }),
+                });
+                toast('تم رفض الطلب', 'success');
+                await this.loadWebCompRequests();
+            } catch (e) {
+                toast('فشل الرفض', 'error');
+            }
         },
     };
 }

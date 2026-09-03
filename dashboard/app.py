@@ -25,6 +25,7 @@ import urllib.error
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import parse_qs
+import re
 
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, jsonify, Response, flash, send_file, g,
@@ -8787,6 +8788,345 @@ def api_comp_admin_account(acc_id):
                       f"تأكد من رقم الحساب وأنك سجلت بكود البرومو الخاص بنا ثم أعد المحاولة.")
     log_action(f'comp_account_{action}', acc_id)
     return jsonify({'success': True})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ===== COMPENSATION / REFERRAL SYSTEM (Web) =====
+# ══════════════════════════════════════════════════════════════════════════════
+
+_COMP_CSV_LOCK_WEB = threading.Lock()
+_RECOVERY_UPLOADS_DIR = os.path.join(BASE_DIR, 'recovery_uploads')
+
+def _comp_read_accounts():
+    return read_csv('compensation_accounts.csv')
+
+def _comp_write_accounts(rows):
+    write_csv('compensation_accounts.csv', rows,
+              ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+               'status', 'created_at'])
+
+def _comp_read_pins():
+    return read_csv('compensation_pins.csv')
+
+def _comp_write_pins(rows):
+    write_csv('compensation_pins.csv', rows,
+              ['user_id', 'pin_hash', 'created_at'])
+
+def _comp_read_requests():
+    return read_csv('compensation_requests.csv')
+
+def _comp_write_requests(rows):
+    write_csv('compensation_requests.csv', rows,
+              ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+               'screenshot', 'status', 'amount', 'note', 'created_at',
+               'reviewed_at', 'reviewed_by'])
+
+def _comp_pin_hash(pin):
+    return hashlib.sha256(pin.encode()).hexdigest()
+
+def _comp_get_user_pin(uid):
+    for p in _comp_read_pins():
+        if str(p.get('user_id', '')) == str(uid):
+            return p
+    return None
+
+def _comp_get_user_accounts(uid):
+    return [a for a in _comp_read_accounts()
+            if str(a.get('user_id', '')) == str(uid)]
+
+def _comp_get_user_requests(uid):
+    return [r for r in _comp_read_requests()
+            if str(r.get('user_id', '')) == str(uid)]
+
+def _comp_get_all_companies():
+    """Return active companies with compensation data (affiliate links, promo codes)."""
+    result = []
+    try:
+        translations = _read_company_translations()
+    except Exception:
+        translations = {}
+    for c in read_csv('companies.csv'):
+        if (c.get('is_active', '') or '').lower() not in ('active', 'yes', '1', 'true'):
+            continue
+        show = (c.get('show_in_comp', '') or '').lower()
+        if show in ('no', '0', 'false'):
+            continue
+        cid = c.get('id', '')
+        name = c.get('name', '')
+        icon = c.get('icon', '🏢')
+        promo = c.get('promo_code', '')
+        affiliate = c.get('affiliate_link', '')
+        app_link = c.get('app_link', '')
+        color = '#334155'
+        desc = ''
+        if name in translations:
+            tr = translations[name]
+            color = tr.get('color', color)
+            ar = tr.get('ar', {})
+            desc = ar.get('description', '')[:200]
+        result.append({
+            'id': cid, 'name': name, 'icon': icon,
+            'promo_code': promo, 'affiliate_link': affiliate,
+            'app_link': app_link, 'color': color, 'description': desc
+        })
+    return result
+
+
+@app.route('/compensation')
+@login_required
+def page_compensation():
+    uid = session.get('admin_id', '')
+    user_name = session.get('admin_name', 'User')
+    return render_template('compensation.html', active_page='compensation',
+                           user_name=user_name, uid=uid)
+
+
+@app.route('/api/comp/status')
+@login_required
+def api_comp_status():
+    uid = session.get('admin_id', '')
+    pin = _comp_get_user_pin(uid)
+    accounts = _comp_get_user_accounts(uid)
+    requests = _comp_get_user_requests(uid)
+    companies = _comp_get_all_companies()
+    return jsonify({
+        'has_pin': pin is not None,
+        'accounts': accounts,
+        'requests': sorted(requests, key=lambda r: r.get('created_at', ''), reverse=True),
+        'companies': companies
+    })
+
+
+@app.route('/api/comp/register', methods=['POST'])
+@login_required
+def api_comp_register():
+    uid = session.get('admin_id', '')
+    data = request.get_json(silent=True) or {}
+    company_id = str(data.get('company_id', '')).strip()
+    account_number = str(data.get('account_number', '')).strip()
+    if not company_id:
+        return jsonify({'error': 'اختر الشركة'}), 400
+    if not account_number or len(account_number) < 3:
+        return jsonify({'error': 'رقم الحساب يجب أن يكون 3 أحرف على الأقل'}), 400
+    if len(account_number) > 64:
+        return jsonify({'error': 'رقم الحساب طويل جداً'}), 400
+    company = _find_active_company(company_id)
+    if not company:
+        return jsonify({'error': 'الشركة غير موجودة أو غير نشطة'}), 404
+    with _COMP_CSV_LOCK_WEB:
+        rows = _comp_read_accounts()
+        for r in rows:
+            if (str(r.get('user_id', '')) == str(uid)
+                    and r.get('company_id') == company_id
+                    and r.get('status') in ('pending', 'active', 'approved')):
+                return jsonify({'error': 'لديك حساب مسجل بالفعل في هذه الشركة'}), 409
+        acc_id = f"CA{secrets.token_hex(5).upper()}"
+        fieldnames = get_fieldnames('compensation_accounts.csv',
+            ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+             'status', 'created_at'])
+        append_csv('compensation_accounts.csv', {
+            'id': acc_id,
+            'user_id': str(uid),
+            'company_id': company_id,
+            'company_name': company.get('name', ''),
+            'account_number': account_number,
+            'status': 'pending',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }, fieldnames)
+    _comp_alert_admins(
+        f"🆕 <b>طلب تسجيل حساب تعويض (ويب)</b>\n"
+        f"👤 المستخدم: <code>{uid}</code>\n"
+        f"🏢 الشركة: {company.get('name', '')}\n"
+        f"🔢 الحساب: <code>{account_number}</code>"
+    )
+    return jsonify({'ok': True, 'id': acc_id})
+
+
+@app.route('/api/comp/pin', methods=['POST'])
+@login_required
+def api_comp_pin():
+    uid = session.get('admin_id', '')
+    data = request.get_json(silent=True) or {}
+    pin = str(data.get('pin', '')).strip()
+    if not re.match(r'^\d{4}$', pin):
+        return jsonify({'error': 'الرمز يجب أن يكون 4 أرقام'}), 400
+    with _COMP_CSV_LOCK_WEB:
+        existing = _comp_get_user_pin(uid)
+        if existing:
+            return jsonify({'error': 'لديك رمز PIN مسجل بالفعل'}), 409
+        fieldnames = get_fieldnames('compensation_pins.csv',
+            ['user_id', 'pin_hash', 'created_at'])
+        append_csv('compensation_pins.csv', {
+            'user_id': str(uid),
+            'pin_hash': _comp_pin_hash(pin),
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }, fieldnames)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/comp/request', methods=['POST'])
+@login_required
+def api_comp_request():
+    uid = session.get('admin_id', '')
+    company_id = str(request.form.get('company_id', '')).strip()
+    if not company_id:
+        return jsonify({'error': 'اختر الشركة'}), 400
+    company = _find_active_company(company_id)
+    if not company:
+        return jsonify({'error': 'الشركة غير موجودة أو غير نشطة'}), 404
+    accounts = _comp_get_user_accounts(uid)
+    acc = next((a for a in accounts
+                if a.get('company_id') == company_id
+                and a.get('status') in ('active', 'approved')), None)
+    if not acc:
+        return jsonify({'error': 'يجب تأكيد حسابك في هذه الشركة أولاً'}), 400
+    f = request.files.get('screenshot')
+    if not f or not f.filename:
+        return jsonify({'error': 'أرفق لقطة شاشة'}), 400
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in ('.png', '.jpg', '.jpeg', '.webp'):
+        return jsonify({'error': 'صيغة الصورة غير مدعومة (png/jpg/webp)'}), 400
+    blob = f.read(5 * 1024 * 1024 + 1)
+    if len(blob) > 5 * 1024 * 1024:
+        return jsonify({'error': 'حجم الصورة يتجاوز 5MB'}), 400
+    if not blob:
+        return jsonify({'error': 'الملف فارغ'}), 400
+    _sig_ok = (blob.startswith(b'\x89PNG') or blob.startswith(b'\xff\xd8\xff')
+               or (blob[:4] == b'RIFF' and blob[8:12] == b'WEBP'))
+    if not _sig_ok:
+        return jsonify({'error': 'الملف ليس صورة صالحة'}), 400
+    with _COMP_CSV_LOCK_WEB:
+        existing = _comp_read_requests()
+        for r in existing:
+            if (str(r.get('user_id', '')) == str(uid)
+                    and r.get('company_id') == company_id
+                    and r.get('status') == 'pending'):
+                return jsonify({'error': 'لديك طلب معلق بالفعل في هذه الشركة'}), 409
+    os.makedirs(_RECOVERY_UPLOADS_DIR, exist_ok=True)
+    fname = f"comp_{uid}_{secrets.token_hex(8)}{ext}"
+    upload_path = os.path.join(_RECOVERY_UPLOADS_DIR, fname)
+    with open(upload_path, 'wb') as out:
+        out.write(blob)
+    with _COMP_CSV_LOCK_WEB:
+        req_id = f"CR{secrets.token_hex(5).upper()}"
+        fieldnames = get_fieldnames('compensation_requests.csv',
+            ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+             'screenshot', 'status', 'amount', 'note', 'created_at',
+             'reviewed_at', 'reviewed_by'])
+        append_csv('compensation_requests.csv', {
+            'id': req_id,
+            'user_id': str(uid),
+            'company_id': company_id,
+            'company_name': company.get('name', ''),
+            'account_number': acc.get('account_number', ''),
+            'screenshot': fname,
+            'status': 'pending',
+            'amount': '',
+            'note': '',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'reviewed_at': '',
+            'reviewed_by': ''
+        }, fieldnames)
+    _comp_alert_admins(
+        f"💰 <b>طلب تعويض جديد (ويب)</b>\n"
+        f"👤 المستخدم: <code>{uid}</code>\n"
+        f"🏢 الشركة: {company.get('name', '')}\n"
+        f"🔢 الحساب: <code>{acc.get('account_number', '')}</code>\n"
+        f"🆔 الطلب: <code>{req_id}</code>"
+    )
+    return jsonify({'ok': True, 'request_id': req_id})
+
+
+@app.route('/api/comp/admin/requests')
+@api_auth
+@permission_required('view_financial')
+def api_comp_admin_requests():
+    requests = _comp_read_requests()
+    requests.reverse()
+    return jsonify({'requests': requests[:200]})
+
+
+@app.route('/api/comp/admin/requests/<req_id>/approve', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_comp_admin_approve_request(req_id):
+    data = request.get_json(silent=True) or {}
+    amount = str(data.get('amount', '')).strip()
+    note = str(data.get('note', '')).strip()
+    with _COMP_CSV_LOCK_WEB:
+        rows = _comp_read_requests()
+        fieldnames = get_fieldnames('compensation_requests.csv',
+            ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+             'screenshot', 'status', 'amount', 'note', 'created_at',
+             'reviewed_at', 'reviewed_by'])
+        row = next((r for r in rows if r.get('id') == req_id), None)
+        if not row:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if row.get('status') != 'pending':
+            return jsonify({'error': 'تمت معالجة هذا الطلب مسبقاً'}), 409
+        row['status'] = 'approved'
+        row['amount'] = amount
+        row['note'] = note
+        row['reviewed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+        row['reviewed_by'] = str(session.get('admin_id', ''))
+        _comp_write_requests(rows)
+    uid = str(row.get('user_id', ''))
+    _comp_tg(uid,
+             f"✅ <b>تم التعويض!</b>\n"
+             f"🏢 الشركة: {row.get('company_name', '')}\n"
+             f"💰 المبلغ: {amount} $\n"
+             f"📋 الطلب: <code>{req_id}</code>")
+    log_action('comp_request_approve', f'{req_id} amount={amount}')
+    return jsonify({'ok': True})
+
+
+@app.route('/api/comp/admin/requests/<req_id>/reject', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_comp_admin_reject_request(req_id):
+    data = request.get_json(silent=True) or {}
+    note = str(data.get('note', '')).strip()
+    with _COMP_CSV_LOCK_WEB:
+        rows = _comp_read_requests()
+        fieldnames = get_fieldnames('compensation_requests.csv',
+            ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+             'screenshot', 'status', 'amount', 'note', 'created_at',
+             'reviewed_at', 'reviewed_by'])
+        row = next((r for r in rows if r.get('id') == req_id), None)
+        if not row:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if row.get('status') != 'pending':
+            return jsonify({'error': 'تمت معالجة هذا الطلب مسبقاً'}), 409
+        row['status'] = 'rejected'
+        row['note'] = note
+        row['reviewed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+        row['reviewed_by'] = str(session.get('admin_id', ''))
+        _comp_write_requests(rows)
+    uid = str(row.get('user_id', ''))
+    _comp_tg(uid,
+             f"❌ <b>تم رفض طلب التعويض</b>\n"
+             f"🏢 الشركة: {row.get('company_name', '')}\n"
+             f"📋 الطلب: <code>{req_id}</code>")
+    log_action('comp_request_reject', req_id)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/comp/admin/requests/<req_id>/screenshot')
+@api_auth
+@permission_required('view_financial')
+def api_comp_admin_request_screenshot(req_id):
+    rows = _comp_read_requests()
+    row = next((r for r in rows if r.get('id') == req_id), None)
+    if not row:
+        return jsonify({'error': 'Not found'}), 404
+    screenshot = row.get('screenshot', '')
+    if not screenshot:
+        return jsonify({'error': 'No screenshot'}), 404
+    path = os.path.join(_RECOVERY_UPLOADS_DIR, screenshot)
+    if not os.path.exists(path):
+        return jsonify({'error': 'File not found'}), 404
+    return send_file(path)
+
 
 # ===== API — Payment Methods =====
 
