@@ -2463,10 +2463,11 @@ function _regT(key){
   return(t&&t[key])||key;
 }
 
-function _regIconHtml(icon){
-  if(!icon)return '<span style="font-size:36px">\ud83c\udfe2</span>';
-  if(icon.indexOf('/')===0||icon.indexOf('http')===0)return '<img src="'+icon+'" style="width:52px;height:52px;border-radius:14px;object-fit:cover">';
-  return '<span style="font-size:36px;line-height:1">'+icon+'</span>';
+function _regIconHtml(icon,size){
+  size=size||52;
+  if(!icon)return '<div style="width:'+size+'px;height:'+size+'px;border-radius:14px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:'+(size*0.45)+'px">\ud83c\udfe2</div>';
+  if(icon.indexOf('/static')===0||icon.indexOf('http')===0)return '<img src="'+icon+'" style="width:'+size+'px;height:'+size+'px;border-radius:14px;object-fit:cover" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div style="width:'+size+'px;height:'+size+'px;border-radius:14px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:'+(size*0.45)+'px;display:none">\ud83c\udfe2</div>';
+  return '<div style="width:'+size+'px;height:'+size+'px;border-radius:14px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:'+(size*0.45)+'px">'+icon+'</div>';
 }
 
 function _regClose(){
@@ -2476,9 +2477,8 @@ function _regClose(){
 
 function _regRenderStep1(){
   var d=_regData;
-  var isRtl=['ar','fa','ur'].indexOf(localStorage.getItem('vex_lang')||'ar')>=0;
   var h='<div style="text-align:center;margin-bottom:16px">'
-    +'<div style="width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,'+d.color+'18,'+d.color+'08);border:2px solid '+d.color+'30;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">'+_regIconHtml(d.icon)+'</div>'
+    +'<div style="margin:0 auto 14px">'+_regIconHtml(d.icon,72)+'</div>'
     +'<div style="font-size:22px;font-weight:900;color:#0f172a;margin-bottom:4px">'+d.name+'</div>'
     +'<div style="font-size:13px;color:#475569;line-height:1.6">'+_regT('reg_subtitle')+'</div></div>'
     +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">'
@@ -2490,24 +2490,24 @@ function _regRenderStep1(){
     +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(26,115,232,.1);display:flex;align-items:center;justify-content:center"><i class="fas fa-mobile-alt" style="color:#1a73e8;font-size:16px"></i></div>'
     +'<div style="flex:1"><div style="font-size:11px;color:#475569;font-weight:600">'+_regT('reg_download_app')+'</div><div style="font-size:13px;font-weight:700;color:#0f172a">'+d.name+' APK</div></div>'
     +'<i class="fas fa-external-link-alt" style="color:#94a3b8;font-size:12px"></i></a>':'')
-    +'<button onclick="window.open(\''+d.affiliate+'\',\'_blank\');_regStep=2;_regRenderStep2()" style="width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;margin-bottom:8px;box-shadow:0 4px 16px rgba(22,163,74,.25)"><i class="fas fa-check-circle"></i> '+_regT('reg_confirm')+'</button>'
-    +'<button onclick="_regClose()" style="width:100%;padding:11px;border-radius:12px;border:1px solid #e2e8f0;background:#fff;color:#475569;font-size:13px;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif">'+_regT('reg_close')+'</button>';
+    +'<a href="'+d.affiliate+'" target="_blank" onclick="_regStep=2;setTimeout(function(){_regRenderStep2()},100)" style="display:block;width:100%;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;margin-bottom:8px;box-shadow:0 4px 16px rgba(22,163,74,.25);text-decoration:none;text-align:center"><i class="fas fa-check-circle"></i> '+_regT('reg_confirm')+'</a>'
+    +'<button onclick="_regClose()" style="width:100%;padding:11px;border-radius:14px;border:1px solid #e2e8f0;background:#fff;color:#475569;font-size:13px;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif">'+_regT('reg_close')+'</button>';
   document.getElementById('regModalBody').innerHTML=h;
 }
 
 function _regRenderStep2(){
   var d=_regData;
   var h='<div style="text-align:center;margin-bottom:16px">'
-    +'<div style="width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,'+d.color+'18,'+d.color+'08);border:2px solid '+d.color+'30;display:flex;align-items:center;justify-content:center;margin:0 auto 12px">'+_regIconHtml(d.icon)+'</div>'
+    +'<div style="margin:0 auto 12px">'+_regIconHtml(d.icon,64)+'</div>'
     +'<div style="font-size:18px;font-weight:900;color:#0f172a;margin-bottom:4px">'+_regT('reg_title')+' '+d.name+'</div>'
     +'<div style="font-size:13px;color:#475569;line-height:1.6">'+_regT('reg_info')+'</div></div>'
     +'<div style="margin-bottom:14px"><label style="font-size:13px;color:#475569;margin-bottom:8px;display:block;font-weight:700">'+_regT('reg_account_label')+'</label>'
-    +'<input id="regAccNum" style="width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:13px 16px;color:#0f172a;font-size:14px;font-family:Cairo,sans-serif;outline:none;transition:border-color .2s" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="'+_regT('reg_account_placeholder')+'"></div>'
+    +'<input id="regAccNum" style="width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:13px 16px;color:#0f172a;font-size:14px;font-family:Cairo,sans-serif;outline:none;transition:border-color .2s" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="'+_regT('reg_account_placeholder')+'"></div>'
     +'<div style="margin-bottom:16px"><label style="font-size:13px;color:#475569;margin-bottom:8px;display:block;font-weight:700">'+_regT('reg_pin_label')+'</label>'
-    +'<input id="regPin" type="password" maxlength="4" inputmode="numeric" style="width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:13px 16px;color:#0f172a;font-size:14px;font-family:Cairo,sans-serif;outline:none;text-align:center;letter-spacing:8px;transition:border-color .2s" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="\u2022\u2022\u2022\u2022"></div>'
+    +'<input id="regPin" type="password" maxlength="4" inputmode="numeric" style="width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:13px 16px;color:#0f172a;font-size:14px;font-family:Cairo,sans-serif;outline:none;text-align:center;letter-spacing:8px;transition:border-color .2s" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="\u2022\u2022\u2022\u2022"></div>'
     +'<div id="regError" style="display:none;color:#dc2626;font-size:12px;text-align:center;margin-bottom:10px;font-weight:600"></div>'
-    +'<button id="regSubmitBtn" onclick="_regSubmit()" style="width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;margin-bottom:8px;box-shadow:0 4px 16px rgba(22,163,74,.25)"><i class="fas fa-paper-plane"></i> '+_regT('reg_submit')+'</button>'
-    +'<button onclick="_regStep=1;_regRenderStep1()" style="width:100%;padding:11px;border-radius:12px;border:1px solid #e2e8f0;background:#fff;color:#475569;font-size:13px;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif">'+_regT('reg_close')+'</button>';
+    +'<button id="regSubmitBtn" onclick="_regSubmit()" style="width:100%;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;margin-bottom:8px;box-shadow:0 4px 16px rgba(22,163,74,.25)"><i class="fas fa-paper-plane"></i> '+_regT('reg_submit')+'</button>'
+    +'<button onclick="_regStep=1;_regRenderStep1()" style="width:100%;padding:11px;border-radius:14px;border:1px solid #e2e8f0;background:#fff;color:#475569;font-size:13px;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif">'+_regT('reg_close')+'</button>';
   document.getElementById('regModalBody').innerHTML=h;
   var an=document.getElementById('regAccNum');
   if(an)setTimeout(function(){an.focus();},300);
@@ -2532,7 +2532,7 @@ async function _regSubmit(){
       +'<div style="width:72px;height:72px;border-radius:50%;background:rgba(22,163,74,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><i class="fas fa-check-circle" style="font-size:36px;color:#16a34a"></i></div>'
       +'<div style="font-size:22px;font-weight:900;color:#0f172a;margin-bottom:8px">'+_regT('reg_success')+'</div>'
       +'<div style="font-size:13px;color:#475569;line-height:1.8;margin-bottom:20px">'+_regT('reg_account_label')+': <b style="color:#0f172a">'+accNum+'</b><br>'+d.name+'</div>'
-      +'<button onclick="_regClose()" style="width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;box-shadow:0 4px 16px rgba(22,163,74,.25)">'+_regT('reg_close')+'</button></div>';
+      +'<button onclick="_regClose()" style="width:100%;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;box-shadow:0 4px 16px rgba(22,163,74,.25)">'+_regT('reg_close')+'</button></div>';
   }catch(e){
     if(err){err.style.display='block';err.textContent=_regT('reg_connection_error');}
     if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> '+_regT('reg_submit');}
