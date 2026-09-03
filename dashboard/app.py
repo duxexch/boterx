@@ -8968,6 +8968,11 @@ def page_compensation():
     return render_template('compensation.html', active_page='compensation')
 
 
+@app.route('/compensation-info')
+def page_compensation_info():
+    return render_template('compensation-info.html')
+
+
 @app.route('/api/comp/public/companies')
 def api_comp_public_companies():
     companies = _comp_get_all_companies()
