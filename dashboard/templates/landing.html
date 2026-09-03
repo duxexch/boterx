@@ -1503,43 +1503,36 @@ body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--t
 .section h2{font-size:1.6rem;font-weight:900;margin-bottom:8px;line-height:1.3;letter-spacing:-.01em}
 .section .sub{color:var(--muted);font-size:14px;margin-bottom:18px;line-height:1.7}
 
-/* ===== COMPANY CARDS - DISTINCT COLORS ===== */
+/* ===== COMPANY CARDS ===== */
 .comp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
-.comp-card{position:relative;background:var(--surface);border:1px solid color-mix(in srgb,var(--card-accent,var(--green)) 25%,var(--border));border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow);transition:all .25s cubic-bezier(.4,0,.2,1);border-top:4px solid var(--card-accent,var(--green))}
-.comp-card:hover{transform:translateY(-6px);box-shadow:0 16px 40px color-mix(in srgb,var(--card-accent,var(--green)) 15%,rgba(0,0,0,.10));border-color:var(--card-accent,var(--green))}
+.comp-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow);transition:all .25s cubic-bezier(.4,0,.2,1);border-top:4px solid var(--card-accent,var(--green))}
+.comp-card:hover{transform:translateY(-6px);box-shadow:0 16px 40px rgba(0,0,0,.10)}
 
-/* Card Header */
 .comp-head{display:flex;gap:12px;padding:18px 18px 12px;align-items:center}
-.comp-icon{width:52px;height:52px;border-radius:0;background:linear-gradient(135deg,color-mix(in srgb,var(--card-accent,var(--green)) 20%,transparent),color-mix(in srgb,var(--card-accent,var(--green)) 10%,transparent));border:1.5px solid color-mix(in srgb,var(--card-accent,var(--green)) 30%,transparent);display:flex;align-items:center;justify-content:center;font-size:24px;overflow:hidden;flex-shrink:0;box-shadow:0 4px 12px color-mix(in srgb,var(--card-accent,var(--green)) 12%,rgba(0,0,0,.06))}
+.comp-icon{width:52px;height:52px;border-radius:0;border:1.5px solid;display:flex;align-items:center;justify-content:center;font-size:24px;overflow:hidden;flex-shrink:0}
 .comp-icon img{width:100%;height:100%;object-fit:cover}
 .comp-head-info{flex:1;min-width:0}
 .comp-name{font-weight:900;font-size:17px;line-height:1.2;color:var(--text);letter-spacing:-.01em}
 .comp-license{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600}
-.badge{font-size:11px;padding:4px 10px;border-radius:999px;background:var(--card-accent,var(--green));color:#fff;border:none;font-weight:800;flex-shrink:0}
+.badge{font-size:11px;padding:4px 10px;border-radius:999px;border:none;font-weight:800;flex-shrink:0}
 
-/* Stats Row */
-.comp-stats{display:flex;gap:0;padding:0 18px 12px;border-bottom:1px solid color-mix(in srgb,var(--card-accent,var(--green)) 15%,var(--border))}
+.comp-stats{display:flex;gap:0;padding:0 18px 12px;border-bottom:1px solid var(--border)}
 .comp-stat{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;color:var(--muted);padding:6px 0;font-weight:600}
-.comp-stat i{font-size:10px;color:var(--card-accent,var(--green))}
-.comp-stat:not(:last-child){border-left:1px solid color-mix(in srgb,var(--card-accent,var(--green)) 15%,var(--border))}
+.comp-stat:not(:last-child){border-left:1px solid var(--border)}
 
-/* Card Body */
-.comp-body{padding:14px 18px;flex:1;background:linear-gradient(180deg,color-mix(in srgb,var(--card-accent,var(--green)) 5%,transparent),transparent)}
+.comp-body{padding:14px 18px;flex:1}
 .comp-desc{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:12px}
 
-/* Promo Code */
-.comp-promo{background:color-mix(in srgb,var(--card-accent,var(--green)) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--card-accent,var(--green)) 18%,var(--border));border-radius:10px;padding:10px 12px;margin-bottom:12px}
-.comp-promo-label{font-size:10px;color:var(--card-accent,var(--green));font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:flex;align-items:center;gap:5px}
-.comp-promo-label i{color:var(--card-accent,var(--green))}
+.comp-promo{border:1px solid;border-radius:10px;padding:10px 12px;margin-bottom:12px}
+.comp-promo-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:flex;align-items:center;gap:5px}
 .comp-promo-code{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.comp-promo-code code{font-size:16px;font-weight:900;color:var(--card-accent,var(--green));letter-spacing:.5px}
-.copy-btn{background:var(--surface);border:1.5px solid color-mix(in srgb,var(--card-accent,var(--green)) 30%,var(--border));border-radius:0;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:700;color:var(--card-accent,var(--green));transition:all .15s;font-family:'Cairo',sans-serif}
-.copy-btn:hover{background:var(--card-accent,var(--green));border-color:var(--card-accent,var(--green));color:#fff}
+.comp-promo-code code{font-size:16px;font-weight:900;letter-spacing:.5px}
+.copy-btn{background:var(--surface);border:1.5px solid;border-radius:0;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:700;transition:all .15s;font-family:'Cairo',sans-serif}
+.copy-btn:hover{color:#fff!important}
 
-/* Pros/Cons */
 .pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.pros-cons div{background:color-mix(in srgb,var(--card-accent,var(--green)) 6%,var(--surface));border:1px solid color-mix(in srgb,var(--card-accent,var(--green)) 12%,var(--border));border-radius:10px;padding:10px}
-.pros-cons strong{font-size:11px;display:block;margin-bottom:5px;color:var(--card-accent,var(--green))}
+.pros-cons div{border:1px solid;border-radius:10px;padding:10px}
+.pros-cons strong{font-size:11px;display:block;margin-bottom:5px}
 .pros-cons ul{list-style:none;padding:0;margin:0}
 .pros-cons li{font-size:12px;padding:2px 0;display:flex;gap:4px;color:var(--muted)}
 
@@ -1873,41 +1866,43 @@ footer a:hover{text-decoration:underline}
   <p class="sub" data-i18n="companies_sub">كل شركة نراجعها كأنها منتجنا — الترخيص، المقر، سنة التأسيس، المميزات والعيوب، كود البرومو ورابط التسجيل المباشر برعاية VEX</p>
   <div class="comp-grid">
     {% for c in companies %}
-    <article class="comp-card" style="--card-accent:{% if c.name == "1XBET" %}var(--accent-1xbet){% elif c.name == "MELBET" %}var(--accent-melbet){% elif c.name == "BETJAM" %}var(--accent-betjam){% elif c.name == "MOSTBET" %}var(--accent-mostbet){% elif c.name == "BIZBET" %}var(--accent-bizbet){% elif c.name == "XPARI" %}var(--accent-xpari){% elif c.name == "LINEBET" %}var(--accent-linebet){% elif c.name == "GOOOBET" %}var(--accent-gooobet){% else %}var(--green){% endif %}" id="company-{{ c.slug }}" itemscope itemtype="https://schema.org/Review">
+    {% set colors = {'1XBET':'#E31937','MELBET':'#1565C0','BETJAM':'#FF6D00','MOSTBET':'#2E7D32','BIZBET':'#7B1FA2','XPARI':'#00838F','LINEBET':'#3949AB','GOOOBET':'#C2185B'} %}
+    {% set cc = colors.get(c.name, '#16a34a') %}
+    <article class="comp-card" style="--card-accent:{{ cc }}" id="company-{{ c.slug }}" itemscope itemtype="https://schema.org/Review">
       <div class="comp-head">
-        <div class="comp-icon">{% if c.icon.startswith('/static') %}<img src="{{ c.icon }}" alt="{{ c.name }}" loading="lazy">{% else %}{{ c.icon }}{% endif %}</div>
+        <div class="comp-icon" style="background:{{ cc }}15;border-color:{{ cc }}30;box-shadow:0 4px 12px {{ cc }}18">{% if c.icon.startswith('/static') %}<img src="{{ c.icon }}" alt="{{ c.name }}" loading="lazy">{% else %}{{ c.icon }}{% endif %}</div>
         <div class="comp-head-info">
           <div class="comp-name" itemprop="name">{{ c.name }}</div>
           <div class="comp-license">{{ c.license }}</div>
         </div>
-        <span class="badge" data-i18n="badge_trusted">موثوق</span>
+        <span class="badge" style="background:{{ cc }};color:#fff" data-i18n="badge_trusted">موثوق</span>
       </div>
-      <div class="comp-stats">
-        <div class="comp-stat"><i class="fas fa-map-marker-alt"></i><span>{{ c.headquarters }}</span></div>
-        <div class="comp-stat"><i class="fas fa-calendar-alt"></i><span>{{ c.founded }}</span></div>
-        <div class="comp-stat"><i class="fas fa-star"></i><span itemprop="reviewRating" itemscope itemtype="https://schema.org/Rating"><span itemprop="ratingValue">{{ c.rating }}</span>/5</span></div>
+      <div class="comp-stats" style="border-bottom-color:{{ cc }}20">
+        <div class="comp-stat"><i class="fas fa-map-marker-alt" style="color:{{ cc }}"></i><span>{{ c.headquarters }}</span></div>
+        <div class="comp-stat" style="border-left-color:{{ cc }}20"><i class="fas fa-calendar-alt" style="color:{{ cc }}"></i><span>{{ c.founded }}</span></div>
+        <div class="comp-stat" style="border-left-color:{{ cc }}20"><i class="fas fa-star" style="color:{{ cc }}"></i><span itemprop="reviewRating" itemscope itemtype="https://schema.org/Rating"><span itemprop="ratingValue">{{ c.rating }}</span>/5</span></div>
       </div>
-      <div class="comp-body">
+      <div class="comp-body" style="background:linear-gradient(180deg,{{ cc }}08,transparent)">
         <p class="comp-desc" itemprop="reviewBody" data-company="{{ c.name }}" data-promo="{{ c.promo_code or 'VEX' }}" data-license="{{ c.license }}" data-hq="{{ c.headquarters }}" data-founded="{{ c.founded }}" data-rating="{{ c.rating }}">
           {% if c.name == '1XBET' %}1xBet عملاق المراهنات العالمي — 1000+ سوق يومياً، بث مباشر، كازينو ضخم وسحب فوري. كود <b>{{ c.promo_code or 'VEX' }}</b> وبونص حتى 130%.
           {% elif c.name == 'MELBET' %}Melbet مرخصة وموثوقة — واجهة عربية ممتازة، احتمالات عالية، دفع فوري. كود <b>{{ c.promo_code or 'VEX' }}</b>.
           {% else %}{{ c.name }} شركة مراهنة مرخصة — بونص ترحيبي، دفع فوري ودعم عربي. كود <b>{{ c.promo_code or 'VEX' }}</b>.{% endif %}
         </p>
         {% if c.promo_code %}
-        <div class="comp-promo">
-          <div class="comp-promo-label"><i class="fas fa-tag"></i> <span data-i18n="comp_promo">كود البرومو</span></div>
-          <div class="comp-promo-code"><code id="promo-{{ c.id }}">{{ c.promo_code }}</code><button class="copy-btn" onclick="copyPromo('{{ c.id }}','{{ c.promo_code }}')" title="Copy" data-i18n="copy_code_btn">نسخ</button></div>
+        <div class="comp-promo" style="background:{{ cc }}0a;border-color:{{ cc }}18">
+          <div class="comp-promo-label" style="color:{{ cc }}"><i class="fas fa-tag"></i> <span data-i18n="comp_promo">كود البرومو</span></div>
+          <div class="comp-promo-code"><code id="promo-{{ c.id }}" style="color:{{ cc }}">{{ c.promo_code }}</code><button class="copy-btn" style="border-color:{{ cc }}30;color:{{ cc }}" onclick="copyPromo('{{ c.id }}','{{ c.promo_code }}')" title="Copy" data-i18n="copy_code_btn">نسخ</button></div>
         </div>
         {% endif %}
         <div class="pros-cons">
-          <div><strong data-i18n="pros_title">المميزات</strong><ul><li data-i18n="pros_instant">دفع فوري</li><li data-i18n="pros_arabic">دعم عربي</li><li data-i18n="pros_licensed">مرخص رسمياً</li></ul></div>
-          <div><strong data-i18n="why_vex_pros_title">⭐ لماذا VEX؟</strong><ul><li data-i18n="why_vex_bonus">بونص حصري</li><li data-i18n="why_vex_verified">شريك معتمد</li><li data-i18n="why_vex_wallet">محفظة آمنة</li></ul></div>
+          <div style="background:{{ cc }}08;border-color:{{ cc }}12"><strong style="color:{{ cc }}" data-i18n="pros_title">المميزات</strong><ul><li data-i18n="pros_instant">دفع فوري</li><li data-i18n="pros_arabic">دعم عربي</li><li data-i18n="pros_licensed">مرخص رسمياً</li></ul></div>
+          <div style="background:{{ cc }}08;border-color:{{ cc }}12"><strong style="color:{{ cc }}" data-i18n="why_vex_pros_title">⭐ لماذا VEX؟</strong><ul><li data-i18n="why_vex_bonus">بونص حصري</li><li data-i18n="why_vex_verified">شريك معتمد</li><li data-i18n="why_vex_wallet">محفظة آمنة</li></ul></div>
         </div>
       </div>
-      <div class="comp-cta">
-        <a href="javascript:void(0)" class="cta-main" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')"><i class="fas fa-user-plus"></i> <span data-i18n="comp_cta_register" data-company-name="{{ c.name }}">سجّل</span></a>
-        <a href="{{ c.app_link or '#' }}" class="cta-app" target="_blank" rel="noopener"><i class="fas fa-download"></i> <span data-i18n="download_app">التطبيق</span></a>
-        <a href="/company/{{ c.id }}" class="cta-sec"><i class="fas fa-info-circle"></i> <span data-i18n="comp_cta_details">التفاصيل</span></a>
+      <div class="comp-cta" style="background:{{ cc }}05;border-top-color:{{ cc }}15">
+        <a href="javascript:void(0)" class="cta-main" style="background:linear-gradient(180deg,{{ cc }},{{ cc}}dd,{{ cc}}bb);color:#fff;box-shadow:0 2px 8px {{ cc }}40" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')"><i class="fas fa-user-plus"></i> <span data-i18n="comp_cta_register" data-company-name="{{ c.name }}">سجّل</span></a>
+        <a href="{{ c.app_link or '#' }}" class="cta-app" style="background:linear-gradient(180deg,{{ cc }}cc,{{ cc }}aa,{{ cc }}88);color:#fff;box-shadow:0 2px 8px {{ cc }}30" target="_blank" rel="noopener"><i class="fas fa-download"></i> <span data-i18n="download_app">التطبيق</span></a>
+        <a href="/company/{{ c.id }}" class="cta-sec" style="background:{{ cc }}0a;color:{{ cc }};border:1.5px solid {{ cc }}40"><i class="fas fa-info-circle"></i> <span data-i18n="comp_cta_details">التفاصيل</span></a>
       </div>
       <meta itemprop="author" content="VEX Games">
     </article>
