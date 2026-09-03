@@ -8873,12 +8873,82 @@ def _comp_get_all_companies():
 
 
 @app.route('/compensation')
-@login_required
 def page_compensation():
-    uid = session.get('admin_id', '')
-    user_name = session.get('admin_name', 'User')
-    return render_template('compensation.html', active_page='compensation',
-                           user_name=user_name, uid=uid)
+    return render_template('compensation.html', active_page='compensation')
+
+
+@app.route('/api/comp/public/companies')
+def api_comp_public_companies():
+    companies = _comp_get_all_companies()
+    return jsonify({'companies': companies})
+
+
+@app.route('/api/comp/public/my-accounts')
+def api_comp_public_my_accounts():
+    user_id = request.args.get('user_id', '').strip()
+    if not user_id:
+        return jsonify({'accounts': []})
+    accounts = [r for r in _comp_read_accounts() if str(r.get('user_id', '')) == user_id]
+    return jsonify({'accounts': accounts})
+
+
+@app.route('/api/comp/public/register', methods=['POST'])
+def api_comp_public_register():
+    data = request.get_json(silent=True) or {}
+    user_id = str(data.get('user_id', '')).strip()
+    company_id = str(data.get('company_id', '')).strip()
+    company_name = str(data.get('company_name', '')).strip()
+    account_number = str(data.get('account_number', '')).strip()
+    pin = str(data.get('pin', '')).strip()
+    if not user_id:
+        return jsonify({'error': 'معرّف المستخدم مفقود'}), 400
+    if not company_id:
+        return jsonify({'error': 'اختر الشركة'}), 400
+    if not account_number or len(account_number) < 3:
+        return jsonify({'error': 'رقم الحساب يجب أن يكون 3 أحرف على الأقل'}), 400
+    if len(account_number) > 64:
+        return jsonify({'error': 'رقم الحساب طويل جداً'}), 400
+    if not re.match(r'^\d{4}$', pin):
+        return jsonify({'error': 'الرمز يجب أن يكون 4 أرقام'}), 400
+    company = _find_active_company(company_id)
+    if not company:
+        return jsonify({'error': 'الشركة غير موجودة أو غير نشطة'}), 404
+    with _COMP_CSV_LOCK_WEB:
+        existing = _comp_read_accounts()
+        for r in existing:
+            if (str(r.get('user_id', '')) == user_id
+                    and r.get('company_id') == company_id
+                    and r.get('status') in ('pending', 'active', 'approved')):
+                return jsonify({'error': 'لديك حساب مسجل بالفعل في هذه الشركة'}), 409
+        acc_id = f"CA{secrets.token_hex(5).upper()}"
+        fieldnames = get_fieldnames('compensation_accounts.csv',
+            ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+             'status', 'created_at'])
+        append_csv('compensation_accounts.csv', {
+            'id': acc_id,
+            'user_id': user_id,
+            'company_id': company_id,
+            'company_name': company_name or company.get('name', ''),
+            'account_number': account_number,
+            'status': 'pending',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }, fieldnames)
+        pin_fieldnames = get_fieldnames('compensation_pins.csv',
+            ['user_id', 'pin_hash', 'created_at'])
+        has_pin = any(str(r.get('user_id', '')) == user_id for r in _comp_read_pins())
+        if not has_pin:
+            append_csv('compensation_pins.csv', {
+                'user_id': user_id,
+                'pin_hash': _comp_pin_hash(pin),
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+            }, pin_fieldnames)
+    _comp_alert_admins(
+        f"🆕 <b>طلب تسجيل حساب تعويض (ويب)</b>\n"
+        f"👤 المستخدم: <code>{user_id}</code>\n"
+        f"🏢 الشركة: {company_name or company.get('name', '')}\n"
+        f"🔢 الحساب: <code>{account_number}</code>"
+    )
+    return jsonify({'ok': True, 'id': acc_id})
 
 
 @app.route('/api/comp/status')

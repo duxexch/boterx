@@ -1879,7 +1879,7 @@ footer a:hover{text-decoration:underline}
         </div>
       </div>
       <div class="comp-cta">
-        <a href="{{ c.affiliate_link }}" class="cta-main" target="_blank" rel="noopener" data-i18n="comp_cta_register">سجّل في {{ c.name }}</a>
+        <button class="cta-main" onclick="openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')" data-i18n="comp_cta_register">سجّل في {{ c.name }}</button>
         {% if c.app_link %}
         <a href="{{ c.app_link }}" class="cta-app" target="_blank" rel="noopener" data-i18n="download_app">تحميل التطبيق</a>
         {% endif %}
@@ -2110,6 +2110,34 @@ function copyPromo(id, code){
 }
 
 window.COMPANY_TRANS = {{ company_translations | safe }};
+
+function openRegModal(id, name, icon, affiliate, app, promo) {
+    var existing = document.getElementById('regModal');
+    if (existing) existing.remove();
+    var m = document.createElement('div');
+    m.id = 'regModal';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    m.onclick = function(e) { if (e.target === m) m.remove(); };
+    m.innerHTML = '<div style="background:#1a2028;border:1px solid #262e39;border-radius:20px;padding:24px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto">'
+        + '<div style="text-align:center;margin-bottom:20px">'
+        + '<div style="font-size:40px;margin-bottom:8px">' + icon + '</div>'
+        + '<div style="font-size:18px;font-weight:900">' + name + '</div>'
+        + '<div style="font-size:12px;color:#8794a3;margin-top:4px">اختر طريقة التسجيل</div>'
+        + '</div>'
+        + '<a href="' + affiliate + '" target="_blank" style="display:flex;align-items:center;gap:12px;background:#0b0e11;border:2px solid #262e39;border-radius:14px;padding:14px;margin-bottom:10px;text-decoration:none;color:#eef2f6;transition:all .2s" onmouseover="this.style.borderColor=\'#00e701\'" onmouseout="this.style.borderColor=\'#262e39\'">'
+        + '<div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(0,231,1,.1);color:#00e701;flex-shrink:0"><i class="fas fa-bolt"></i></div>'
+        + '<div><div style="font-size:14px;font-weight:800">تسجيل مباشر</div>'
+        + '<div style="font-size:11px;color:#8794a3">افتح رابط التسجيل وسجّل حساب جديد</div></div>'
+        + '</a>'
+        + '<a href="/compensation?company=' + id + '" style="display:flex;align-items:center;gap:12px;background:#0b0e11;border:2px solid #262e39;border-radius:14px;padding:14px;margin-bottom:10px;text-decoration:none;color:#eef2f6;transition:all .2s" onmouseover="this.style.borderColor=\'#3b82f6\'" onmouseout="this.style.borderColor=\'#262e39\'">'
+        + '<div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(59,130,246,.1);color:#3b82f6;flex-shrink:0"><i class="fas fa-shield-alt"></i></div>'
+        + '<div><div style="font-size:14px;font-weight:800">تسجيل بنظام التعويض</div>'
+        + '<div style="font-size:11px;color:#8794a3">سجّل وادخل رقم حسابك — عند الخسارة هنعدلك 100%</div></div>'
+        + '</a>'
+        + '<button onclick="this.closest(\'#regModal\').remove()" style="width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;font-family:Cairo,sans-serif">إغلاق</button>'
+        + '</div>';
+    document.body.appendChild(m);
+}
 
 (function(){
   var supported=['ar','en','fr','es','de','it','pt','ru','zh','tr','ur','hi','fa','id','ja','ko','th'];
