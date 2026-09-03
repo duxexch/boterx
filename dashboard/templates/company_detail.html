@@ -61,12 +61,13 @@ a{color:inherit;text-decoration:none}
 
 /* CTA Buttons */
 .detail-cta{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
-.detail-cta a{flex:1;min-width:200px;text-align:center;padding:16px 24px;border-radius:14px;font-weight:800;font-size:16px;transition:all .15s}
+.detail-cta a{flex:1;min-width:200px;text-align:center;padding:16px 24px;border-radius:0;font-weight:800;font-size:16px;transition:all .2s;position:relative;overflow:hidden}
 .detail-cta a:active{transform:scale(.97)}
-.cta-register{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 80%,#000));color:#fff;box-shadow:0 6px 24px color-mix(in srgb,var(--accent) 30%,transparent)}
-.cta-register:hover{box-shadow:0 8px 32px color-mix(in srgb,var(--accent) 40%,transparent);transform:translateY(-2px)}
-.cta-app{background:linear-gradient(135deg,#1a73e8,#0d47a1);color:#fff;box-shadow:0 6px 24px rgba(26,115,232,.25)}
-.cta-app:hover{box-shadow:0 8px 32px rgba(26,115,232,.35);transform:translateY(-2px)}
+.detail-cta a::after{content:'';position:absolute;top:0;left:0;right:0;height:50%;background:linear-gradient(180deg,rgba(255,255,255,.25) 0%,rgba(255,255,255,.05) 100%);pointer-events:none}
+.cta-register{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 100%,#fff 0%) 0%,var(--accent) 50%,color-mix(in srgb,var(--accent) 100%,#000 10%) 100%);color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 35%,transparent),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)}
+.cta-register:hover{box-shadow:0 4px 16px color-mix(in srgb,var(--accent) 45%,transparent),inset 0 1px 0 rgba(255,255,255,.3),inset 0 -1px 0 rgba(0,0,0,.2);transform:translateY(-1px)}
+.cta-app{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 80%,#fff 20%) 0%,color-mix(in srgb,var(--accent) 70%,#fff 30%) 50%,color-mix(in srgb,var(--accent) 80%,#000 20%) 100%);color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 25%,transparent),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)}
+.cta-app:hover{box-shadow:0 4px 16px color-mix(in srgb,var(--accent) 35%,transparent),inset 0 1px 0 rgba(255,255,255,.3),inset 0 -1px 0 rgba(0,0,0,.2);transform:translateY(-1px)}
 
 /* Similar Companies */
 .similar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:12px}

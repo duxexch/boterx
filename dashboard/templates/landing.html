@@ -1491,7 +1491,7 @@ body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--t
 .comp-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:18px;overflow:;display:flex;flex-direction:column;box-shadow:var(--shadow);transition:all .25s cubic-bezier(.4,0,.2,1);border-top:3px solid var(--card-accent,var(--green))}
 .comp-card:hover{transform:translateY(-6px);box-shadow:0 16px 40px rgba(0,0,0,.10);border-color:var(--card-accent,var(--green))}
 .comp-head{display:flex;gap:14px;padding:18px 18px 14px;align-items:center}
-.comp-icon{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,color-mix(in srgb,var(--card-accent,var(--green)) 15%,transparent),color-mix(in srgb,var(--card-accent,var(--green)) 8%,transparent));border:1px solid color-mix(in srgb,var(--card-accent,var(--green)) 20%,transparent);display:flex;align-items:center;justify-content:center;font-size:24px;overflow:hidden;flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,.06)}
+.comp-icon{width:52px;height:52px;border-radius:0;background:linear-gradient(135deg,color-mix(in srgb,var(--card-accent,var(--green)) 15%,transparent),color-mix(in srgb,var(--card-accent,var(--green)) 8%,transparent));border:1px solid color-mix(in srgb,var(--card-accent,var(--green)) 20%,transparent);display:flex;align-items:center;justify-content:center;font-size:24px;overflow:hidden;flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,.06)}
 .comp-icon img{width:100%;height:100%;object-fit:cover}
 .comp-name{font-weight:900;font-size:17px;line-height:1.2;color:var(--text);letter-spacing:-.01em}
 .comp-meta{font-size:12px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
@@ -1517,14 +1517,15 @@ body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 /* Card CTA */
 .comp-cta{padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap;background:color-mix(in srgb,var(--card-accent,var(--green)) 3%,var(--surface2));border-top:1px solid var(--border)}
-.comp-cta a{flex:1;min-width:0;text-align:center;padding:12px;border-radius:10px;font-weight:800;font-size:14px;text-decoration:none;transition:all .15s}
+.comp-cta a{flex:1;min-width:0;text-align:center;padding:12px;border-radius:0;font-weight:800;font-size:14px;text-decoration:none;transition:all .2s;position:relative;overflow:hidden;border:none}
 .comp-cta a:active{transform:scale(.97)}
-.cta-main{background:linear-gradient(135deg,var(--card-accent,var(--green)),color-mix(in srgb,var(--card-accent,var(--green)) 85%,#000));color:#fff;box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 30%,transparent)}
-.cta-main:hover{box-shadow:0 6px 24px color-mix(in srgb,var(--card-accent,var(--green)) 40%,transparent);transform:translateY(-1px)}
-.cta-app{background:linear-gradient(135deg,#1a73e8,#0d47a1);color:#fff;box-shadow:0 4px 16px rgba(26,115,232,.25)}
-.cta-app:hover{box-shadow:0 6px 24px rgba(26,115,232,.35);transform:translateY(-1px)}
-.cta-sec{background:var(--surface);color:var(--text);border:1px solid var(--border)}
-.cta-sec:hover{border-color:var(--card-accent,var(--green))}
+.comp-cta a::after{content:'';position:absolute;top:0;left:0;right:0;height:50%;background:linear-gradient(180deg,rgba(255,255,255,.25) 0%,rgba(255,255,255,.05) 100%);pointer-events:none}
+.cta-main{background:linear-gradient(180deg,color-mix(in srgb,var(--card-accent,var(--green)) 100%,#fff 0%) 0%,var(--card-accent,var(--green)) 50%,color-mix(in srgb,var(--card-accent,var(--green)) 100%,#000 10%) 100%);color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--card-accent,var(--green)) 35%,transparent),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)}
+.cta-main:hover{box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 45%,transparent),inset 0 1px 0 rgba(255,255,255,.3),inset 0 -1px 0 rgba(0,0,0,.2);transform:translateY(-1px)}
+.cta-app{background:linear-gradient(180deg,color-mix(in srgb,var(--card-accent,var(--green)) 80%,#fff 20%) 0%,color-mix(in srgb,var(--card-accent,var(--green)) 70%,#fff 30%) 50%,color-mix(in srgb,var(--card-accent,var(--green)) 80%,#000 20%) 100%);color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--card-accent,var(--green)) 25%,transparent),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)}
+.cta-app:hover{box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 35%,transparent),inset 0 1px 0 rgba(255,255,255,.3),inset 0 -1px 0 rgba(0,0,0,.2);transform:translateY(-1px)}
+.cta-sec{background:linear-gradient(180deg,color-mix(in srgb,var(--card-accent,var(--green)) 12%,#fff 88%) 0%,color-mix(in srgb,var(--card-accent,var(--green)) 8%,#fff 92%) 50%,color-mix(in srgb,var(--card-accent,var(--green)) 15%,#fff 85%) 100%);color:var(--card-accent,var(--green));border:1.5px solid color-mix(in srgb,var(--card-accent,var(--green)) 40%,transparent);box-shadow:0 2px 8px color-mix(in srgb,var(--card-accent,var(--green)) 10%,transparent),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(0,0,0,.05)}
+.cta-sec:hover{border-color:var(--card-accent,var(--green));box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 20%,transparent),inset 0 1px 0 rgba(255,255,255,.6),inset 0 -1px 0 rgba(0,0,0,.08);transform:translateY(-1px)}
 
 /* Promo Code Copy */
 .promo-code-row{display:flex;align-items:center;gap:6px}
@@ -1879,7 +1880,7 @@ footer a:hover{text-decoration:underline}
         </div>
       </div>
       <div class="comp-cta">
-        <a href="javascript:void(0)" class="cta-main" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')" data-i18n="comp_cta_register">سجّل في {{ c.name }}</a>
+        <a href="javascript:void(0)" class="cta-main" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')" data-i18n="comp_cta_register" data-company-name="{{ c.name }}">سجّل في {{ c.name }}</a>
         {% if c.app_link %}
         <a href="{{ c.app_link }}" class="cta-app" target="_blank" rel="noopener" data-i18n="download_app">تحميل التطبيق</a>
         {% endif %}
@@ -2069,6 +2070,10 @@ function applyAllTranslations(lang){
     var key=e.getAttribute('data-i18n');
     if(!t[key])return;
     if(htmlKeys.indexOf(key)>=0){e.innerHTML=t[key];}else{e.textContent=t[key];}
+    if(key==='comp_cta_register'){
+      var cn=e.getAttribute('data-company-name');
+      if(cn)e.textContent=e.textContent+' '+cn;
+    }
   });
   document.querySelectorAll('[data-company]').forEach(function(e){
     var name=e.getAttribute('data-company');
@@ -2468,11 +2473,11 @@ function _regClose(){
   _regData={};_regStep=0;
 }
 
-var _regBtnStyle='width:100%;padding:14px 20px;border-radius:14px;border:none;font-size:15px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;text-decoration:none;text-align:center';
-var _regBtnGreen=_regBtnStyle+';background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;box-shadow:0 4px 16px rgba(22,163,74,.25)';
-var _regBtnBlue=_regBtnStyle+';background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;box-shadow:0 4px 16px rgba(59,130,246,.25)';
-var _regBtnOutline=_regBtnStyle+';background:#fff;border:1.5px solid #e2e8f0;color:#475569';
-var _regBtnGold=_regBtnStyle+';background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;box-shadow:0 4px 16px rgba(245,158,11,.25)';
+var _regBtnStyle='width:100%;padding:14px 20px;border-radius:0;border:none;font-size:15px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;text-decoration:none;text-align:center;position:relative;overflow:hidden';
+var _regBtnGreen=_regBtnStyle+';background:linear-gradient(180deg,#22c55e 0%,#16a34a 50%,#15803d 100%);color:#fff;box-shadow:0 2px 8px rgba(22,163,74,.35),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)';
+var _regBtnBlue=_regBtnStyle+';background:linear-gradient(180deg,#60a5fa 0%,#3b82f6 50%,#2563eb 100%);color:#fff;box-shadow:0 2px 8px rgba(59,130,246,.35),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)';
+var _regBtnOutline=_regBtnStyle+';background:linear-gradient(180deg,rgba(255,255,255,.95) 0%,rgba(248,250,252,.9) 50%,rgba(241,245,249,.95) 100%);border:1.5px solid #e2e8f0;color:#475569;box-shadow:0 2px 8px rgba(0,0,0,.05),inset 0 1px 0 rgba(255,255,255,.8),inset 0 -1px 0 rgba(0,0,0,.03)';
+var _regBtnGold=_regBtnStyle+';background:linear-gradient(180deg,#fbbf24 0%,#f59e0b 50%,#d97706 100%);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,.35),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)';
 
 function _regRenderStep1(){
   var d=_regData;
@@ -2481,10 +2486,10 @@ function _regRenderStep1(){
     +'<div style="font-size:22px;font-weight:900;color:#0f172a;margin-bottom:4px">'+d.name+'</div>'
     +'<div style="font-size:13px;color:#475569;line-height:1.6">'+_regT('reg_subtitle')+'</div></div>'
     +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">'
-    +'<div style="width:40px;height:40px;border-radius:12px;background:rgba(217,119,6,.1);display:flex;align-items:center;justify-content:center"><i class="fas fa-tag" style="color:#d97706;font-size:16px"></i></div>'
+    +'<div style="width:40px;height:40px;border-radius:0;background:rgba(217,119,6,.1);display:flex;align-items:center;justify-content:center"><i class="fas fa-tag" style="color:#d97706;font-size:16px"></i></div>'
     +'<div style="flex:1"><div style="font-size:11px;color:#475569;font-weight:600">'+_regT('reg_promo_label')+'</div>'
     +'<div style="font-size:18px;font-weight:900;color:#d97706;letter-spacing:.5px">'+d.promo+'</div></div>'
-    +'<button onclick="navigator.clipboard.writeText(\''+d.promo+'\');var b=this;b.textContent=\'\u2705\';setTimeout(function(){b.textContent=\'\ud83d\udccb\';},1500)" style="background:#fff;border:1.5px solid #e2e8f0;color:#475569;padding:8px 12px;border-radius:12px;cursor:pointer;font-size:13px;font-weight:700;font-family:Cairo,sans-serif">\ud83d\udccb</button></div>'
+    +'<button onclick="navigator.clipboard.writeText(\''+d.promo+'\');var b=this;b.textContent=\'\u2705\';setTimeout(function(){b.textContent=\'\ud83d\udccb\';},1500)" style="background:#fff;border:1.5px solid #e2e8f0;color:#475569;padding:8px 12px;border-radius:0;cursor:pointer;font-size:13px;font-weight:700;font-family:Cairo,sans-serif">\ud83d\udccb</button></div>'
     +(d.app?'<a href="'+d.app+'" target="_blank" style="'+_regBtnOutline+'margin-bottom:10px"><i class="fas fa-mobile-alt" style="color:#3b82f6"></i> '+_regT('reg_download_app')+'</a>':'')
     +'<a id="regConfirmBtn" href="'+d.affiliate+'" target="_blank" onclick="_regStep=2" style="'+_regBtnGreen+'margin-bottom:10px" onmouseover="this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.transform=\'none\'"><i class="fas fa-check-circle"></i> '+_regT('reg_confirm')+'</a>'
     +'<button onclick="_regClose()" style="'+_regBtnOutline+'">'+_regT('reg_close')+'</button>';
@@ -2495,9 +2500,9 @@ function _regRenderStep1(){
 
 function _regIconHtml(icon,size){
   size=size||52;
-  if(!icon)return '<div style="width:'+size+'px;height:'+size+'px;border-radius:16px;background:linear-gradient(135deg,#e2e8f0,#f1f5f9);display:flex;align-items:center;justify-content:center;font-size:'+(size*0.45)+'px;border:2px solid #e2e8f0">\ud83c\udfe2</div>';
-  if(icon.indexOf('/static')===0||icon.indexOf('http')===0)return '<img src="'+icon+'" style="width:'+size+'px;height:'+size+'px;border-radius:16px;object-fit:cover;border:2px solid #e2e8f0" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div style="width:'+size+'px;height:'+size+'px;border-radius:16px;background:linear-gradient(135deg,#e2e8f0,#f1f5f9);display:none;align-items:center;justify-content:center;font-size:'+(size*0.45)+'px;border:2px solid #e2e8f0">\ud83c\udfe2</div>';
-  return '<div style="width:'+size+'px;height:'+size+'px;border-radius:16px;background:linear-gradient(135deg,#e2e8f0,#f1f5f9);display:flex;align-items:center;justify-content:center;font-size:'+(size*0.45)+'px;border:2px solid #e2e8f0">'+icon+'</div>';
+  if(!icon)return '<div style="width:'+size+'px;height:'+size+'px;border-radius:0;background:linear-gradient(135deg,#e2e8f0,#f1f5f9);display:flex;align-items:center;justify-content:center;font-size:'+(size*0.45)+'px;border:2px solid #e2e8f0">\ud83c\udfe2</div>';
+  if(icon.indexOf('/static')===0||icon.indexOf('http')===0)return '<img src="'+icon+'" style="width:'+size+'px;height:'+size+'px;border-radius:0;object-fit:cover;border:2px solid #e2e8f0" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div style="width:'+size+'px;height:'+size+'px;border-radius:0;background:linear-gradient(135deg,#e2e8f0,#f1f5f9);display:none;align-items:center;justify-content:center;font-size:'+(size*0.45)+'px;border:2px solid #e2e8f0">\ud83c\udfe2</div>';
+  return '<div style="width:'+size+'px;height:'+size+'px;border-radius:0;background:linear-gradient(135deg,#e2e8f0,#f1f5f9);display:flex;align-items:center;justify-content:center;font-size:'+(size*0.45)+'px;border:2px solid #e2e8f0">'+icon+'</div>';
 }
 
 function _regRenderStep2(){
@@ -2507,9 +2512,9 @@ function _regRenderStep2(){
     +'<div style="font-size:18px;font-weight:900;color:#0f172a;margin-bottom:4px">'+_regT('reg_title')+' '+d.name+'</div>'
     +'<div style="font-size:13px;color:#475569;line-height:1.6">'+_regT('reg_info')+'</div></div>'
     +'<div style="margin-bottom:14px"><label style="font-size:13px;color:#475569;margin-bottom:8px;display:block;font-weight:700">'+_regT('reg_account_label')+'</label>'
-    +'<input id="regAccNum" style="width:100%;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px 16px;color:#0f172a;font-size:14px;font-family:Cairo,sans-serif;outline:none;transition:border-color .2s" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="'+_regT('reg_account_placeholder')+'"></div>'
+    +'<input id="regAccNum" style="width:100%;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:0;padding:14px 16px;color:#0f172a;font-size:14px;font-family:Cairo,sans-serif;outline:none;transition:border-color .2s" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="'+_regT('reg_account_placeholder')+'"></div>'
     +'<div style="margin-bottom:16px"><label style="font-size:13px;color:#475569;margin-bottom:8px;display:block;font-weight:700">'+_regT('reg_pin_label')+'</label>'
-    +'<input id="regPin" type="password" maxlength="4" inputmode="numeric" style="width:100%;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px 16px;color:#0f172a;font-size:14px;font-family:Cairo,sans-serif;outline:none;text-align:center;letter-spacing:8px;transition:border-color .2s" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="\u2022\u2022\u2022\u2022"></div>'
+    +'<input id="regPin" type="password" maxlength="4" inputmode="numeric" style="width:100%;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:0;padding:14px 16px;color:#0f172a;font-size:14px;font-family:Cairo,sans-serif;outline:none;text-align:center;letter-spacing:8px;transition:border-color .2s" onfocus="this.style.borderColor=\'#16a34a\'" onblur="this.style.borderColor=\'#e2e8f0\'" placeholder="\u2022\u2022\u2022\u2022"></div>'
     +'<div id="regError" style="display:none;color:#dc2626;font-size:12px;text-align:center;margin-bottom:10px;font-weight:600"></div>'
     +'<button id="regSubmitBtn" onclick="_regSubmit()" style="'+_regBtnBlue+'margin-bottom:10px"><i class="fas fa-paper-plane"></i> '+_regT('reg_submit')+'</button>'
     +'<button onclick="_regStep=1;_regRenderStep1()" style="'+_regBtnOutline+'">'+_regT('reg_close')+'</button>';
@@ -2534,7 +2539,7 @@ async function _regSubmit(){
     var d=await r.json();
     if(d.error){if(err){err.style.display='block';err.textContent=d.error;}if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> '+_regT('reg_submit');}return;}
     document.getElementById('regModalBody').innerHTML='<div style="text-align:center;padding:30px 0">'
-      +'<div style="width:72px;height:72px;border-radius:50%;background:rgba(22,163,74,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><i class="fas fa-check-circle" style="font-size:36px;color:#16a34a"></i></div>'
+      +'<div style="width:72px;height:72px;border-radius:0;background:rgba(22,163,74,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><i class="fas fa-check-circle" style="font-size:36px;color:#16a34a"></i></div>'
       +'<div style="font-size:22px;font-weight:900;color:#0f172a;margin-bottom:8px">'+_regT('reg_success')+'</div>'
       +'<div style="font-size:13px;color:#475569;line-height:1.8;margin-bottom:20px">'+_regT('reg_account_label')+': <b style="color:#0f172a">'+accNum+'</b><br>'+d.name+'</div>'
       +'<button onclick="_regClose()" style="'+_regBtnGreen+'">'+_regT('reg_close')+'</button></div>';
@@ -2553,7 +2558,7 @@ function openRegModal(id,name,icon,affiliate,app,promo){
   m.id='regModal';
   m.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
   m.innerHTML='<style>@keyframes regSpin{to{transform:rotate(360deg)}}</style>'
-    +'<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.12);animation:regSlideUp .25s ease">'
+    +'<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:0;padding:24px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.12);animation:regSlideUp .25s ease">'
     +'<style>@keyframes regSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}</style>'
     +'<div id="regModalBody"></div></div>';
   document.body.appendChild(m);
