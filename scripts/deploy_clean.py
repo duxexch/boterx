@@ -11,6 +11,10 @@ stdin, stdout, stderr = ssh.exec_command('systemctl stop boterx-dashboard.servic
 stdout.channel.recv_exit_status()
 time.sleep(3)
 
+print('1.5. Preserving CSV files...')
+stdin, stdout, stderr = ssh.exec_command('cd /opt/bot && cp companies.csv /tmp/_companies_backup.csv 2>/dev/null; cp payment_methods.csv /tmp/_payment_backup.csv 2>/dev/null; echo "backed up"', timeout=30)
+stdout.channel.recv_exit_status()
+
 print('2. Pulling latest code...')
 stdin, stdout, stderr = ssh.exec_command('cd /opt/bot && git fetch origin && git reset --hard origin/main && git clean -fd', timeout=120)
 out = stdout.read().decode('utf-8', 'ignore').strip()
@@ -18,6 +22,10 @@ print(out)
 err = stderr.read().decode('utf-8', 'ignore').strip()
 if err:
     print('STDERR:', err)
+
+print('2.5. Restoring CSV files...')
+stdin, stdout, stderr = ssh.exec_command('cd /opt/bot && cp /tmp/_companies_backup.csv companies.csv 2>/dev/null; cp /tmp/_payment_backup.csv payment_methods.csv 2>/dev/null; rm -f /tmp/_companies_backup.csv /tmp/_payment_backup.csv; echo "restored"', timeout=30)
+stdout.channel.recv_exit_status()
 
 print('3. Starting dashboard...')
 stdin, stdout, stderr = ssh.exec_command('systemctl start boterx-dashboard.service', timeout=60)
