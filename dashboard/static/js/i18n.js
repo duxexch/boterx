@@ -126,6 +126,7 @@
     Resolved:      { ar: 'تم الحل', en: 'Resolved' },
     Error:         { ar: 'خطأ', en: 'Error' },
     referrals:    { ar: 'الإحالات', en: 'Referrals' },
+    compensation: { ar: 'التعويضات', en: 'Compensation' },
     channels:     { ar: 'القنوات', en: 'Channels' },
     bots:         { ar: 'البوتات', en: 'Bots' },
     browser:      { ar: 'المتصفح', en: 'Browser' },

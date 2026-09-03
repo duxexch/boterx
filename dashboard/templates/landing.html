@@ -1517,14 +1517,14 @@ body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 /* Card CTA */
 .comp-cta{padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap;background:color-mix(in srgb,var(--card-accent,var(--green)) 3%,var(--surface2));border-top:1px solid var(--border)}
-.comp-cta a{flex:1;min-width:0;text-align:center;padding:12px;border-radius:10px;font-weight:800;font-size:14px;text-decoration:none;transition:all .15s}
-.comp-cta a:active{transform:scale(.97)}
+.comp-cta a,.comp-cta button{flex:1;min-width:0;text-align:center;padding:12px;border-radius:12px;font-weight:800;font-size:14px;text-decoration:none;transition:all .15s;border:none;cursor:pointer;font-family:'Cairo',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px}
+.comp-cta a:active,.comp-cta button:active{transform:scale(.97)}
 .cta-main{background:linear-gradient(135deg,var(--card-accent,var(--green)),color-mix(in srgb,var(--card-accent,var(--green)) 85%,#000));color:#fff;box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 30%,transparent)}
 .cta-main:hover{box-shadow:0 6px 24px color-mix(in srgb,var(--card-accent,var(--green)) 40%,transparent);transform:translateY(-1px)}
-.cta-app{background:linear-gradient(135deg,#1a73e8,#0d47a1);color:#fff;box-shadow:0 4px 16px rgba(26,115,232,.25)}
-.cta-app:hover{box-shadow:0 6px 24px rgba(26,115,232,.35);transform:translateY(-1px)}
-.cta-sec{background:var(--surface);color:var(--text);border:1px solid var(--border)}
-.cta-sec:hover{border-color:var(--card-accent,var(--green))}
+.cta-app{background:linear-gradient(135deg,var(--card-accent,var(--green)),color-mix(in srgb,var(--card-accent,var(--green)) 85%,#000));color:#fff;box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 30%,transparent)}
+.cta-app:hover{box-shadow:0 6px 24px color-mix(in srgb,var(--card-accent,var(--green)) 40%,transparent);transform:translateY(-1px)}
+.cta-sec{background:linear-gradient(135deg,var(--card-accent,var(--green)),color-mix(in srgb,var(--card-accent,var(--green)) 85%,#000));color:#fff;box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 30%,transparent)}
+.cta-sec:hover{box-shadow:0 6px 24px color-mix(in srgb,var(--card-accent,var(--green)) 40%,transparent);transform:translateY(-1px)}
 
 /* Promo Code Copy */
 .promo-code-row{display:flex;align-items:center;gap:6px}
@@ -1879,7 +1879,7 @@ footer a:hover{text-decoration:underline}
         </div>
       </div>
       <div class="comp-cta">
-        <button class="cta-main" onclick="openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')" data-i18n="comp_cta_register">سجّل في {{ c.name }}</button>
+        <a href="javascript:void(0)" class="cta-main" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')" data-i18n="comp_cta_register">سجّل في {{ c.name }}</a>
         {% if c.app_link %}
         <a href="{{ c.app_link }}" class="cta-app" target="_blank" rel="noopener" data-i18n="download_app">تحميل التطبيق</a>
         {% endif %}
