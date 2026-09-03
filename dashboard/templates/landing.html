@@ -1533,17 +1533,19 @@ body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--t
 .pros-cons li{font-size:13px;padding:3px 0;display:flex;gap:5px;color:var(--muted)}
 
 /* Card CTA */
-.comp-cta{padding:12px 14px;display:flex;gap:6px;background:color-mix(in srgb,var(--card-accent,var(--green)) 3%,var(--surface2));border-top:1px solid var(--border)}
-.comp-cta a{flex:1;min-width:0;text-align:center;padding:10px 6px;border-radius:0;font-weight:800;font-size:12px;text-decoration:none;transition:all .2s;position:relative;overflow:hidden;border:none;white-space:nowrap}
+.comp-cta{padding:12px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:color-mix(in srgb,var(--card-accent,var(--green)) 3%,var(--surface2));border-top:1px solid var(--border)}
+.comp-cta a{text-align:center;padding:10px 4px;border-radius:0;font-weight:800;font-size:12px;text-decoration:none;transition:all .2s;position:relative;overflow:hidden;border:none;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:4px;min-width:0}
 .comp-cta a:active{transform:scale(.97)}
 .comp-cta a::after{content:'';position:absolute;top:0;left:0;right:0;height:50%;background:linear-gradient(180deg,rgba(255,255,255,.25) 0%,rgba(255,255,255,.05) 100%);pointer-events:none}
+.comp-cta a i{font-size:11px;flex-shrink:0}
 .cta-main{background:linear-gradient(180deg,color-mix(in srgb,var(--card-accent,var(--green)) 100%,#fff 0%) 0%,var(--card-accent,var(--green)) 50%,color-mix(in srgb,var(--card-accent,var(--green)) 100%,#000 10%) 100%);color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--card-accent,var(--green)) 35%,transparent),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)}
 .cta-main:hover{box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 45%,transparent),inset 0 1px 0 rgba(255,255,255,.3),inset 0 -1px 0 rgba(0,0,0,.2);transform:translateY(-1px)}
 .cta-app{background:linear-gradient(180deg,color-mix(in srgb,var(--card-accent,var(--green)) 80%,#fff 20%) 0%,color-mix(in srgb,var(--card-accent,var(--green)) 70%,#fff 30%) 50%,color-mix(in srgb,var(--card-accent,var(--green)) 80%,#000 20%) 100%);color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--card-accent,var(--green)) 25%,transparent),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.15)}
 .cta-app:hover{box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 35%,transparent),inset 0 1px 0 rgba(255,255,255,.3),inset 0 -1px 0 rgba(0,0,0,.2);transform:translateY(-1px)}
 .cta-sec{background:linear-gradient(180deg,color-mix(in srgb,var(--card-accent,var(--green)) 12%,#fff 88%) 0%,color-mix(in srgb,var(--card-accent,var(--green)) 8%,#fff 92%) 50%,color-mix(in srgb,var(--card-accent,var(--green)) 15%,#fff 85%) 100%);color:var(--card-accent,var(--green));border:1.5px solid color-mix(in srgb,var(--card-accent,var(--green)) 40%,transparent);box-shadow:0 2px 8px color-mix(in srgb,var(--card-accent,var(--green)) 10%,transparent),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(0,0,0,.05)}
 .cta-sec:hover{border-color:var(--card-accent,var(--green));box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 20%,transparent),inset 0 1px 0 rgba(255,255,255,.6),inset 0 -1px 0 rgba(0,0,0,.08);transform:translateY(-1px)}
-@media(max-width:420px){.comp-cta a{font-size:11px;padding:9px 4px}}
+@media(max-width:420px){.comp-cta{gap:4px;padding:10px 10px}.comp-cta a{font-size:11px;padding:8px 2px;gap:3px}.comp-cta a i{font-size:10px}}
+@media(max-width:360px){.comp-cta a span{display:none}.comp-cta a{font-size:14px;padding:10px 0}}
 
 /* Promo Code Copy */
 .promo-code-row{display:flex;align-items:center;gap:6px}
@@ -1899,9 +1901,7 @@ footer a:hover{text-decoration:underline}
       </div>
       <div class="comp-cta">
         <a href="javascript:void(0)" class="cta-main" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')"><i class="fas fa-user-plus"></i> <span data-i18n="comp_cta_register" data-company-name="{{ c.name }}">سجّل</span></a>
-        {% if c.app_link %}
-        <a href="{{ c.app_link }}" class="cta-app" target="_blank" rel="noopener"><i class="fas fa-download"></i> <span data-i18n="download_app">التطبيق</span></a>
-        {% endif %}
+        <a href="{{ c.app_link or '#' }}" class="cta-app" target="_blank" rel="noopener"><i class="fas fa-download"></i> <span data-i18n="download_app">التطبيق</span></a>
         <a href="/company/{{ c.id }}" class="cta-sec"><i class="fas fa-info-circle"></i> <span data-i18n="comp_cta_details">التفاصيل</span></a>
       </div>
       <meta itemprop="author" content="VEX Games">
