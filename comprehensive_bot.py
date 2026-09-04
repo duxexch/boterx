@@ -97,6 +97,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         self.api_url = f"https://api.telegram.org/bot{token}"
         self.offset = 0
         self._db = get_db()
+        # bot's own user ID (from token prefix) — used to skip relaying own messages
+        self.bot_id = int(token.split(':')[0]) if ':' in token else 0
         self.user_states = PersistentStateDict(self._db)
         self.temp_company_data = {}  # إضافة المتغير المفقود
         self.init_files()
@@ -3370,6 +3372,11 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         chat_id = message.get('chat', {}).get('id', '')
         chat_title = message.get('chat', {}).get('title', '')
 
+        # تجاهل الرسائل المرسلة من البوت نفسه لمنع حلقات إعادة النشر اللانهائية
+        sender_id = message.get('from', {}).get('id', 0)
+        if sender_id and sender_id == self.bot_id:
+            return False
+
         # فحص هل القناة مسجلة (سواء مصدرية أو مدارة)
         channel_settings = self.get_channel_settings(chat_id)
         source_channel = None
@@ -3722,6 +3729,11 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         chat_id = message.get('chat', {}).get('id', '')
         chat_title = message.get('chat', {}).get('title', '')
         chat_type = message.get('chat', {}).get('type', '')
+
+        # تجاهل الرسائل المرسلة من البوت نفسه لمنع حلقات إعادة النشر اللانهائية
+        sender_id = message.get('from', {}).get('id', 0)
+        if sender_id and sender_id == self.bot_id:
+            return False
 
         # فحص هل القناة مسجلة
         channel_settings = self.get_channel_settings(chat_id)
