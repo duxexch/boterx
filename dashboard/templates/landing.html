@@ -1896,12 +1896,14 @@ footer a:hover{text-decoration:underline}
     {% set ch = {'1XBET':'#E31937','MELBET':'#1565C0','BETJAM':'#FF6D00','MOSTBET':'#2E7D32','BIZBET':'#7B1FA2','XPARI':'#00838F','LINEBET':'#3949AB','GOOOBET':'#C2185B'} %}
     {% set cc = colors.get(c.name, '22,163,74') %}
     {% set chex = ch.get(c.name, '#16a34a') %}
-    <article class="comp-card" style="--card-accent:{{ chex }}" id="company-{{ c.slug }}" itemscope itemtype="https://schema.org/Review">
+    <article class="comp-card" style="--card-accent:{{ chex }}" id="company-{{ c.slug }}" itemscope itemtype="https://schema.org/Review" itemprop="itemReviewed" itemscope itemtype="https://schema.org/Organization">
       <div class="comp-head">
         <div class="comp-icon" style="background:rgba({{cc}},0.08);border-color:rgba({{cc}},0.18);box-shadow:0 4px 12px rgba({{cc}},0.1)">{% if c.icon.startswith('/static') %}<img src="{{ c.icon }}" alt="{{ c.name }}" loading="lazy">{% else %}{{ c.icon }}{% endif %}</div>
         <div class="comp-head-info">
           <div class="comp-name" itemprop="name">{{ c.name }}</div>
           <div class="comp-license">{{ c.license }}</div>
+          <meta itemprop="name" content="{{ c.name }}">
+          <meta itemprop="url" content="https://vex.deals/go/{{ c.id }}">
         </div>
         <span class="badge" style="background:{{ chex }};color:#fff" data-i18n="badge_trusted">موثوق</span>
       </div>
@@ -1927,10 +1929,14 @@ footer a:hover{text-decoration:underline}
           <div style="background:rgba({{cc}},0.05);border-color:rgba({{cc}},0.1)"><strong style="color:{{ chex }}" data-i18n="why_vex_pros_title">⭐ لماذا VEX؟</strong><ul><li data-i18n="why_vex_bonus">بونص حصري</li><li data-i18n="why_vex_verified">شريك معتمد</li><li data-i18n="why_vex_wallet">محفظة آمنة</li></ul></div>
         </div>
       </div>
-      <div class="comp-cta" style="background:rgba({{cc}},0.03);border-top-color:rgba({{cc}},0.1)">
+<div class="comp-cta" style="background:rgba({{cc}},0.03);border-top-color:rgba({{cc}},0.1)">
         <a href="javascript:void(0)" class="cta-main" style="background:linear-gradient(180deg,{{ chex }},{{ chex }}dd,{{ chex }}bb);color:#fff;box-shadow:0 2px 8px rgba({{cc}},0.3)" onclick="event.preventDefault();openRegModal('{{ c.id }}','{{ c.name }}','{{ c.icon }}','{{ c.affiliate_link }}','{{ c.app_link }}','{{ c.promo_code or "VEX" }}')"><i class="fas fa-user-plus"></i> <span data-i18n="comp_cta_register" data-company-name="{{ c.name }}">سجّل</span></a>
         <a href="{{ c.app_link or '#' }}" class="cta-app" style="background:linear-gradient(180deg,rgba({{cc}},0.85),rgba({{cc}},0.65),rgba({{cc}},0.5));color:#fff;box-shadow:0 2px 8px rgba({{cc}},0.2)" target="_blank" rel="noopener"><i class="fas fa-download"></i> <span data-i18n="download_app">التطبيق</span></a>
         <a href="/company/{{ c.id }}" class="cta-sec" style="background:rgba({{cc}},0.08);color:{{ chex }};border:1.5px solid rgba({{cc}},0.3)"><i class="fas fa-info-circle"></i> <span data-i18n="comp_cta_details">التفاصيل</span></a>
+        <div itemprop="author" itemscope itemtype="https://schema.org/Organization" style="display:none">
+          <meta itemprop="name" content="VEX Games">
+          <meta itemprop="url" content="https://vex.deals">
+        </div>
       </div>
       <meta itemprop="author" content="VEX Games">
     </article>
