@@ -381,10 +381,14 @@ def get_fieldnames(filename, default_fields):
     return default_fields
 
 def log_action(action_type, details=''):
-    """تسجيل إجراء الأدمن"""
+    """تسجيل إجراء الأدمن — آمن خارج request context (المهام الخلفية زي auto-post)"""
+    try:
+        admin_id = session.get('admin_id', 'unknown')
+    except RuntimeError:
+        admin_id = 'scheduler'
     entry = {
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'admin_id': session.get('admin_id', 'unknown'),
+        'admin_id': admin_id,
         'action_type': action_type,
         'details': details
     }
@@ -14072,7 +14076,7 @@ _CONTENT_TEMPLATES = {
         "🎯 picks اليوم: {picks}. هل توافق؟",
     ],
     "analysis": [
-        "📋 تحليل مباراة {match_name}:\\n{analysis_details}",
+        "📋 تحليل مباراة {match_name}:\n{analysis_details}",
         "🔍 تقرير مفصل: {report_summary}",
         "📝 تقييم أداء اللاعبين: {player_ratings}",
     ],
@@ -14085,6 +14089,34 @@ _CONTENT_TEMPLATES = {
         "🏁 نتيجة المباراة: {result}",
         "✅ خلاصة المباراة: {match_summary}",
         "📊 النتيجة النهائية: {final_result}",
+    ],
+    # منشورات تحفيزية — روابط عميقة (deep links) لدومين عشوائي كل مرة — HTML صالح لتليجرام
+    "engagement": [
+        '🚀 <b>كل يوم فرصة جديدة!</b>\nابدأ رحلتك معنا الآن من <a href="{random_domain}">منصتنا الرسمية</a> 🔥',
+        '💡 <b>نصيحة اليوم:</b> النتائج تصنع الثقة — تابع تحليلاتنا الحصرية من <a href="{random_domain}">هنا</a> ⚡',
+        '🏆 <b>أبطال لا يتوقفون!</b> انضم لمجتمعنا واحصل على مميزات حصرية عبر <a href="{random_domain}">الرابط الرسمي</a> 💎',
+        '🔥 <b>فرصتك تنتظرك!</b> لا تفوّت التحديثات اليومية — تصفّح الآن: <a href="{random_domain}">منصتنا</a> 🎯',
+        '⭐ <b>ابدأ اليوم واحصد الغد!</b> كل خطوة تقربك من جائزتك — <a href="{random_domain}">ادخل الآن</a> 🌟',
+        '🎁 <b>مميزات جديدة بانتظارك!</b> سجّل واستفد من العروض عبر <a href="{random_domain}">الرابط</a> ✅',
+    ],
+
+    # ── منشورات ترويجية للمشروع (ميزات، محفظة، يانصيب، أرباح) ──
+    "promo_features": [
+        '🎰 <b>اليانصيب الأسبوعي — فرصتك للربح الكبير!</b>\n🎟️ تذكرة من 5 EGP — جائزة كبرى تزداد مع كل تذكرة\n🏆 فائزون متعددون في كل سحبة\n🔄 سحبات منتظمة وشفافة\n👇 شارك الآن: <a href="{random_domain}">اليانصيب</a>',
+        '🌟 <b>فرصة ذهبية مع اليانصيب</b>\n💰 اشترِ تذكرة — انتظر السحبة — اربح الجائزة الكبرى\n✅ نظام عادل وشفاف\n🎯 جوائز نقدية فورية\n🔗 <a href="{random_domain}">احصل على تذكرتك</a>',
+        '🎟️ <b>اليانصيب في VEX Games</b>\n🎁 تذاكر بأسعار تنافسية\n🏆 سحبات أسبوعية بجوائز كبرى\n📊 نتائج شفافة ومعلنة\n➡️ <a href="{random_domain}">اشترك الآن</a>',
+    ],
+    "promo_wallet": [
+        '💳 <b>محفظة VEX Games — رصيدك بأمان</b>\n💰 رصيد ألعاب موحد لجميع الألعاب\n📱 تحقق بالهاتف لحماية الحساب\n💸 أرباح الإحالة تضاف للرصيد تلقائياً\n🔐 عمليات آمنة بـ SQLite\n👛 افتح محفظتك: <a href="{random_domain}">من هنا</a>',
+        '🏦 <b>إدارة أموال ذكية</b>\n✅ إيداع للعب في أي لعبة\n✅ سحب الأرباح بسهولة\n✅ سجل معاملات شفاف\n✅ رصيد موحد — لا تحتاج تحويل بين الألعاب\n🔗 جرّب المحفظة: <a href="{random_domain}">الرابط</a>',
+    ],
+    "promo_lottery": [
+        '🎰 <b>اليانصيب الأسبوعي — جوائز كبرى!</b>\n🎟️ تذكرة من 5 EGP — فرصة للفوز الكبير\n🏆 فائزون متعددون في كل سحبة\n💰 جائزة كبرى تزداد مع كل تذكرة\n🔄 سحبات منتظمة وشفافة\n🎫 اشترك الآن: <a href="{random_domain}">شارك في اليانصيب</a>',
+        '🌟 <b>فرصتك للربح مع اليانصيب</b>\n🎯 اشتري تذكرة — انتظر السحبة\n🏆 جوائز نقدية فورية\n✅ نظام عادل وشفاف\n👇 <a href="{random_domain}">احصل على تذكرتك</a>',
+    ],
+    "promo_profits": [
+        '📈 <b>اكسب مع VEX Games</b>\n🤝 ادعُ أصدقاءك — أرباح إحالة تضاف لرصيدك\n🎁 شركات شريكة بروابط حصرية\n🏆 ألعب واربح — رصيدك يكبر مع كل جولة\n🔗 ابدأ الكسب: <a href="{random_domain}">من هنا</a>',
+        '💎 <b>حوّل لعبك لأرباح حقيقية</b>\n🎮 9 ألعاب = 9 فرص للربح\n📊 رصيد موحد يسهل الإدارة\n🔄 أرباح الإحالة تلقائية\n➡️ <a href="{random_domain}">اكتشف كيف تربح</a>',
     ],
 }
 
@@ -14121,6 +14153,199 @@ def _apply_placeholders(text, channel, extra=None):
     return text
 
 
+# قيم رياضية عامة لـ placeholders القوالب — تمنع إرسال نص فيه {…} مكسور
+_AUTO_FILL_POOL = {
+    'stats_today': [
+        'استحواذ عالٍ وصناعة فرص متعددة طوال اللقاء',
+        'ضغط هجومي مستمر وكرات سريعة في المرتدات',
+        'أداء منظم في الوسط وخطورة دائمة على الأطراف',
+    ],
+    'stat_highlight': [
+        'تسديدات على المرمى أكثر من المعتاد ودفاع صلب',
+        'استحواذ يتجاوز 60% وصناعة فرص واضحة',
+        'تمريرات مفتاحية ناجحة بين خطوط الخصم',
+    ],
+    'fun_fact': [
+        'أكثر المباريات تُحسم في آخر15 دقيقة من الوقت بدلها',
+        'الفريق الذي يسجّل أولًا يفوز في أغلب مواجهات الموسم',
+        'الكرات الثابتة تصنع الفارق في أكثر من نصف المباريات',
+    ],
+    'achievement': [
+        'سلسلة نتائج إيجابية متتالية يستحق التتويج',
+        'أرقام مميزة في الهجوم والدفاع معًا',
+        'تألق واضح في المباريات الكبرى هذا الموسم',
+    ],
+    'question': [
+        'من برأيكم الأكثر استحقاقًا للفوز بالقمة؟',
+        'ما التغيير الذي سيعيد التوازن في الشوط الثاني؟',
+        'من لاعب المباراة برأيكم حتى الآن؟',
+    ],
+    'upcoming_match': ['قمة الليلة', 'المواجهة المنتظرة', 'الديربي الكبير'],
+    'prediction_details': [
+        'كلا الفريقين يسجّل وأكثر من هدفين في اللقاء',
+        'شوط أول حذر وحسم في الثلث الأخير',
+        'فوز صاحب الأرض بهدف نظيف بعد ضغط مبكر',
+    ],
+    'prediction': [
+        'كلا الفريقين يسجّل',
+        'تعادل إيجابي في الشوط الأول',
+        'أكثر من هدفين في المباراة',
+    ],
+    'picks': [
+        'رون الفريقين + أكثر من8 كورنرز',
+        'الطرف الأول يسجّل + تسديدات على المرمى',
+        'شوط دون أهداف وحسم متأخر',
+    ],
+    'match_name': ['مباراة القمة', 'الديربي الكبير', 'المواجهة الحاسمة'],
+    'analysis_details': [
+        'وسط ميدان مسيطر وضغط عالٍ على الأطراف مع مساحات خلف الظهير',
+        'دفاع منظم والاعتماد على المرتدات السريعة عبر العمق',
+        'استحواذ في المنطقة الوسطى وتوليد الفرص من الأطراف',
+    ],
+    'report_summary': [
+        'أفضلية نسبية لصاحب الأرض مع خطورة متوازنة من الضيف',
+        'سيطرة في وسط الميدان وفرص متبادلة قليلة الخطورة',
+        'مباراة مغلقة تُحسم على الفرديات والكرات الثابتة',
+    ],
+    'player_ratings': [
+        'أداء قوي للمهاجم الصريح وتألق حارس المرمى',
+        'خط الوسط الأفضل تأثيرًا والظهير الأكثر نشاطًا',
+        'قلب الدفاع الأثبت ومهاجم يستحق التتويج بالأفضل',
+    ],
+    'live_event': [
+        'هدف مبكر يغيّر موازين المباراة',
+        'فرصة محققة تُهدر في الشوط الأول',
+        'طرد مثير للفريق الضيف بعد احتكاك عنيف',
+    ],
+    'live_update': [
+        'النتيجة1-0 لصالح صاحب الأرض حتى الآن',
+        'استحواذ متوازن وفرص متبادلة سريعة',
+        'ضغط حاسم من الفريق صاحب النتيجة في الدقائق الأخيرة',
+    ],
+    'live_details': [
+        'هدف من ركلة حرة مباشرة تجاوزت الحائط',
+        'تصدٍّ مذهل يمنع التعادل في الوقت بدل الضائع',
+        'هجوم مكثف ودفاع يقف على خط المرمى',
+    ],
+    'result': ['فوز صاحب الأرض بهدف نظيف', 'تعادل إيجابي2-2 بعد مباراة مفتوحة', 'فوز الضيف في اللحظات الأخيرة'],
+    'match_summary': [
+        'سيطرة متبادلة وحسم في الدقائق الختامية',
+        'شوط أول حافل وشوط ثانٍ محسوم للدفاع',
+        'مباراة قوية انتهت بنتيجة عادلة للفريقين',
+    ],
+    'final_result': ['النتيجة النهائية1-0', 'النتيجة النهائية2-1', 'النتيجة النهائية1-1'],
+    'event_name': ['كأس الموسم', 'قمة الجولة', 'ديربي المدينة'],
+    'event_details': [
+        'مواجهتان متتاليتان تحددان صدارة الترتيب',
+        'جوائز تشجيعية للمشاركين ومتابعة مباشرة',
+        'موعد مثير بين منافسين تقليديين هذا الموسم',
+    ],
+}
+
+
+def _auto_fill_placeholders(text):
+    """يملأ أي placeholder متبقٍ بقيمة رياضية عامة — يمنع إرسال نص فيه {…} مكسور."""
+    def _rep(m):
+        pool = _AUTO_FILL_POOL.get(m.group(1))
+        return random.choice(pool) if pool else ''
+    return re.sub(r'\{([a-zA-Z_][a-zA-Z0-9_]*)\}', _rep, text)
+
+
+_PROJECT_DOMAINS = [
+    'https://vex.deals',
+    'https://betjam.sbs',
+    'https://betongame.cloud',
+    'https://1xbetservices.com',
+    'https://vixo.uno',
+]
+
+
+def _last_auto_user_post_at():
+    """آخر وقت منشور تلقائي موجّه للمستخدمين — لمنع التكرار (حد أدنى6 ساعات)"""
+    last = None
+    for row in read_csv('broadcast_queue.csv'):
+        if row.get('created_by') != 'auto_post_engine' or row.get('recipient') != 'all':
+            continue
+        try:
+            ts = datetime.strptime(row.get('created_at', '') or '', '%Y-%m-%d %H:%M')
+        except ValueError:
+            continue
+        if last is None or ts > last:
+            last = ts
+    return last
+
+
+def _queue_auto_post_for_channel(ch, now_s):
+    """جدولة منشور واحد — منشور للمستخدمين (والميرور ينسخه للقنوات)، أو منشور قناة مباشر."""
+    types_raw = str(ch.get("auto_post_types") or "info|question|prediction|analysis")
+    allowed_types = [t.strip() for t in types_raw.split("|") if t.strip()] or ["info", "question"]
+    allowed_types = [t for t in allowed_types if _CONTENT_TEMPLATES.get(t)]
+    if not allowed_types:
+        return False
+    chosen_type = random.choice(allowed_types)
+    template = random.choice(_CONTENT_TEMPLATES[chosen_type])
+    text = _apply_placeholders(template, ch)
+    # دومين عشوائي جديد لكل منشور — روابط عميقة (deep links) داخل نص تليجرام
+    text = text.replace('{random_domain}', random.choice(_PROJECT_DOMAINS))
+    text = _auto_fill_placeholders(text)
+    full_text = text + _get_branding_suffix(ch)
+
+    entry = {
+        "id": "AUTO" + secrets.token_hex(4).upper(),
+        "message": full_text,
+        "type": "channel",
+        "platform": str(ch.get("platform", "telegram") or "telegram").lower(),
+        "target_chat_id": str(ch.get("chat_id", "") or ""),
+        "platform_account_id": str(ch.get("platform_account_id", "") or ""),
+        "target_channel_id": ch.get("id", ""),
+        "created_at": now_s,
+        "created_by": "auto_post_engine",
+        "status": "pending",
+        "target": "channel",
+        "recipient": "single",
+        "priority": "normal",
+        "country": "all",
+        "media_urls": "",
+        "target_user": "",
+        "target_name": "",
+        "scheduled_at": "",
+        "cron_expr": "",
+    }
+
+    # منشور تحفيزي: يذهب للمستخدمين مباشرة والميرور ينسخه لكل القنوات — كحد أدنى كل6 ساعات
+    if chosen_type == 'engagement':
+        last_u = _last_auto_user_post_at()
+        if last_u and (datetime.now() - last_u).total_seconds() < 6 * 3600:
+            return False
+        entry.update({
+            'type': 'broadcast',
+            'target': '',
+            'recipient': 'all',
+            'target_chat_id': '',
+            'target_channel_id': '',
+        })
+
+    fieldnames = get_fieldnames("broadcast_queue.csv", [
+        "id", "message", "type", "platform", "target_chat_id",
+        "platform_account_id", "target_channel_id", "created_at",
+        "created_by", "status", "target", "recipient", "priority",
+        "country", "media_urls", "target_user", "target_name",
+        "scheduled_at", "cron_expr"
+    ])
+    append_csv("broadcast_queue.csv", entry, fieldnames)
+    # إشعار ويب فوري (SSE + Web Push + سجل اللوحة)
+    try:
+        push_notification(
+            'auto_post',
+            '📣 منشور تلقائي مجدول',
+            f'{ch.get("title") or ch.get("id")}: {full_text[:150]}',
+            {'channel_id': ch.get('id', ''), 'kind': chosen_type, 'queue_id': entry['id']}
+        )
+    except Exception:
+        pass
+    return True
+
+
 @app.route("/api/content-templates", methods=["GET", "POST"])
 @api_auth
 @permission_required("send_broadcast")
@@ -14149,48 +14374,8 @@ def api_auto_post_run():
     queued = 0
     now_s = datetime.now().strftime("%Y-%m-%d %H:%M")
     for ch in active:
-        types_raw = str(ch.get("auto_post_types") or "info|question|prediction|analysis")
-        allowed_types = [t.strip() for t in types_raw.split("|") if t.strip()]
-        if not allowed_types:
-            allowed_types = ["info", "question"]
-        chosen_type = random.choice(allowed_types)
-        templates = _CONTENT_TEMPLATES.get(chosen_type, [])
-        if not templates:
-            continue
-        template = random.choice(templates)
-        text = _apply_placeholders(template, ch)
-        suffix = _get_branding_suffix(ch)
-        full_text = text + suffix
-        entry = {
-            "id": "AUTO" + secrets.token_hex(4).upper(),
-            "message": full_text,
-            "type": "channel",
-            "platform": str(ch.get("platform", "telegram") or "telegram").lower(),
-            "target_chat_id": str(ch.get("chat_id", "") or ""),
-            "platform_account_id": str(ch.get("platform_account_id", "") or ""),
-            "target_channel_id": ch.get("id", ""),
-            "created_at": now_s,
-            "created_by": "auto_post_engine",
-            "status": "pending",
-            "target": "channel",
-            "recipient": "single",
-            "priority": "normal",
-            "country": "all",
-            "media_urls": "",
-            "target_user": "",
-            "target_name": "",
-            "scheduled_at": "",
-            "cron_expr": "",
-        }
-        fieldnames = get_fieldnames("broadcast_queue.csv", [
-            "id", "message", "type", "platform", "target_chat_id",
-            "platform_account_id", "target_channel_id", "created_at",
-            "created_by", "status", "target", "recipient", "priority",
-            "country", "media_urls", "target_user", "target_name",
-            "scheduled_at", "cron_expr"
-        ])
-        append_csv("broadcast_queue.csv", entry, fieldnames)
-        queued += 1
+        if _queue_auto_post_for_channel(ch, now_s):
+            queued += 1
     log_action("auto_post_run", str(queued) + " channels queued")
     return jsonify({"success": True, "queued": queued})
 
@@ -14210,6 +14395,728 @@ def api_auto_post_scheduler():
             "chat_id": ch.get("chat_id"),
         })
     return jsonify({"enabled_count": len(enabled), "channels": status})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  AUTO-POST SCHEDULER — مجدول النشر التلقائي (خلفية)
+#  tick كل 60 ثانية + قفل ملف يمنع التكرار بين عمال gunicorn الثلاثة
+# ═══════════════════════════════════════════════════════════════
+_AUTO_POST_LOCK = os.path.join(BASE_DIR, '.auto_post_scheduler.lock')
+
+
+def _auto_post_last_times():
+    """آخر وقت جدولة auto-post لكل قناة — من broadcast_queue.csv."""
+    last = {}
+    for row in read_csv('broadcast_queue.csv'):
+        if row.get('created_by') != 'auto_post_engine':
+            continue
+        ch_id = row.get('target_channel_id', '')
+        if not ch_id:
+            continue
+        try:
+            ts = datetime.strptime(row.get('created_at', '') or '', '%Y-%m-%d %H:%M')
+        except ValueError:
+            continue
+        if ch_id not in last or ts > last[ch_id]:
+            last[ch_id] = ts
+    return last
+
+
+def _auto_post_tick():
+    """يجدول منشور واحد لكل قناة مفعّلة تجاوزت فترة الانتظار."""
+    channels = read_csv('bot_channels.csv')
+    active = [c for c in channels
+              if c.get('auto_post_enabled') == 'yes' and c.get('is_active') == 'yes']
+    if not active:
+        return
+    now = datetime.now()
+    now_s = now.strftime('%Y-%m-%d %H:%M')
+    last_times = _auto_post_last_times()
+    for ch in active:
+        try:
+            interval = max(1, int(ch.get('auto_post_interval_min') or 120))
+        except (TypeError, ValueError):
+            interval = 120
+        last = last_times.get(ch.get('id', ''))
+        if last and (now - last).total_seconds() < interval * 60:
+            continue
+        try:
+            if _queue_auto_post_for_channel(ch, now_s):
+                title = ch.get('title') or ch.get('id', '')
+                log_action('auto_post_scheduler', f'{title} queued (every {interval}m)')
+                print(f'[AUTO_POST] queued for channel {title} ({ch.get("chat_id", "")}) every {interval}m', flush=True)
+        except Exception as exc:
+            app.logger.error('[AUTO_POST] queue failed for %s: %s', ch.get('id', ''), exc)
+
+
+def _auto_post_scheduler_loop():
+    import fcntl as _fcntl
+    time.sleep(20)  # انتظار اكتمال تحميل التطبيق قبل أول tick
+    while True:
+        try:
+            fd = os.open(_AUTO_POST_LOCK, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                _fcntl.flock(fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+                _auto_post_tick()
+                _fcntl.flock(fd, _fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+        except BlockingIOError:
+            pass  # عامل gunicorn آخر ينفّذ الـtick الآن
+        except Exception as exc:
+            app.logger.error('auto_post_scheduler: %s', exc)
+        time.sleep(60)
+
+
+threading.Thread(target=_auto_post_scheduler_loop, daemon=True, name='auto_post_scheduler').start()
+print('[AUTO_POST] scheduler thread started (60s interval, flock-guarded)', flush=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SOURCE HEALTH MONITOR — فحص المصادر والإشعارات كل 30 دقيقة
+# ═══════════════════════════════════════════════════════════════
+_SOURCE_HEALTH_LOCK = os.path.join(BASE_DIR, '.source_health.lock')
+_SOURCE_HEALTH_STATE = os.path.join(BASE_DIR, '.source_health_state.json')
+
+
+def _sh_state_load():
+    try:
+        with open(_SOURCE_HEALTH_STATE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _sh_state_save(state):
+    try:
+        with open(_SOURCE_HEALTH_STATE, 'w', encoding='utf-8') as f:
+            json.dump(state, f)
+    except Exception:
+        pass
+
+
+def _source_health_check():
+    """فحص شامل: المصادر، ودقة الأخبار، اشتراك الويب، الخدمات، فشل النشر."""
+    issues = []
+    ok_notes = []
+    now = datetime.now()
+    channels = read_csv('bot_channels.csv')
+    managed = [c for c in channels
+               if c.get('channel_role') in ('source', 'both') and c.get('is_active') == 'yes']
+    try:
+        ext = [s for s in read_csv('source_channels.csv') if s.get('is_active') == 'yes']
+    except Exception:
+        ext = []
+    n_sources = len(managed) + len(ext)
+
+    if n_sources == 0:
+        issues.append('لا توجد أي مصادر مسجلة — أضف البوت أدمن في قنوات الأخبار/الرياضة')
+    else:
+        # آخر نشاط وارد من مصدر (أي نوع غير المنشورات الصادرة من البوت نفسه)
+        last_src = ''
+        try:
+            for r in read_csv('relay_log.csv'):
+                t = (r.get('type') or '').strip()
+                if t and t not in ('broadcast', 'queue_post'):
+                    ts = (r.get('timestamp') or '').strip()
+                    if ts > last_src:
+                        last_src = ts
+        except Exception:
+            pass
+        if not last_src:
+            issues.append(f'{n_sources} مصدر مسجل لكن لم يصل أي خبر منه حتى الآن')
+        else:
+            try:
+                last_dt = datetime.strptime(last_src[:16], '%Y-%m-%d %H:%M')
+                idle_h = (now - last_dt).total_seconds() / 3600.0
+                if idle_h > 6:
+                    issues.append(f'آخر خبر من المصادر قبل {idle_h:.1f} ساعة (>6h)')
+                else:
+                    ok_notes.append(f'أخبار واردة قبل {idle_h:.1f} ساعة')
+            except ValueError:
+                pass
+        inactive = [c.get('title') or c.get('id') for c in channels
+                    if c.get('channel_role') in ('source', 'both') and c.get('is_active') != 'yes']
+        if inactive:
+            issues.append('قنوات مصدر معطّلة: ' + ', '.join(str(x) for x in inactive[:4]))
+
+    # اشتراك إشعارات الويب (الجرس) — هل يوجد متصفح مشترك فعليًا؟
+    try:
+        subs = read_csv('push_subscriptions.csv')
+        real = [s for s in subs
+                if (s.get('endpoint') or '').startswith('https://')
+                and 'DEADBEEF' not in (s.get('endpoint') or '')]
+        if not real:
+            issues.append('لا يوجد اشتراك إشعارات ويب فعّال — افتح اللوحة وسمح بالإشعارات 🔔')
+        else:
+            ok_notes.append(f'{len(real)} اشتراك إشعارات ويب')
+    except Exception:
+        pass
+
+    # حالة الخدمات
+    try:
+        import subprocess as _sp
+        for svc in ('boterx', 'boterx-dashboard'):
+            st = _sp.run(['systemctl', 'is-active', svc],
+                         capture_output=True, text=True, timeout=8).stdout.strip()
+            if st != 'active':
+                issues.append(f'خدمة {svc}: {st}')
+    except Exception:
+        pass
+
+    # فشل منشورات تلقائية آخر ساعتين
+    fails = []
+    for r in read_csv('broadcast_queue.csv'):
+        if r.get('created_by') == 'auto_post_engine' and (r.get('status') or '') == 'failed':
+            try:
+                ts = datetime.strptime(r.get('created_at', '') or '', '%Y-%m-%d %H:%M')
+                if (now - ts).total_seconds() <= 7200:
+                    fails.append(r.get('id', '?'))
+            except ValueError:
+                continue
+    if fails:
+        issues.append('منشورات تلقائية فشلت آخر ساعتين: ' + ', '.join(fails[:5]))
+
+    ts_now = now.strftime('%Y-%m-%d %H:%M:%S')
+    state = _sh_state_load()
+
+    if not state.get('first_run'):
+        state['first_run'] = True
+        state['first_run_ts'] = ts_now
+        _sh_state_save(state)
+        try:
+            push_notification('system', '✅ نظام الفحص الدوري يعمل',
+                              f'فحص كل30 دقيقة — المصادر: {n_sources} — '
+                              + (f'{len(issues)} ملاحظة' if issues else 'كل شيء سليم'),
+                              {'sources': n_sources, 'issues': issues})
+        except Exception:
+            pass
+
+    if issues:
+        key = '|'.join(sorted(issues))[:240]
+        try:
+            last_ts = datetime.strptime(state.get('alert_ts', ''), '%Y-%m-%d %H:%M:%S')
+        except (TypeError, ValueError):
+            last_ts = datetime(2000, 1, 1)
+        if key != state.get('alert_key') or (now - last_ts).total_seconds() >= 6 * 3600:
+            try:
+                push_notification('source_alert', '⚠️ فحص المصادر الدوري',
+                                  '؛ '.join(issues), {'issues': issues, 'sources': n_sources})
+            except Exception:
+                pass
+            state['alert_key'] = key
+            state['alert_ts'] = ts_now
+            _sh_state_save(state)
+        print(f'[SOURCE_HEALTH] issues: {" | ".join(issues)}', flush=True)
+    else:
+        # سجل صامت في لوحة الإشعارات (يظهر عند فتح اللوحة بدون دفع للمتصفح)
+        try:
+            entry = {
+                'timestamp': ts_now, 'type': 'source_health',
+                'type_label': '✅ فحص المصادر الدوري',
+                'message_preview': f'المصادر {n_sources} — ' + (', '.join(ok_notes) or 'سليم'),
+                'target_type': 'dashboard', 'target_id': '', 'status': 'ok',
+            }
+            fns = get_fieldnames('notifications_log.csv',
+                                 ['timestamp', 'type', 'type_label', 'message_preview',
+                                  'target_type', 'target_id', 'status'])
+            append_csv('notifications_log.csv', entry, fns)
+        except Exception:
+            pass
+        print(f'[SOURCE_HEALTH] ok — sources={n_sources}', flush=True)
+
+
+def _source_health_loop():
+    import fcntl as _shf
+    time.sleep(45)  # انتظار اكتمال تحميل التطبيق
+    while True:
+        try:
+            fd = os.open(_SOURCE_HEALTH_LOCK, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                _shf.flock(fd, _shf.LOCK_EX | _shf.LOCK_NB)
+                _source_health_check()
+                _shf.flock(fd, _shf.LOCK_UN)
+            finally:
+                os.close(fd)
+        except BlockingIOError:
+            pass  # عامل gunicorn آخر يفحص الآن
+        except Exception as exc:
+            print(f'[SOURCE_HEALTH] error: {exc}', flush=True)
+        time.sleep(1800)
+
+
+threading.Thread(target=_source_health_loop, daemon=True, name='source_health').start()
+print('[SOURCE_HEALTH] 30-min monitor started (flock-guarded)', flush=True)
+
+# ===== مراقب الأخبار الرياضية بالمتصفح (news_monitor.py) =====
+try:
+    import importlib.util as _nm_ilu
+    _nm_path = os.path.join(BASE_DIR, 'dashboard', 'news_monitor.py')
+    _nm_spec = _nm_ilu.spec_from_file_location('news_monitor', _nm_path)
+    _nm_mod = _nm_ilu.module_from_spec(_nm_spec)
+    _nm_spec.loader.exec_module(_nm_mod)
+    _nm_mod.start(push_notification=push_notification, read_csv=read_csv,
+                  append_csv=append_csv, get_fieldnames=get_fieldnames,
+                  project_domains=_PROJECT_DOMAINS)
+    print('[NEWS] browser news monitor started (10-min, flock-guarded)', flush=True)
+except Exception as _nm_err:
+    print(f'[NEWS] failed to start: {_nm_err}', flush=True)
+
+
+# ===== مجدول المنشورات الترويجية (30/يوم × 7 أيام = 210/أسبوع، تتكرر) =====
+_PROMO_TYPES = ['promo_features', 'promo_wallet', 'promo_lottery', 'promo_profits']
+_PROMO_DAYS = ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+_PROMO_INTERVAL_SEC = 48 * 60  # 48 دقيقة = 30 منشور/يوم
+_PROMO_LOCK_FILE = os.path.join(BASE_DIR, '.promo_scheduler.lock')
+_PROMO_STATE_FILE = os.path.join(BASE_DIR, '.promo_scheduler_state.json')
+
+
+def _promo_state_load():
+    try:
+        with open(_PROMO_STATE_FILE, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _promo_state_save(state):
+    try:
+        with open(_PROMO_STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(state, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def _promo_get_today_type():
+    """نوع اليوم من الأسبوع (0=سبت..6=جمعة) — يحدد التركيز الأساسي"""
+    # يمكن تخصيص تركيز كل يوم
+    day_focus = {
+        0: ['promo_features', 'promo_wallet'],       # السبت: مميزات + محفظة
+        1: ['promo_lottery', 'promo_profits'],        # الأحد: يانصيب + أرباح
+        2: ['promo_features', 'promo_lottery'],       # الاثنين: مميزات + يانصيب
+        3: ['promo_wallet', 'promo_profits'],         # الثلاثاء: محفظة + أرباح
+        4: ['promo_features', 'promo_wallet', 'promo_lottery'],  # الأربعاء: تنوع
+        5: ['promo_lottery', 'promo_profits', 'promo_features'],  # الخميس: يانصيب + أرباح
+        6: ['promo_wallet', 'promo_profits', 'promo_features'],   # الجمعة: محفظة + أرباح
+    }
+    today = datetime.now().weekday()  # 0=Mon...6=Sun
+    # تحويل: الاثنين=0 -> index 2 في _PROMO_DAYS
+    idx = (today + 2) % 7
+    return day_focus.get(idx, _PROMO_TYPES)
+
+
+def _promo_queue_post_for_channel(ch, now_s):
+    """جدولة منشور ترويجي واحد لقناة"""
+    today_types = _promo_get_today_type()
+    chosen_type = random.choice(today_types)
+    templates = _CONTENT_TEMPLATES.get(chosen_type, [])
+    if not templates:
+        return False
+    template = random.choice(templates)
+    text = _apply_placeholders(template, ch)
+    # دومين عشوائي
+    text = text.replace('{random_domain}', random.choice(_PROJECT_DOMAINS))
+    text = _auto_fill_placeholders(text)
+    full_text = text + _get_branding_suffix(ch)
+
+    entry = {
+        "id": "PROMO" + secrets.token_hex(4).upper(),
+        "message": full_text,
+        "type": "channel",
+        "platform": str(ch.get("platform", "telegram") or "telegram").lower(),
+        "target_chat_id": str(ch.get("chat_id", "") or ""),
+        "platform_account_id": str(ch.get("platform_account_id", "") or ""),
+        "target_channel_id": ch.get("id", ""),
+        "created_at": now_s,
+        "created_by": "promo_scheduler",
+        "status": "pending",
+        "target": "channel",
+        "recipient": "single",
+        "priority": "normal",
+        "country": "all",
+        "media_urls": "",
+        "target_user": "",
+        "target_name": "",
+        "scheduled_at": "",
+        "cron_expr": "",
+    }
+
+    fieldnames = get_fieldnames("broadcast_queue.csv", [
+        "id", "message", "type", "platform", "target_chat_id",
+        "platform_account_id", "target_channel_id", "created_at",
+        "created_by", "status", "target", "recipient", "priority",
+        "country", "media_urls", "target_user", "target_name",
+        "scheduled_at", "cron_expr"
+    ])
+    append_csv("broadcast_queue.csv", entry, fieldnames)
+
+    # إشعار ويب
+    try:
+        push_notification(
+            'promo_post',
+            '📢 منشور ترويجي مجدول',
+            f'{ch.get("title") or ch.get("id")}: {full_text[:150]}',
+            {'channel_id': ch.get('id', ''), 'kind': chosen_type, 'queue_id': entry['id']}
+        )
+    except Exception:
+        pass
+    return True
+
+
+def _promo_scheduler_loop():
+    import fcntl as _pfcntl
+    time.sleep(30)  # انتظار اكتمال التحميل
+    while True:
+        try:
+            fd = os.open(_PROMO_LOCK_FILE, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                _pfcntl.flock(fd, _pfcntl.LOCK_EX | _pfcntl.LOCK_NB)
+            except BlockingIOError:
+                os.close(fd)
+                time.sleep(_PROMO_INTERVAL_SEC)
+                continue
+
+            try:
+                state = _promo_state_load()
+                now = datetime.now()
+                now_s = now.strftime('%Y-%m-%d %H:%M')
+
+                # التحقق من عدم تجاوز الحد اليومي (30/يوم)
+                today_key = now.strftime('%Y-%m-%d')
+                day_count = state.get(today_key, 0)
+                if day_count >= 30:
+                    # انتظار حتى منتصف الليل
+                    tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                    wait_sec = int((tomorrow - now).total_seconds())
+                    print(f'[PROMO] daily limit reached (30), waiting {wait_sec}s', flush=True)
+                    _pfcntl.flock(fd, _pfcntl.LOCK_UN)
+                    os.close(fd)
+                    time.sleep(min(wait_sec, 3600))
+                    continue
+
+                # جدولة المنشور التالي
+                channels = read_csv("bot_channels.csv")
+                active_channels = [c for c in channels
+                                   if c.get("auto_post_enabled") == "yes"
+                                   and c.get("is_active") == "yes"
+                                   and c.get("platform", "telegram") == "telegram"]
+
+                if active_channels:
+                    for ch in active_channels:
+                        if _promo_queue_post_for_channel(ch, now_s):
+                            day_count += 1
+                            state[today_key] = day_count
+                            _promo_state_save(state)
+                            print(f'[PROMO] queued for {ch.get("title")} — day total: {day_count}/30', flush=True)
+                            if day_count >= 30:
+                                break
+
+                _pfcntl.flock(fd, _pfcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+        except BlockingIOError:
+            pass
+        except Exception as exc:
+            print(f'[PROMO] error: {exc}', flush=True)
+        time.sleep(_PROMO_INTERVAL_SEC)
+
+
+threading.Thread(target=_promo_scheduler_loop, daemon=True, name='promo_scheduler').start()
+print('[PROMO] promotional scheduler started (48-min interval, 30/day, flock-guarded)', flush=True)
+
+
+# ===== مجدول السحب التلقائي لليانصيب =====
+_LOTTERY_DRAW_LOCK = os.path.join(BASE_DIR, '.lottery_draw.lock')
+_LOTTERY_DRAW_INTERVAL = 60  # فحص كل دقيقة
+
+def _auto_lottery_draw_loop():
+    import fcntl as _lfcntl
+    time.sleep(10)  # انتظار التحميل
+    while True:
+        try:
+            fd = os.open(_LOTTERY_DRAW_LOCK, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                _lfcntl.flock(fd, _lfcntl.LOCK_EX | _lfcntl.LOCK_NB)
+            except BlockingIOError:
+                os.close(fd)
+                time.sleep(_LOTTERY_DRAW_INTERVAL)
+                continue
+
+            try:
+                rounds = read_csv('lottery_rounds.csv')
+                now = datetime.now()
+                changed = False
+                for r in rounds:
+                    if r.get('status') != 'active':
+                        continue
+                    draw_time_str = r.get('draw_time', '').strip()
+                    if not draw_time_str:
+                        continue
+                    try:
+                        draw_dt = datetime.strptime(draw_time_str, '%Y-%m-%d %H:%M')
+                    except ValueError:
+                        continue
+                    if now >= draw_dt:
+                        # حان وقت السحب - تنفيذ
+                        round_id = r.get('id')
+                        print(f'[LOTTERY] Auto-draw triggered for {round_id}', flush=True)
+                        try:
+                            # استدعاء دالة السحب الداخلية
+                            from game_engine import _db as _gm_db
+                            import hashlib, secrets
+
+                            tickets = read_csv('lottery_tickets.csv')
+                            round_tickets = [t for t in tickets if t.get('round_id') == round_id and t.get('payment_verified') == 'yes']
+
+                            if round_tickets:
+                                winner_count = int(r.get('winner_count', '1'))
+                                if winner_count > len(round_tickets):
+                                    winner_count = len(round_tickets)
+
+                                # احتساب الجائزة
+                                ticket_price = float(r.get('ticket_price', '0') or '0')
+                                total_pool = ticket_price * len(round_tickets)
+                                admin_pct = float(r.get('admin_profit_pct', '0') or '0')
+                                net_prize = total_pool * (1 - admin_pct / 100)
+
+                                if winner_count > len(round_tickets):
+                                    winner_count = len(round_tickets)
+                                selected = round_tickets if winner_count >= len(round_tickets) else random.sample(round_tickets, winner_count)
+
+                                if winner_count == 1:
+                                    shares = [1.0]
+                                elif winner_count == 2:
+                                    shares = [0.6, 0.4]
+                                elif winner_count == 3:
+                                    shares = [0.5, 0.3, 0.2]
+                                else:
+                                    shares = [0.4, 0.25, 0.15] + [0.2 / (winner_count - 3)] * (winner_count - 3)
+
+                                winner_fieldnames = get_fieldnames('lottery_winners.csv', ['id','round_id','user_id','ticket_id','prize_amount','currency','distributed','created_at'])
+                                for i, w in enumerate(selected):
+                                    prize = round(net_prize * shares[i], 2)
+                                    currency = r.get('currency', 'EGP')
+                                    user_id = str(w.get('user_id', '')).strip()
+
+                                    winner_entry = {
+                                        'id': f"WIN{secrets.token_hex(3).upper()}",
+                                        'round_id': round_id,
+                                        'user_id': user_id,
+                                        'user_name': w.get('user_name', ''),
+                                        'ticket_id': w.get('id', ''),
+                                        'ticket_number': w.get('ticket_number', ''),
+                                        'prize_amount': f"{prize:.2f}",
+                                        'currency': currency,
+                                        'distributed': 'no',
+                                        'rank': str(i + 1),
+                                        'draw_time': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+                                    }
+
+                                    distributed = 'no'
+                                    if user_id and user_id != '0':
+                                        try:
+                                            if _gm_db:
+                                                idempotency_key = f"lottery_{round_id}_{user_id}_{i+1}"
+                                                ok, _, _ = _gm_db.credit_with_idempotency(user_id, prize, idempotency_key, {'type': 'lottery_win'})
+                                                if ok:
+                                                    distributed = 'yes'
+                                            else:
+                                                # fallback
+                                                try:
+                                                    from comprehensive_bot import GameManager
+                                                    GameManager().add_frozen_balance(user_id, prize)
+                                                    distributed = 'yes'
+                                                except:
+                                                    pass
+                                        except Exception as e:
+                                            print(f'[LOTTERY] Auto-credit error: {e}', flush=True)
+
+                                    winner_entry['distributed'] = distributed
+                                    append_csv('lottery_winners.csv', winner_entry, winner_fieldnames)
+
+                                    # إشعار
+                                    try:
+                                        push_notification('lottery_win', '🎉 مبروك! ربحت في اليانصيب',
+                                            f'جائزتك: {prize:.2f} {currency} — تمت إضافتها لرصيدك',
+                                            {'user_id': user_id, 'round_id': round_id, 'prize': prize, 'currency': currency})
+                                    except:
+                                        pass
+
+                                # تحديث حالة الجولة
+                                r['status'] = 'drawn'
+                                r['total_prize'] = f"{net_prize:.2f}"
+                                changed = True
+                                print(f'[LOTTERY] Auto-draw completed: {round_id}, winners={len(selected)}, prize={net_prize:.2f}', flush=True)
+                            else:
+                                # لا توجد تذاكر - أغلق الجولة
+                                r['status'] = 'drawn'
+                                r['total_prize'] = '0'
+                                changed = True
+
+                        except Exception as e:
+                            print(f'[LOTTERY] Auto-draw error for {round_id}: {e}', flush=True)
+
+                if changed:
+                    write_csv('lottery_rounds.csv', rounds, get_fieldnames('lottery_rounds.csv', ['id','name','ticket_price','currency','winner_count','max_tickets','admin_pct','draw_time','status','created_at','total_prize']))
+
+                _lfcntl.flock(fd, _lfcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+        except BlockingIOError:
+            pass
+        except Exception as exc:
+            print(f'[LOTTERY] scheduler error: {exc}', flush=True)
+        time.sleep(_LOTTERY_DRAW_INTERVAL)
+
+
+threading.Thread(target=_auto_lottery_draw_loop, daemon=True, name='lottery_auto_draw').start()
+print('[LOTTERY] auto-draw scheduler started (1-min interval, flock-guarded)', flush=True)
+
+
+# ===== صفحة مركز الأخبار الرياضية + واجهاتها =====
+
+@app.route('/news')
+@admin_required
+@page_permission_required('send_broadcast')
+def page_news():
+    return render_template('news.html', active_page='news')
+
+
+def _news_mod():
+    return globals().get('_nm_mod')
+
+
+@app.route('/api/news/state')
+@api_auth
+def api_news_state():
+    nm = _news_mod()
+    try:
+        sources = nm._load_sources() if nm else read_csv('news_sources.csv')
+    except Exception:
+        sources = read_csv('news_sources.csv')
+    items = read_csv('news_seen.csv')[-80:][::-1]
+    state = {}
+    try:
+        with open(os.path.join(BASE_DIR, '.news_monitor_state.json'), encoding='utf-8') as f:
+            state = json.load(f)
+    except Exception:
+        pass
+    channels = [c for c in read_csv('bot_channels.csv') if c.get('is_active') == 'yes']
+    return jsonify({
+        'sources': sources,
+        'items': items,
+        'last_digest': state.get('last_digest', ''),
+        'domains': _PROJECT_DOMAINS,
+        'channels': [{'id': c.get('id'), 'title': c.get('title'), 'chat_id': c.get('chat_id')}
+                     for c in channels],
+        'interval_min': 10,
+    })
+
+
+@app.route('/api/news/sources', methods=['PUT'])
+@api_auth
+@permission_required('send_broadcast')
+def api_news_source_update():
+    data = request.json or {}
+    name = str(data.get('name') or '').strip()
+    rows = read_csv('news_sources.csv')
+    found = None
+    for r in rows:
+        if r.get('name') == name:
+            for key in ('enabled', 'post_to_channels'):
+                if key in data:
+                    r[key] = 'yes' if str(data[key]).lower() in ('1', 'true', 'yes', 'on') else 'no'
+            found = r
+    if not found:
+        return jsonify({'error': 'المصدر غير موجود'}), 404
+    write_csv('news_sources.csv', rows,
+              get_fieldnames('news_sources.csv', ['name', 'url', 'enabled', 'post_to_channels',
+                                                  'last_check', 'last_status']))
+    log_action('update_news_source', name)
+    return jsonify({'success': True, 'source': found})
+
+
+@app.route('/api/news/run', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_news_run():
+    nm = _news_mod()
+    if not nm:
+        return jsonify({'error': 'مراقب الأخبار غير متاح'}), 503
+
+    def _worker():
+        try:
+            ok = nm.run_now()
+            print(f'[NEWS] manual run: {"started" if ok else "busy"}', flush=True)
+        except Exception as _e:
+            print(f'[NEWS] manual run error: {_e}', flush=True)
+
+    threading.Thread(target=_worker, daemon=True).start()
+    return jsonify({'success': True, 'started': True})
+
+
+@app.route('/api/news/digest-preview')
+@api_auth
+def api_news_digest_preview():
+    nm = _news_mod()
+    rows = read_csv('news_seen.csv')[-24:]
+    postable_names = {s.get('name') for s in read_csv('news_sources.csv')
+                      if s.get('post_to_channels') == 'yes'}
+    grouped = {}
+    for r in reversed(rows):
+        src = r.get('source', '')
+        if src not in postable_names:
+            continue
+        grouped.setdefault(src, [])
+        if len(grouped[src]) < 4:
+            grouped[src].append({'title': r.get('title', ''), 'url': r.get('url', '')})
+        if sum(len(v) for v in grouped.values()) >= 6:
+            break
+    msg = nm._digest_message(grouped) if nm and grouped else ''
+    return jsonify({'message': msg, 'items': sum(len(v) for v in grouped.values())})
+
+
+@app.route('/api/news/publish', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_news_publish():
+    nm = _news_mod()
+    if not nm:
+        return jsonify({'error': 'مراقب الأخبار غير متاح'}), 503
+    body = request.json or {}
+    rows = read_csv('news_seen.csv')[-24:]
+    postable_names = {s.get('name') for s in read_csv('news_sources.csv')
+                      if s.get('post_to_channels') == 'yes'}
+    grouped = {}
+    if body.get('title') and body.get('source'):
+        # نشر عنصر واحد محدد
+        grouped = {str(body['source']): [{'title': str(body['title']), 'url': str(body.get('url', ''))}]}
+    else:
+        for r in reversed(rows):
+            src = r.get('source', '')
+            if src not in postable_names:
+                continue
+            grouped.setdefault(src, [])
+            if len(grouped[src]) < 4:
+                grouped[src].append({'title': r.get('title', ''), 'url': r.get('url', '')})
+            if sum(len(v) for v in grouped.values()) >= 6:
+                break
+    if not grouped:
+        return jsonify({'error': 'لا توجد أخبار لنشرها'}), 400
+    queued = nm._queue_digest(grouped)
+    if not queued:
+        return jsonify({'error': 'لا توجد قنوات نشطة للنشر'}), 400
+    total = sum(len(v) for v in grouped.values())
+    try:
+        push_notification(
+            'news', '🗞️ تم جدولة نشر الأخبار',
+            f'{total} عنوان — أُرسل لـ{queued} قناة',
+            {'queued': queued, 'items': total})
+    except Exception:
+        pass
+    log_action('publish_news_digest', f'{total} items -> {queued} channels')
+    return jsonify({'success': True, 'queued': queued, 'items': total})
 
 @app.route('/api/channels', methods=['POST'])
 @api_auth
@@ -14268,7 +15175,7 @@ def api_add_channel_manual():
         'affiliate_link': str(data.get('affiliate_link', '') or '').strip(),
         'auto_post_enabled': 'no',
         'auto_post_interval_min': '120',
-        'auto_post_types': 'info|question|prediction|analysis',
+        'auto_post_types': 'info|question|prediction|analysis|engagement',
     }
     new_channel, _ = _normalize_channel_row(new_channel, actor_uid=owner_admin_id)
     append_csv('bot_channels.csv', new_channel, fieldnames)
@@ -16607,51 +17514,126 @@ _lottery_draw_lock = threading.Lock()
 def api_lottery_draw(round_id):
   with _lottery_draw_lock:
     rounds = read_csv('lottery_rounds.csv')
-    round_fieldnames = get_fieldnames('lottery_rounds.csv', ['id','name','ticket_price','currency','winner_count','max_tickets','admin_pct','draw_time','status','created_at'])
+    round_fieldnames = get_fieldnames('lottery_rounds.csv', ['id','name','ticket_price','currency','winner_count','max_tickets','admin_pct','draw_time','status','created_at','total_prize'])
 
     lot_round = None
-    for r in rounds:
+    round_idx = None
+    for i, r in enumerate(rounds):
         if r.get('id') == round_id:
             lot_round = r
+            round_idx = i
             break
 
     if not lot_round:
         return jsonify({'error': 'Round not found'}), 404
-    # One-shot guard: a round can only be drawn once (prevents duplicate winners)
     if lot_round.get('status') == 'drawn':
         return jsonify({'error': 'تم سحب هذه الجولة بالفعل'}), 400
-    lot_round['status'] = 'drawn'
-
-    write_csv('lottery_rounds.csv', rounds, round_fieldnames)
 
     tickets = read_csv('lottery_tickets.csv')
     round_tickets = [t for t in tickets if t.get('round_id') == round_id and t.get('payment_verified') == 'yes']
 
+    if not round_tickets:
+        lot_round['status'] = 'drawn'
+        write_csv('lottery_rounds.csv', rounds, round_fieldnames)
+        return jsonify({'success': True, 'winners': [], 'message': 'لا توجد تذاكر مدفوعة'})
+
     winner_count = int(lot_round.get('winner_count', '1'))
+    if winner_count > len(round_tickets):
+        winner_count = len(round_tickets)
+
+    # احتساب صندوق الجائزة من مبيعات التذاكر
+    ticket_price = float(lot_round.get('ticket_price', '0') or '0')
+    total_pool = ticket_price * len(round_tickets)
+    admin_pct = float(lot_round.get('admin_profit_pct', '0') or '0')
+    admin_profit = total_pool * admin_pct / 100
+    net_prize = total_pool - admin_profit
+
+    # تحديث total_prize في الجولة
+    if round_idx is not None:
+        rounds[round_idx]['total_prize'] = f"{net_prize:.2f}"
+
+    # اختيار الفائزين
+    selected = round_tickets if winner_count >= len(round_tickets) else random.sample(round_tickets, winner_count)
+
+    # توزيع الجوائز
+    if winner_count == 1:
+        shares = [1.0]
+    elif winner_count == 2:
+        shares = [0.6, 0.4]
+    elif winner_count == 3:
+        shares = [0.5, 0.3, 0.2]
+    else:
+        shares = [0.4, 0.25, 0.15] + [0.2 / (winner_count - 3)] * (winner_count - 3)
+
+    winner_fieldnames = get_fieldnames('lottery_winners.csv', ['id','round_id','user_id','ticket_id','prize_amount','currency','distributed','created_at'])
     winners = []
-    if round_tickets and winner_count > 0:
-        if winner_count >= len(round_tickets):
-            selected = round_tickets
-        else:
-            selected = random.sample(round_tickets, winner_count)
 
-        winner_fieldnames = get_fieldnames('lottery_winners.csv', ['id','round_id','user_id','ticket_id','prize_amount','currency','distributed','created_at'])
-        for w in selected:
-            winner_entry = {
-                'id': f"WIN{secrets.token_hex(3).upper()}",
-                'round_id': round_id,
-                'user_id': w.get('user_id', ''),
-                'ticket_id': w.get('id', ''),
-                'prize_amount': lot_round.get('ticket_price', '0'),
-                'currency': lot_round.get('currency', 'SAR'),
-                'distributed': 'no',
-                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
-            }
-            append_csv('lottery_winners.csv', winner_entry, winner_fieldnames)
-            winners.append(winner_entry)
+    # الحصول على GameManager لـ credit_with_idempotency
+    from game_engine import _db as _gm_db
 
-    log_action('lottery_draw', f'{round_id}: {len(winners)} winners')
-    return jsonify({'success': True, 'winners': winners, 'winners_count': len(winners)})
+    for i, w in enumerate(selected):
+        prize = round(net_prize * shares[i], 2)
+        currency = lot_round.get('currency', 'EGP')
+        user_id = str(w.get('user_id', '')).strip()
+
+        winner_entry = {
+            'id': f"WIN{secrets.token_hex(3).upper()}",
+            'round_id': round_id,
+            'user_id': user_id,
+            'user_name': w.get('user_name', ''),
+            'ticket_id': w.get('id', ''),
+            'ticket_number': w.get('ticket_number', ''),
+            'prize_amount': f"{prize:.2f}",
+            'currency': currency,
+            'distributed': 'no',
+            'rank': str(i + 1),
+            'draw_time': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }
+
+        # إضافة الجائزة للمحفظة الحقيقية عبر credit_with_idempotency (idempotent - آمن ضد التكرار)
+        distributed = 'no'
+        if user_id and user_id != '0':
+            try:
+                if _gm_db:
+                    # مفتاح إيدمبوتنسي: lottery_<round_id>_<user_id>_<rank>
+                    idempotency_key = f"lottery_{round_id}_{user_id}_{i+1}"
+                    response_template = {'type': 'lottery_win', 'round_id': round_id, 'rank': i+1}
+                    ok, stored, _ = _gm_db.credit_with_idempotency(user_id, prize, idempotency_key, {'type': 'lottery_win'})
+                    if ok:
+                        distributed = 'yes'
+                        logger.info(f"Lottery prize credited: user={user_id}, prize={prize}, round={round_id}")
+                    else:
+                        logger.warning(f"Lottery credit failed (duplicate?): user={user_id}, round={round_id}")
+                else:
+                    # fallback CSV
+                    from comprehensive_bot import GameManager
+                    gm = GameManager()
+                    gm.add_frozen_balance(user_id, prize)
+                    distributed = 'yes'
+            except Exception as e:
+                logger.error(f"Lottery credit error: user={user_id}, prize={prize}, error={e}")
+
+        winner_entry['distributed'] = distributed
+        append_csv('lottery_winners.csv', winner_entry, winner_fieldnames)
+        winners.append(winner_entry)
+
+        # إشعار الفائز
+        try:
+            push_notification(
+                'lottery_win',
+                '🎉 مبروك! ربحت في اليانصيب',
+                f'جائزتك: {prize:.2f} {currency} — تمت إضافتها لرصيدك',
+                {'user_id': user_id, 'round_id': round_id, 'prize': prize, 'currency': currency}
+            )
+        except Exception:
+            pass
+
+    lot_round['status'] = 'drawn'
+    write_csv('lottery_rounds.csv', rounds, round_fieldnames)
+
+    log_action('lottery_draw', f'{round_id}: {len(winners)} winners, total_prize={net_prize:.2f}')
+    return jsonify({'success': True, 'winners': winners, 'winners_count': len(winners), 'total_prize': f"{net_prize:.2f}", 'currency': currency})
 
 
 # ===== API — Wheel Actions =====
@@ -17317,6 +18299,24 @@ def _clean_log_rows(rows):
         if row.get('timestamp') or row.get('message_preview'):
             cleaned.append(row)
     return cleaned
+
+
+@app.route('/api/internal/push', methods=['POST'])
+def api_internal_push():
+    """جسر داخلي: البوت يرسل إشعارات ويب (SSE + Web Push + سجل اللوحة).
+
+    محمي بسر مشترك INTERNAL_PUSH_SECRET من .env — يستخدم من localhost فقط داخليًا."""
+    secret = os.getenv('INTERNAL_PUSH_SECRET', '') or _env_file_value('INTERNAL_PUSH_SECRET')
+    if not secret or request.headers.get('X-Internal-Secret', '') != secret:
+        return jsonify({'error': 'forbidden'}), 403
+    data = request.json or {}
+    push_notification(
+        str(data.get('type') or 'bot_event'),
+        str(data.get('title') or 'Bot'),
+        str(data.get('message') or ''),
+        data.get('data') if isinstance(data.get('data'), dict) else {},
+    )
+    return jsonify({'success': True})
 
 
 @app.route('/api/notifications-log')

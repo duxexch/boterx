@@ -1163,9 +1163,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         last_error = f"API error: {error_desc}"
             except urllib.error.HTTPError as e:
                 last_error = f"HTTP {e.code}: {e.reason}"
-                # 400/403 = خطأ دائم — لا تعيد المحاولة
+                # 400/403 = خطأ دائم — لا تعيد المحاولة (مع قراءة وصف الخطأ من الجسم)
                 if e.code in (400, 403):
-                    logger.warning(f"API {method} skipped (HTTP {e.code}): {e.reason}")
+                    desc = e.reason
+                    try:
+                        body = json.loads(e.read().decode('utf-8'))
+                        desc = body.get('description') or desc
+                    except Exception:
+                        pass
+                    logger.warning(f"API {method} skipped (HTTP {e.code}): {desc}")
                     return None
                 if e.code == 429:  # Rate limited — اقرأ retry_after من جسم الخطأ
                     retry_after = 3.0
@@ -3160,6 +3166,28 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             time.sleep(0.05)  # منع flood limit
         return sent
 
+    def mirror_broadcast_to_channels(self, msg, media_urls=None):
+        """نسخ أي بث مُرسَل لعامة المستخدمين إلى كل القنوات النشطة التي يُشرف عليها البوت"""
+        try:
+            channels = self.get_bot_channels(active_only=True)
+        except Exception:
+            channels = []
+        mirrored = 0
+        for ch in channels:
+            chat_id = ch.get('chat_id', '')
+            if not chat_id:
+                continue
+            try:
+                ok, reason = self._post_to_single_channel(chat_id, msg, media_urls or [], None)
+                if ok:
+                    mirrored += 1
+                else:
+                    logger.info(f"Broadcast mirror → {chat_id}: skipped ({reason})")
+            except Exception as e:
+                logger.error(f"Broadcast mirror → {chat_id} error: {e}")
+        logger.info(f"Broadcast mirror: {mirrored}/{len(channels)} channel(s) posted")
+        return mirrored
+
     def broadcast_to_all_users(self, text, photo=None, video=None, document=None, sticker=None):
         """بث محتوى لكل المستخدمين — في thread منفصل، rate limiting آمن، يدعم 70K+ مستخدم"""
         import threading as _th
@@ -4123,16 +4151,33 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def log_notification(self, target_type, target_id, notif_type, message):
-        """تسجيل كل إشعار في سجل الإشعارات"""
+        """تسجيل كل إشعار — بترميز متوافق مع لوحة الويب (الجرس/SSE/Web Push)"""
         try:
-            file_exists = os.path.exists('notifications_log.csv')
+            fields = ['timestamp', 'type', 'type_label', 'message_preview',
+                      'target_type', 'target_id', 'status']
+            need_header = (not os.path.exists('notifications_log.csv')) or \
+                          os.path.getsize('notifications_log.csv') == 0
+            header = fields
+            if not need_header:
+                try:
+                    with open('notifications_log.csv', 'r', encoding='utf-8-sig', newline='') as f:
+                        existing = next(csv.reader(f), [])
+                    if existing:
+                        header = existing
+                except Exception:
+                    pass
+            preview = message[:200] + ('...' if len(message) > 200 else '')
+            entry = {
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'type': notif_type, 'type_label': notif_type,
+                'message_preview': preview, 'target_type': target_type,
+                'target_id': str(target_id), 'status': 'sent',
+            }
             with open('notifications_log.csv', 'a', newline='', encoding='utf-8-sig') as f:
-                writer = csv.writer(f)
-                if not file_exists:
-                    writer.writerow(['timestamp', 'target_type', 'target_id', 'type', 'message_preview'])
-                preview = message[:100] + '...' if len(message) > 100 else message
-                writer.writerow([datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                target_type, target_id, notif_type, preview])
+                writer = csv.DictWriter(f, fieldnames=header, extrasaction='ignore', restval='')
+                if need_header:
+                    writer.writeheader()
+                writer.writerow({k: entry.get(k, '') for k in header})
         except:
             pass
 
@@ -5089,6 +5134,26 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 "💚 <b>VEX</b> — Buy & sell with other users, safely\n\n"
                 "🌍 Please choose your language / اختر لغتك:\n"
                 "👇 اختر من القائمة أدناه"
+            )
+
+            # ── روابط المشروع — كل الدومينات + دومين عشوائي مُختار للعميل ──
+            project_domains = [
+                'https://vex.deals',
+                'https://betjam.sbs',
+                'https://betongame.cloud',
+                'https://1xbetservices.com',
+                'https://vixo.uno',
+            ]
+            picked_domain = random.choice(project_domains)
+            links_lines = '\n'.join(
+                f"{i + 1}. {d}" + (' ⭐' if d == picked_domain else '')
+                for i, d in enumerate(project_domains)
+            )
+            welcome_text += (
+                f"\n\n🌍 <b>روابط المشروع / Project links:</b>\n"
+                f"{links_lines}\n\n"
+                f"⭐ <b>دومينك المختار / Your picked domain:</b>\n"
+                f"{picked_domain}"
             )
 
             keyboard = []
@@ -7265,9 +7330,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
         # البوت أصبح مشرفاً/عضواً
         if new_status in ('member', 'administrator') and old_status not in ('member', 'administrator'):
+            # تجاهل محادثات Direct Messages (رسائل المشتركين تابعة للقناة) — البوت لا ينشر فيها
+            if self._is_direct_messages_chat(chat):
+                logger.info(f"تجاهل Direct Messages chat (وليس قنوات قابلة للنشر): {chat_title} ({chat_id})")
+                return
             # تسجيل القناة تلقائياً
             self._register_channel(chat_id, chat_title, chat_type)
             logger.info(f"تم تسجيل قناة تلقائياً: {chat_title} ({chat_id})")
+            self._web_push('channel', '📢 قناة جديدة مرتبطة',
+                           f'{chat_title} ({chat_id}) — تسجيل تلقائي ناجح، النشر والميرور مفعّلين')
             # إشعار الأدمن
             for admin_id in self.admin_ids:
                 try:
@@ -7284,12 +7355,45 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         elif new_status in ('left', 'kicked') and old_status not in ('left', 'kicked'):
             self._unregister_channel(chat_id)
             logger.info(f"تم إلغاء تسجيل قناة: {chat_title} ({chat_id})")
+            self._web_push('channel', '🗑️ إزالة قناة', f'{chat_title} ({chat_id}) — أُزيل البوت من القناة')
             for admin_id in self.admin_ids:
                 try:
                     self.send_message(int(admin_id),
                         self.tr('a0647_تمت_إزالة', 'ar', chat_title=chat_title, chat_id=chat_id))
                 except:
                     pass
+
+    def _is_direct_messages_chat(self, chat):
+        """هل هذه محادثة Direct Messages تابعة لقناة؟ (البوت لا يستطيع النشر فيها)"""
+        if chat.get('is_direct_messages') or chat.get('parent_chat'):
+            return True
+        cid = str(chat.get('id', '')).strip()
+        if not cid:
+            return False
+        try:
+            r = self.api_call('getChat', {'chat_id': cid}) or {}
+            res = r.get('result') or {}
+            return bool(res.get('is_direct_messages') or res.get('parent_chat'))
+        except Exception:
+            return False
+
+    def _web_push(self, ntype, title, message):
+        """إشعار ويب (SSE + Web Push + سجل اللوحة) عبر نقطة داخلية في اللوحة — لا يعطل polling"""
+        try:
+            secret = os.getenv('INTERNAL_PUSH_SECRET', '')
+            if not secret:
+                return
+            payload = json.dumps({
+                'type': ntype, 'title': title, 'message': str(message)[:400],
+            }).encode('utf-8')
+            req = urllib.request.Request(
+                'http://127.0.0.1:8080/api/internal/push',
+                data=payload,
+                headers={'Content-Type': 'application/json',
+                         'X-Internal-Secret': secret})
+            urllib.request.urlopen(req, timeout=5).read()
+        except Exception:
+            pass
 
     def _register_channel(self, chat_id, title, chat_type):
         """تسجيل قناة في bot_channels.csv"""
@@ -7309,7 +7413,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                          'relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text',
                          'category', 'ai_enabled', 'channel_role', 'ai_provider', 'brand_voice',
                          'platform', 'owner_admin_id', 'managed_by_admin_ids',
-                         'allow_subadmin_publish', 'ai_agent_id', 'platform_account_id']
+                         'allow_subadmin_publish', 'ai_agent_id', 'platform_account_id',
+                         'company_name', 'download_link', 'promo_code', 'affiliate_link',
+                         'auto_post_enabled', 'auto_post_interval_min', 'auto_post_types']
             rows = []
             need_header = True
             if os.path.exists('bot_channels.csv'):
@@ -7352,7 +7458,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     'category': '', 'ai_enabled': 'no', 'channel_role': 'both',
                     'ai_provider': '', 'brand_voice': '', 'platform': 'telegram',
                     'owner_admin_id': '', 'managed_by_admin_ids': '',
-                    'allow_subadmin_publish': 'yes', 'ai_agent_id': '', 'platform_account_id': ''
+                    'allow_subadmin_publish': 'yes', 'ai_agent_id': '', 'platform_account_id': '',
+                    'company_name': '', 'download_link': '', 'promo_code': '', 'affiliate_link': '',
+                    'auto_post_enabled': 'yes', 'auto_post_interval_min': '120',
+                    'auto_post_types': 'info|question|prediction|analysis|engagement'
                 })
         except Exception as e:
             logger.error(f"خطأ في تسجيل القناة: {e}")
@@ -8120,6 +8229,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         else:
                             self._posting_stats['failures'] = max(0, self._posting_stats['failures'] - 1)
                         logger.info(f"Queue {item_id} → channel {target_chat}: {'sent' if ok else reason}")
+                        if str(item_id).startswith(('AUTO', 'NEWS')):
+                            self._web_push('auto_post', '📣 نتيجة منشور تلقائي',
+                                           f'{item_id} → {target_chat}: '
+                                           + ('✅ تم النشر' if ok else f'❌ {reason}'))
                         continue
                 except Exception as e:
                     logger.error(f"خطأ في إرسال قناة {item_id}: {e}")
@@ -8152,6 +8265,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     else:
                         self._send_broadcast_to_all(msg, media_urls, country_filter)
                         item['status'] = 'sent'
+                        if str(item_id).startswith(('AUTO', 'NEWS')):
+                            logger.info(f"Queue {item_id} → all users (mirror to channels): sent")
+                            self._web_push('auto_post', '📣 نتيجة منشور تلقائي',
+                                           f'{item_id} → المستخدمين + نسخة القنوات: ✅ تم الإرسال')
                     posts_this_cycle += 1
                     self._posting_stats['total_posts'] += 1
                     self._posting_stats['last_post_at'] = _dt.now().isoformat()
@@ -8260,6 +8377,12 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             if (sent + failed) % 1000 == 0:
                 logger.info(f"بث تقدم: {sent}/{total} sent, {failed} failed")
         logger.info(f"بث مكتمل: {sent}/{total} sent, {failed} failed")
+
+        # mirror: نسخ نفس البث إلى كل القنوات النشطة التي يُشرف عليها البوت
+        try:
+            self.mirror_broadcast_to_channels(msg, media_urls)
+        except Exception as e:
+            logger.error(f"Broadcast mirror failed: {e}")
 
     def _send_whatsapp_to_all(self, msg, media_urls, country_filter='all', platform_account_id=''):
         """بث جماعي عبر WhatsApp حسب أرقام الهواتف المسجلة"""

@@ -148,6 +148,7 @@
         {{ sidebar_link(url_for('page_complaints'), 'complaints', 'fas fa-exclamation-circle', 'complaints', perm='ban_users', section='complaints') }}
         {{ sidebar_link(url_for('page_tickets'), 'tickets', 'fas fa-ticket-alt', 'tickets', perm='ban_users', section='tickets') }}
         {{ sidebar_link(url_for('page_broadcast'), 'broadcast', 'fas fa-tower-broadcast', 'broadcast', perm='send_broadcast', section='broadcast') }}
+        {{ sidebar_link(url_for('page_news'), 'news', 'fas fa-newspaper', 'news', perm='send_broadcast', section='channels') }}
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="advanced_system">Advanced System</p>
         {{ sidebar_link(url_for('page_statistics'), 'statistics', 'fas fa-chart-bar', 'statistics', perm='view_statistics', section='statistics') }}
@@ -268,12 +269,17 @@
                         </div>
                         <div id="notificationsList" class="space-y-2">
                             <template x-for="n in notifications" :key="n.id">
-                                <div class="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 transition cursor-pointer text-sm">
+                                <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-slate-600 transition cursor-pointer text-sm" :style="n.meta ? 'border-left:3px solid ' + n.meta.color : ''">
                                     <div class="flex items-start gap-2">
-                                        <i class="fas mt-0.5" :class="n.icon || 'fa-info-circle text-blue-400'"></i>
-                                        <div class="flex-1">
-                                            <p class="font-medium" x-text="n.title"></p>
-                                            <p class="text-xs text-slate-400" x-text="n.message"></p>
+                                        <template x-if="n.meta">
+                                            <div class="w-7 h-7 rounded-full flex items-center justify-center text-sm shadow-sm flex-shrink-0" :style="'background:' + n.meta.color + '22; color:' + n.meta.color" x-text="n.meta.icon"></div>
+                                        </template>
+                                        <template x-if="!n.meta">
+                                            <i class="fas fa-bell text-emerald-400 w-7 h-7 flex items-center justify-center text-sm"></i>
+                                        </template>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="font-bold text-slate-100 truncate" x-text="n.title"></p>
+                                            <p class="text-xs text-slate-400 truncate mt-0.5" x-text="n.message"></p>
                                             <p class="text-[10px] text-slate-600 mt-1" x-text="n.time"></p>
                                         </div>
                                     </div>
@@ -516,12 +522,13 @@ function baseApp() {
             }
             // Push notifications
             if (s.transactions?.pending > 0 && this.notifications.length === 0) {
+                const m = this.notifMeta('deposit');
                 this.notifications.unshift({
                     id: Date.now(),
-                    icon: 'fa-clock text-emerald-400',
-                    title: 'Ù…Ø¹Ø§Ù…Ù„Ø§Øª Ù…Ø¹Ù„Ù‚Ø©',
-                    message: s.transactions.pending + ' Ù…Ø¹Ø§Ù…Ù„Ø© Ø¨Ø§Ù†ØªØ¸Ø§Ø± Ø§Ù„Ù…Ø±Ø§Ø¬Ø¹Ø©',
-                    time: 'Ø§Ù„Ø¢Ù†'
+                    meta: m,
+                    title: 'معاملات معلقة',
+                    message: s.transactions.pending + ' معاملة بانتظار المراجعة',
+                    time: 'الآن'
                 });
             }
         },
@@ -540,21 +547,19 @@ function baseApp() {
                         this.showToast(d);
                         // Increment notification count
                         this.notifCount++;
-                        // Add to notifications list
+                        // Add to notifications list with rich meta
+                        const m = this.notifMeta(d.type);
                         this.notifications.unshift({
                             id: Date.now(),
-                            icon: d.type.includes('deposit') ? 'fa-money-bill-wave text-green-400' :
-                                  d.type.includes('withdrawal') ? 'fa-hand-holding-usd text-red-400' :
-                                  d.type === 'broadcast' ? 'fa-bullhorn text-amber-400' :
-                                  'fa-bell text-emerald-400',
-                            title: d.title || 'Ø¥Ø´Ø¹Ø§Ø±',
+                            meta: m,
+                            title: d.title || 'إشعار',
                             message: d.message || '',
-                            time: 'Ø§Ù„Ø¢Ù†'
+                            time: 'الآن'
                         });
                         if (this.notifications.length > 20) this.notifications.pop();
                         // Play sound + browser notification
                         if (typeof Notifier !== 'undefined' && Notifier.enabled) {
-                            Notifier.notify(d.title || d.message || 'Ø¥Ø´Ø¹Ø§Ø±', d.type);
+                            Notifier.notify(d.title || d.message || 'إشعار', d.type);
                         }
                         // Also play rich sound directly
                         this.playNotifSound(d.type);
@@ -595,20 +600,44 @@ function baseApp() {
         showToast(d) {
             const container = document.getElementById('toastContainer');
             if (!container) return;
+            const m = this.notifMeta(d.type);
             const toast = document.createElement('div');
-            toast.className = 'fixed top-4 right-4 z-[9999] bg-slate-800 border border-slate-600 rounded-xl p-4 shadow-2xl transition-all duration-300';
-            toast.style.cssText = 'min-width:280px;max-width:360px;transform:translateX(0);opacity:1';
-            const color = d.type.includes('approve') ? '#34d399' : d.type.includes('reject') ? '#ef4444' : '#00e701';
+            toast.className = 'fixed top-4 right-4 z-[9999] rounded-2xl p-4 shadow-2xl border transition-all duration-300';
+            toast.style.cssText = 'min-width:280px;max-width:360px;opacity:0;transform:translateX(100%);background:linear-gradient(135deg,#0f172a,#1e293b);border-left:4px solid ' + m.color;
             toast.innerHTML = `
-                <div style="display:flex;align-items:start;gap:8px">
-                    <div style="width:8px;height:8px;border-radius:50%;background:${color};margin-top:6px;flex-shrink:0"></div>
+                <div style="display:flex;align-items:flex-start;gap:10px">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-base shadow-md" style="background:${m.color}22;color:${m.color}">${m.icon}</div>
                     <div style="flex:1">
-                        <div style="font-weight:700;font-size:13px;color:#f1f5f9">${d.title||''}</div>
-                        <div style="font-size:12px;color:#94a3b8;margin-top:2px">${d.message||''}</div>
+                        <div style="font-weight:800;font-size:13.5px;color:#f8fafc">${d.title||''}</div>
+                        <div style="font-size:12px;color:#94a3b8;margin-top:2px;line-height:1.4">${d.message||''}</div>
                     </div>
                 </div>`;
             container.appendChild(toast);
-            setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; setTimeout(() => toast.remove(), 300); }, 5000);
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(0)';
+            });
+            // Auto dismiss
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 6000);
+        },
+
+        notifMeta(type) {
+            const t = (type || '').toLowerCase();
+            if (t.includes('news') && !t.includes('monitor')) return { icon: '⚽', color: '#38bdf8', label: 'خبر رياضي' };
+            if (t.includes('news_monitor') || t.includes('source_health')) return { icon: '🩺', color: '#34d399', label: 'فحص دوري' };
+            if (t.includes('auto_post')) return { icon: '📣', color: '#fbbf24', label: 'منشور تلقائي' };
+            if (t.includes('source_alert')) return { icon: '⚠️', color: '#f87171', label: 'تنبيه مصادر' };
+            if (t.includes('deposit')) return { icon: '💰', color: '#34d399', label: 'إيداع' };
+            if (t.includes('withdrawal')) return { icon: '💸', color: '#f87171', label: 'سحب' };
+            if (t.includes('broadcast')) return { icon: '📢', color: '#a78bfa', label: 'بث' };
+            if (t.includes('approve')) return { icon: '✅', color: '#34d399', label: 'موافقة' };
+            if (t.includes('reject')) return { icon: '❌', color: '#f87171', label: 'رفض' };
+            return { icon: '🔔', color: '#00e701', label: 'إشعار' };
         },
 
         playNotifSound(type) {
@@ -616,7 +645,23 @@ function baseApp() {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const now = ctx.currentTime;
                 
-                if (type === 'broadcast') {
+                if (type === 'news') {
+                    // News: bright major arpeggio + soft chime
+                    [523, 659, 784, 1047, 1319].forEach((freq, i) => {
+                        const o = ctx.createOscillator(), g = ctx.createGain();
+                        o.connect(g); g.connect(ctx.destination);
+                        o.frequency.value = freq; o.type = 'sine';
+                        g.gain.setValueAtTime(0.18, now + i * 0.08);
+                        g.gain.exponentialRampToValueAtTime(0.01, now + i * 0.08 + 0.2);
+                        o.start(now + i * 0.08); o.stop(now + i * 0.08 + 0.2);
+                    });
+                    const chime = ctx.createOscillator(), cGain = ctx.createGain();
+                    chime.connect(cGain); cGain.connect(ctx.destination);
+                    chime.frequency.value = 1568; chime.type = 'sine';
+                    cGain.gain.setValueAtTime(0.15, now + 0.4);
+                    cGain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+                    chime.start(now + 0.4); chime.stop(now + 0.9);
+                } else if (type === 'broadcast') {
                     // Broadcast fanfare: 5 ascending notes + chime
                     [392, 523, 659, 784, 1047].forEach((freq, i) => {
                         const o = ctx.createOscillator(), g = ctx.createGain();

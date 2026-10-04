@@ -13,7 +13,7 @@ const I18N = {
         payment_methods: 'وسائل الدفع', apps: 'التطبيقات', referrals: 'الإحالات',
         compensation: 'التعويضات',
         channels: 'القنوات', bots: 'البوتات', complaints: 'الشكاوى',
-        broadcast: 'بث رسالة', statistics: 'الإحصائيات', admins: 'إدارة الأدمن',
+        broadcast: 'بث رسالة', statistics: 'الإحصائيات', admins: 'إدارة الأدمن', news: 'أخبار الرياضة',
         themes: 'الثيمات', exchange_addresses: 'عناوين الصرافة',
         send_message: 'رسالة لمستخدم', backup: 'النسخ الاحتياطي', settings: 'الإعدادات',
         operations: 'العمليات', management: 'الإدارة', system: 'النظام',
@@ -365,7 +365,7 @@ const I18N = {
         payment_methods: 'Payment Methods', apps: 'Apps', referrals: 'Referrals',
         compensation: 'Compensation',
         channels: 'Channels', bots: 'Bots', complaints: 'Complaints',
-        broadcast: 'Broadcast', statistics: 'Statistics', admins: 'Admin Management',
+        broadcast: 'Broadcast', statistics: 'Statistics', admins: 'Admin Management', news: 'Sports News',
         themes: 'Themes', exchange_addresses: 'Exchange Addresses',
         send_message: 'Send Message', backup: 'Backup', settings: 'Settings',
         operations: 'Operations', management: 'Management', system: 'System',
@@ -752,7 +752,14 @@ async function api(url, options = {}) {
         credentials: 'same-origin',
         headers
     });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    if (!res.ok) {
+        let detail = null;
+        try { detail = await res.json(); } catch (e) {}
+        const err = new Error((detail && detail.error) || `API error: ${res.status}`);
+        err.status = res.status;
+        err.data = detail;
+        throw err;
+    }
     return res.json();
 }
 
