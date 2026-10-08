@@ -1,0 +1,295 @@
+# Self-Improvement Rules for Smart Publisher
+# قواعد التحسين الذاتي التلقائي
+
+improvement_rules:
+  
+  # ===== قواعد تحديث System Prompts =====
+  prompt_updates:
+    enabled: true
+    trigger_conditions:
+      - "انخفاض متوسط جودة المنشورات > 10% خلال أسبوع"
+      - "اكتشاف نمط نجاح جديد بثقة > 90%"
+      - "شكوى متكررة من الجمهور (نفس الموضوع > 3 مرات)"
+      - "تغير في خوارزمية تيليجرام/منصة يؤثر على الوصول"
+    
+    update_process:
+      1. "جمع عينات: أفضل 20% + أسوأ 20% منشورات الأسبوع"
+      2. "تحليل الفروقات: بنية، مفردات، طول، نبرة، هيكل"
+      3. "توليد System Prompt محسن"
+      - step: "A/B Test: 50% بالحالي، 50% بالجديد (48 ساعة)"
+      2. "قياس: جودة، تفاعل، تحويل"
+      3. "اعتماد إذا تحسن > 5% في متوسط الجودة"
+      3. "نشر للجميع مع توثيق التغيير"
+    
+    safety_constraints:
+      - "لا تغيير > 20% من النص دفعة واحدة"
+      - "الحفاظ على الهوية الأساسية للشخصية"
+      - "اختبار تراجع (Regression Test) على 100 منشور سابق"
+      - "إمكانية التراجع الفوري (Rollback) في < 5 دقائق"
+
+  # ===== قواعد معايرة الثقة (Confidence Calibration) =====
+  confidence_calibration:
+    enabled: true
+    frequency: "weekly"
+    
+    calibration_targets:
+      prediction_agent:
+        target: "مطابقة الثقة المعلنة مع معدل النجاح الفعلي"
+        method: "isotonic_regression"
+        min_samples: 100
+        acceptable_error: 0.05  # ±5%
+        alert_if_drift: 0.10   # إنذار إذا انحراف > 10%
+      
+      quality_guardian:
+        target: "معدل رفض صحيح > 95%"
+        method: "precision_recall_curve"
+        min_precision: 0.95
+        min_recall: 0.90
+    
+    recalibration_actions:
+      - "تحديث system prompt مع أمثلة معايرة"
+      - "تعديل temperature (أقل = أكثر تحفظاً)"
+      - "إضافة أمثلة سلبية (ما لا تفعله)"
+      - "إضافة قواعد صريحة: 'إذا X فـ Y'"
+
+  # ===== قواعد A/B Testing التلقائي =====
+  ab_testing:
+    enabled: true
+    
+    auto_experiments:
+      headlines:
+        enabled: true
+        variants_per_test: 3
+        traffic_split: 0.33
+        min_duration_hours: 24
+        min_samples: 500
+        success_metric: "ctr"  # click-through rate
+        significance_level: 0.95
+        auto_apply_winner: true
+      
+      cta_styles:
+        enabled: true
+        variants: ["direct", "soft", "question", "benefit_first"]
+        traffic_split: 0.25
+        min_duration_hours: 48
+        success_metric: "conversion_rate"
+      
+      posting_times:
+        enabled: true
+        variants: "±30_minutes around best_window"
+        traffic_split: 0.5
+        min_duration_hours: 168  # أسبوع
+        success_metric: "engagement_rate"
+      
+      cta_placement:
+        enabled: true
+        variants: ["top", "middle", "bottom", "inline"]
+        success_metric: "click_rate"
+      
+      content_structure:
+        enabled: true
+        variants: ["lead_first", "hook_first", "data_first", "story_first"]
+        success_metric: "read_completion_rate"
+    
+    experiment_lifecycle:
+      1. "اقتراح من pattern_miner أو جدولة دورية"
+      2. "فحص: هل هناك عينة كافية؟ لا تضارب مع تجارب أخرى؟"
+      3. "تشغيل: تقسيم حركة المرور، جمع بيانات"
+      4. "تحليل: دلالة إحصائية، حجم التأثير"
+      4. "قرار: اعتماد، تمديد، إيقاف"
+      5. "توثيق: نتيجة، تعلم، قاعدة جديدة"
+
+  # ===== قواعد استخراج الأنماط وتحديث القواعد =====
+  pattern_extraction:
+    enabled: true
+    frequency: "daily"
+    
+    sources:
+      - "top_10_percent_posts"      # أعلى 10% أداء
+      - "viral_posts"               # مشاركة عالية، إعادة توجيه
+      - "high_conversion_posts"     # تحويل عالي (نقرات، تسجيل)
+      - "high_retention_posts"      # قراءة كاملة، وقت طويل
+      - "negative_patterns"         # أسوأ 10% (لتجنبها)
+    
+    extracted_features:
+      - "headline_patterns"         # صيغ عناوين ناجحة
+      - "opening_hooks"             # افتتاحيات تجذب
+      - "structure_templates"       # هياكل محتوى ناجحة
+      - "cta_patterns"              # عبارات تحفيز ناجحة
+      - "timing_patterns"           # أوقات/أيام ناجحة
+      - "topic_clusters"            # مواضيع مترابطة ناجحة
+      - "formatting_signatures"     # تنسيقات بصرية ناجحة
+      - "authority_signals"         # إشارات ثقة فعالة
+    
+    rule_generation:
+      min_occurrences: 5           # تكرر 5+ مرات
+      min_effect_size: 0.15        # تأثير 15%+ على المقياس
+      statistical_significance: 0.95
+      max_new_rules_per_week: 3
+      human_review_required: true
+    
+    rule_types:
+      - "prompt_addition"          # إضافة لجملة في System Prompt
+      - "rule_addition"            # قاعدة جودة جديدة
+      - "timing_adjustment"        # تعديل نافذة النشر
+      - "format_template"          # قالب تنسيق جديد
+      - "forbidden_pattern"        # نمط ممنوع
+
+  # ===== قواعد مراقبة الصحة والتنبيهات =====
+  health_monitoring:
+    enabled: true
+    
+    metrics_to_watch:
+      - name: "post_quality_score"
+        threshold_warn: 0.7
+        threshold_critical: 0.6
+        window_hours: 24
+      
+      - name: "engagement_rate"
+        threshold_warn: "drop > 20% vs 7d avg"
+        threshold_critical: "drop > 40% vs 7d avg"
+        window_hours: 12
+      
+      - name: "channel_reach"
+        threshold_warn: "drop > 15% vs 7d avg"
+        threshold_critical: "drop > 30% vs 7d avg"
+        window_hours: 24
+      
+      - name: "agent_confidence_calibration"
+        threshold_warn: "drift > 5%"
+        threshold_critical: "drift > 10%"
+        window_hours: 168
+      
+      - name: "duplicate_rate"
+        threshold_warn: "> 5%"
+        threshold_critical: "> 10%"
+        window_hours: 24
+      
+      - name: "spam_complaints"
+        threshold_warn: "> 0.1%"
+        threshold_critical: "> 0.5%"
+        window_hours: 24
+      
+      - name: "api_error_rate"
+        threshold_warn: "> 1%"
+        threshold_critical: "> 5%"
+        window_hours: 1
+    
+    alert_channels:
+      - "telegram_admin_group"
+      - "email_admin"
+      - "logstash/elasticsearch"
+    
+    auto_mitigation:
+      - condition: "quality_score < 0.6 for 2 hours"
+        action: "switch_to_fallback_model"
+      
+      - condition: "duplicate_rate > 10%"
+        action: "increase_similarity_threshold"
+      
+      - condition: "engagement_drop > 40%"
+        action: "pause_posting + alert_human"
+      
+      - condition: "api_error_rate > 5%"
+        action: "exponential_backoff + circuit_breaker"
+
+  # ===== قواعد إدارة المعرفة والذاكرة =====
+  knowledge_management:
+    memory_consolidation:
+      enabled: true
+      frequency: "daily"
+      process:
+        - "ضغط الذاكرة قصيرة المدى → طويلة المدى"
+        - "استخلاص الدروس: ما نجح، ما فشل، لماذا"
+        - "تحديث قاعدة المعرفة المشتركة"
+        - "إزالة المعلومات القديمة/المتناقضة"
+      
+      retention_policies:
+        raw_interactions: "30 days"
+        performance_metrics: "365 days"
+        learned_patterns: "indefinite (with versioning)"
+        ab_test_results: "180 days"
+        agent_memories: "per_agent_config"
+    
+    knowledge_sharing:
+      enabled: true
+      mechanism: "shared_knowledge_base"
+      sync_frequency: "hourly"
+      conflict_resolution: "latest_wins_with_merge"
+    
+    catastrophic_forgetting_prevention:
+      - "Elastic Weight Consolidation للـ prompts"
+      - "Replay buffer: إعادة تشغيل أفضل 100 حالة أسبوعياً"
+      - "Versioning: كل تغيير في prompt محفوظ مع أداء"
+
+  # ===== قواعد تطوير القدرات الجديدة =====
+  capability_development:
+    enabled: true
+    review_frequency: "monthly"
+    
+    gap_detection:
+      - "مقارنة قدرات الوكلاء مع احتياجات الجمهور (من audience_analyst)"
+      - "فحص تغطية المواضيع: هل نغطي كل ما يسأل عنه الجمهور؟"
+      - "فحص التنسيقات: هل نستخدم أفضل التنسيقات (صور، فيديو، استطلاعات)؟"
+    
+    capability_proposals:
+      auto_generate: true
+      requires_human_approval: true
+      proposal_template:
+        - "القدرة المقترحة"
+        - "الحاجة المثبتة (بيانات)"
+        - "الجهد المتوقع"
+        - "المخاطر"
+        - "خطة التنفيذ والاختبار"
+    
+    experimental_capabilities:
+      - "توليد صور/إنفوجرافيك للنشرات"
+      - "ملخصات صوتية للمقالات الطويلة"
+      - "استطلاعات رأي تفاعلية في القنوات"
+      - "ردود آلية ذكية على التعليقات الشائعة"
+      - "نشر متعدد اللغات متزامن"
+
+  # ===== قواعد إدارة المخاطر =====
+  risk_management:
+    reputation_protection:
+      - "فحص سمعة المصدر قبل النشر"
+      - "قائمة سوداء للمصادر غير الموثوقة (تحديث ديناميكي)"
+      - "فحص المحتوى للكلمات الحساسة قانونياً"
+      - "مسودة → مراجعة حارس الجودة → نشر"
+    
+    legal_compliance:
+      - "إخلاء مسؤولية في كل منشور ترويجي"
+      - "عدم استهداف قاصرين"
+      - "الامتثال لقوانين المقامرة في الدول المستهدفة"
+      - "حماية البيانات الشخصية (GDPR, قانون البيانات السعودي)"
+    
+    operational_risks:
+      - "Circuit Breaker لكل API خارجي"
+      - "فصل النشر عن التوليد (Queue مع Dead Letter)"
+      - "Idempotency: إعادة المحاولة لا تكرر النشر"
+      - "مراقبة التكاليف (API calls، tokens) مع حدود يومية"
+
+  # ===== قواعد تطوير الوكلاء الجدد =====
+  agent_lifecycle:
+    creation:
+      trigger: "فجوة مكتشفة > threshold OR طلب استراتيجي"
+      process:
+        1. "تحديد الحاجة بدقة (use case، KPIs)"
+        2. "تصميم الشخصية (persona design)"
+        3. "بناء System Prompt مبدئي"
+        3. "اختبار في بيئة معزولة (Shadow Mode)"
+        4. "A/B Test ضد الوضع الحالي"
+        5. "نشر تدريجي (Canary → 10% → 50% → 100%)"
+      requirements:
+        - "System Prompt موثق"
+        - "اختبارات وحدة (Unit Tests) للوظائف الحرجة"
+        - "معيار جودة قابل للقياس"
+        - "خطة تراجع (Rollback Plan)"
+    
+    retirement:
+      trigger: "أداء أقل من baseline لمدة 4 أسابيع متتالية"
+      process:
+        1. "تحليل سبب التدهور"
+        2. "محاولة إصلاح (Retraining، Prompt Engineering)"
+        2. "إذا فشل: إيقاف تدريجي، أرشفة المعرفة"
+        3. "نقل المهام لوكيل آخر أو استراتيجي المحتوى"
