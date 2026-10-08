@@ -10,3 +10,4 @@ __pycache__/
 *.pyc
 *.pyo
 *.db
+relay_cursor.json

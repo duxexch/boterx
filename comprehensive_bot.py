@@ -1261,6 +1261,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
     
     def get_updates(self):
         """جلب التحديثات — يشمل my_chat_member لتسجيل القنوات تلقائياً"""
+        if (os.getenv('UPDATES_SOURCE', 'direct')).lower() == 'relay':
+            return self._get_updates_relay()
         url = f"{self.api_url}/getUpdates?offset={self.offset + 1}&timeout=10&allowed_updates=%5B%22message%22%2C%22callback_query%22%2C%22my_chat_member%22%2C%22chat_member%22%2C%22channel_post%22%5D"
         try:
             with urllib.request.urlopen(url, timeout=15) as response:
@@ -1268,6 +1270,70 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         except Exception as e:
             logger.error(f"خطأ في جلب التحديثات: {e}")
             return None
+
+    def _get_updates_relay(self):
+        """سحب التحديثات من relay endpoint بدل getUpdates مباشرة
+        (vex.deals هو sole getUpdates poller — هنا نستهلك من الـ relay بس
+        حتى ما نعترضش مع موقع VEX ونكسر الـ content pipeline)"""
+        base = (os.getenv('RELAY_API_BASE') or os.getenv('SITE_API') or 'https://vex.deals').rstrip('/')
+        key = os.getenv('RELAY_API_KEY') or os.getenv('HERMES_API_KEY') or ''
+        cursor_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'relay_cursor.json')
+        if not hasattr(self, '_relay_cursor'):
+            self._relay_cursor = 0
+            if os.path.exists(cursor_file):
+                try:
+                    with open(cursor_file, 'r', encoding='utf-8') as _cf:
+                        self._relay_cursor = int(json.load(_cf).get('cursor') or 0)
+                except Exception:
+                    self._relay_cursor = 0
+            else:
+                # أول تشغيل: نتجاوز المخزون القديم (الموقع عالجه أصلاً) ونبدأ من آخر update_id
+                for _ in range(5):
+                    try:
+                        data = self._relay_fetch(base, key, self._relay_cursor)
+                    except Exception:
+                        data = None
+                    if not data or not data.get('success'):
+                        break
+                    items = data.get('items') or []
+                    self._relay_cursor = int(data.get('cursor') or self._relay_cursor)
+                    if len(items) < 200:
+                        break
+                self._save_relay_cursor(cursor_file)
+                logger.info(f"relay: warmup done — cursor={self._relay_cursor} (old backlog skipped)")
+        try:
+            data = self._relay_fetch(base, key, self._relay_cursor)
+            if not data or not data.get('success'):
+                if data:
+                    logger.error(f"relay error: {data.get('error') or data}")
+                time.sleep(1)
+                return None
+            items = data.get('items') or []
+            new_cursor = int(data.get('cursor') or self._relay_cursor)
+            if new_cursor > self._relay_cursor:
+                self._relay_cursor = new_cursor
+                self._save_relay_cursor(cursor_file)
+            if not items:
+                # الـ relay يستجيب فوراً (مفيش long-poll) — ننام عشان ما نضربش السيرفر
+                time.sleep(3)
+            return {'ok': True, 'result': items}
+        except Exception as e:
+            logger.error(f"خطأ في جلب التحديثات (relay): {e}")
+            time.sleep(1)
+            return None
+
+    def _relay_fetch(self, base, key, cursor):
+        url = f"{base}/api/telegram/relay?cursor={int(cursor)}&limit=200"
+        req = urllib.request.Request(url, headers={'X-API-Key': key, 'User-Agent': 'boterx-relay/1.0'})
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return json.loads(response.read().decode('utf-8'))
+
+    def _save_relay_cursor(self, cursor_file):
+        try:
+            with open(cursor_file, 'w', encoding='utf-8') as _cf:
+                json.dump({'cursor': int(self._relay_cursor)}, _cf)
+        except Exception as e:
+            logger.error(f"relay cursor save error: {e}")
     
     def _get_csv_lock(self, filename):
         """الحصول على قفل لملف CSV محدد"""
