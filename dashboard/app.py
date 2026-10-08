@@ -55,6 +55,24 @@ def _env_file_value(key):
         pass
     return ''
 
+# تحميل كل ملف .env داخل بيئة gunicorn (بدون Override للمتغيرات الحالية)
+# ضروري لـ OPENROUTER_API_KEY — بدونه مزود OpenRouter غير متاح للوحة/الوكلاء
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv(os.path.join(BASE_DIR, '.env'), override=False)
+except Exception:
+    try:
+        _env_path = os.path.join(BASE_DIR, '.env')
+        if os.path.exists(_env_path):
+            with open(_env_path, 'r', encoding='utf-8') as _f:
+                for _line in _f:
+                    _line = _line.strip()
+                    if _line and not _line.startswith('#') and '=' in _line:
+                        _k, _v = _line.split('=', 1)
+                        os.environ.setdefault(_k.strip(), _v.strip())
+    except Exception:
+        pass
+
 # Load secret key — empty string means "not configured"; checked at startup below.
 # يجب أن يكون ثابتاً عبر كل عمال gunicorn: كل عامل يولّد سراً عشوائياً خاصاً به
 # فيوقّع أحدها الجلسة ويرفضها الآخر بـ 401 عشوائياً (سبب أعطال متقطعة سابقة).
@@ -11737,6 +11755,64 @@ _CHANNEL_DEFAULT_FIELDS = [
     'auto_post_enabled', 'auto_post_interval_min', 'auto_post_types'
 ]
 
+
+def _auto_channel_company(tl):
+    """كشف العلامة التجارية من اسم القناة → company_name (تحدد دومين الروابط)"""
+    if 'betjam' in tl:
+        return 'Betjam'
+    if '1xbet' in tl:
+        return '1xBet'
+    if 'xbet' in tl:
+        return 'XBet'
+    if 'melbet' in tl or 'mlb' in tl:
+        return 'Melbet'
+    if 'mostbet' in tl:
+        return 'Mostbet'
+    if 'betongame' in tl:
+        return 'Betongame'
+    if 'avabet' in tl:
+        return 'Avabet'
+    if 'vixo' in tl:
+        return 'Vixo'
+    if 'all_foot' in tl:
+        return 'All Football'
+    if 'db bet' in tl:
+        return 'DB Bet'
+    if 'media money' in tl:
+        return 'Media Money'
+    if 'vex' in tl:
+        return 'VEX'
+    return 'VEX Games'
+
+
+def _auto_channel_profile(title, ch_type, category=''):
+    """تصنيف تلقائي لقناة جديدة — الفئة + صيغة النشر المناسبة + العلامة التجارية.
+    يُستخدم عند إضافة قناة من اللوحة وعند تسجيل القناة تلقائياً (my_chat_member)."""
+    tl = str(title or '').lower()
+    cat = str(category or '').strip().lower()
+    if not cat:
+        if ch_type == 'private':
+            cat = 'user'
+        elif 'support' in tl or 'مساعدة' in tl or 'دعم' in tl:
+            cat = 'support'
+        elif 'payment' in tl or 'deposit' in tl or 'withdraw' in tl:
+            cat = 'payments'
+        elif any(k in tl for k in ('agent', 'affiliate', 'partner', 'hub',
+                                   'creator', 'gifts')):
+            cat = 'partners'
+        else:
+            cat = 'sports'
+    if cat == 'partners':
+        auto, interval, types = 'yes', '180', 'question|promo_profits'
+    elif cat == 'sports':
+        auto, interval, types = 'yes', '120', 'info|question|prediction|analysis'
+    else:
+        auto, interval, types = 'no', '120', ''
+    company = '' if cat in ('payments', 'support', 'user') else _auto_channel_company(tl)
+    return {'category': cat, 'auto_post_enabled': auto,
+            'auto_post_interval_min': interval, 'auto_post_types': types,
+            'company_name': company}
+
 _AI_AGENT_FIELDS = [
     'id', 'name', 'provider', 'instructions', 'fallback_provider',
     'is_active', 'created_at', 'updated_at', 'created_by',
@@ -14307,8 +14383,30 @@ def _queue_auto_post_for_channel(ch, now_s):
     template = random.choice(_CONTENT_TEMPLATES[chosen_type])
     text = _apply_placeholders(template, ch)
     # دومين العلامة التجارية للقناة — روابط عميقة (deep links) داخل نص تليجرام
-    text = text.replace('{random_domain}', _domain_for_channel(ch))
+    domain = _domain_for_channel(ch)
+    text = text.replace('{random_domain}', domain)
     text = _auto_fill_placeholders(text)
+    # إعادة صياغة AI (OpenRouter) للقنوات المفعّلة ai_enabled — مع الحفاظ على الروابط
+    if str(ch.get('ai_enabled', '')).lower() == 'yes':
+        try:
+            from ai_providers import AIManager
+            _cat = str(ch.get('category') or 'sports')
+            _brand = str(ch.get('company_name') or 'VEX Games')
+            _instructions = (
+                f'أعد صياغة منشور ترويجي قصير لعلامة {_brand} '
+                f'(فئة القناة: {_cat}) بالعربية الفصحى مع إيموجي مناسب. '
+                'حافظ حرفياً على كل الروابط والأرقام (1️⃣ 2️⃣ 3️⃣) وعلى الطول التقريبي، '
+                'لا تخترع نتائج أو معلومات، وابدأ مباشرة بدون مقدمات.'
+            )
+            _rewritten, _used = AIManager().process(
+                text, _instructions,
+                str(ch.get('ai_provider') or '').strip() or None,
+                timeout=25)
+            if _rewritten and len(_rewritten) > 20 and '{' not in _rewritten:
+                if domain not in text or domain in _rewritten:
+                    text = _rewritten
+        except Exception:
+            pass
     full_text = text + _get_branding_suffix(ch)
 
     entry = {
@@ -15168,6 +15266,13 @@ def api_add_channel_manual():
 
     ch_id = f"CH{secrets.token_hex(3).upper()}"
     fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    # تصنيف تلقائي: الفئة + الصيغة المناسبة + العلامة (يحترم category المُرسل صراحةً)
+    profile = _auto_channel_profile(title, ch_type, category=str(data.get('category') or ''))
+    auto_override = data.get('auto_post_enabled')
+    if auto_override in (None, ''):
+        auto_post = profile['auto_post_enabled']
+    else:
+        auto_post = 'yes' if str(auto_override).lower() in ('1', 'true', 'yes', 'on') else 'no'
     new_channel = {
         'id': ch_id,
         'chat_id': str(chat_id),
@@ -15180,7 +15285,7 @@ def api_add_channel_manual():
         'relay_to_channels': 'no',
         'forward_mode': 'all',
         'welcome_text': '',
-        'category': data.get('category', ''),
+        'category': profile['category'],
         'ai_enabled': 'no',
         'channel_role': data.get('channel_role', 'both'),  # source, publish, both
         'ai_provider': data.get('ai_provider', ''),
@@ -15188,15 +15293,15 @@ def api_add_channel_manual():
         'owner_admin_id': owner_admin_id,
         'managed_by_admin_ids': managed_by_admin_ids,
         'allow_subadmin_publish': 'yes' if str(data.get('allow_subadmin_publish', 'no')).lower() in ('1', 'true', 'yes', 'on') else 'no',
-        'ai_agent_id': str(data.get('ai_agent_id', '') or '').strip(),
-        'platform_account_id': str(data.get('platform_account_id', '') or '').strip(),
-        'company_name': str(data.get('company_name', '') or '').strip(),
-        'download_link': str(data.get('download_link', '') or '').strip(),
-        'promo_code': str(data.get('promo_code', '') or '').strip(),
-        'affiliate_link': str(data.get('affiliate_link', '') or '').strip(),
-        'auto_post_enabled': 'no',
-        'auto_post_interval_min': '120',
-        'auto_post_types': 'info|question|prediction|analysis|engagement',
+        'ai_agent_id': str(data.get('ai_agent_id') or '').strip(),
+        'platform_account_id': str(data.get('platform_account_id') or '').strip(),
+        'company_name': str(data.get('company_name') or '').strip() or profile['company_name'],
+        'download_link': str(data.get('download_link') or '').strip(),
+        'promo_code': str(data.get('promo_code') or '').strip(),
+        'affiliate_link': str(data.get('affiliate_link') or '').strip(),
+        'auto_post_enabled': auto_post,
+        'auto_post_interval_min': str(data.get('auto_post_interval_min') or profile['auto_post_interval_min']),
+        'auto_post_types': str(data.get('auto_post_types') or profile['auto_post_types']),
     }
     new_channel, _ = _normalize_channel_row(new_channel, actor_uid=owner_admin_id)
     append_csv('bot_channels.csv', new_channel, fieldnames)

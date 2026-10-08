@@ -7400,18 +7400,23 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 return
             # تسجيل القناة تلقائياً
             self._register_channel(chat_id, chat_title, chat_type)
-            logger.info(f"تم تسجيل قناة تلقائياً: {chat_title} ({chat_id})")
+            cat, auto, interval, types, company = self._classify_new_channel(chat_title, chat_type)
+            logger.info(f"تم تسجيل قناة تلقائياً: {chat_title} ({chat_id}) تصنيف={cat} صيغة={types or '—'}")
             self._web_push('channel', '📢 قناة جديدة مرتبطة',
-                           f'{chat_title} ({chat_id}) — تسجيل تلقائي ناجح، النشر والميرور مفعّلين')
+                           f'{chat_title} ({chat_id}) — تصنيف: {cat}، '
+                           f'نشر تلقائي: {"كل " + interval + "د" if auto == "yes" else "مغلق"}')
             # إشعار الأدمن
             for admin_id in self.admin_ids:
                 try:
                     self.send_message(int(admin_id),
-                        f"📢 <b>قناة جديدة مرتبطة!</b>\n\n"
+                        f"📢 <b>قناة جديدة مرتبطة وتم تصنيفها تلقائياً!</b>\n\n"
                         f"📋 الاسم: <b>{chat_title}</b>\n"
                         f"🆔 <code>{chat_id}</code>\n"
                         f"📎 النوع: {chat_type}\n"
-                        f"✅ تم التسجيل تلقائياً")
+                        f"🗂️ الفئة: <b>{cat}</b>\n"
+                        f"✍️ الصيغة: <code>{types or 'بدون نشر تلقائي'}</code>\n"
+                        f"⏱️ الفترة: {('كل ' + interval + ' دقيقة') if auto == 'yes' else '—'}\n"
+                        f"🏢 العلامة: {company or '—'}")
                 except:
                     pass
 
@@ -7459,8 +7464,58 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         except Exception:
             pass
 
+    def _classify_new_channel(self, title, chat_type):
+        """تصنيف تلقائي لقناة جديدة: الفئة + صيغة النشر المناسبة + العلامة التجارية"""
+        tl = (title or '').lower()
+        if chat_type == 'private':
+            cat = 'user'
+        elif 'support' in tl or 'مساعدة' in tl or 'دعم' in tl:
+            cat = 'support'
+        elif 'payment' in tl or 'deposit' in tl or 'withdraw' in tl:
+            cat = 'payments'
+        elif any(k in tl for k in ('agent', 'affiliate', 'partner', 'hub',
+                                   'creator', 'gifts')):
+            cat = 'partners'
+        else:
+            cat = 'sports'
+        if cat == 'partners':
+            auto, interval, types = 'yes', '180', 'question|promo_profits'
+        elif cat == 'sports':
+            auto, interval, types = 'yes', '120', 'info|question|prediction|analysis'
+        else:
+            auto, interval, types = 'no', '120', ''
+        if cat in ('payments', 'support', 'user'):
+            company = ''
+        elif 'betjam' in tl:
+            company = 'Betjam'
+        elif '1xbet' in tl:
+            company = '1xBet'
+        elif 'xbet' in tl:
+            company = 'XBet'
+        elif 'melbet' in tl or 'mlb' in tl:
+            company = 'Melbet'
+        elif 'mostbet' in tl:
+            company = 'Mostbet'
+        elif 'betongame' in tl:
+            company = 'Betongame'
+        elif 'avabet' in tl:
+            company = 'Avabet'
+        elif 'vixo' in tl:
+            company = 'Vixo'
+        elif 'all_foot' in tl:
+            company = 'All Football'
+        elif 'db bet' in tl:
+            company = 'DB Bet'
+        elif 'media money' in tl:
+            company = 'Media Money'
+        elif 'vex' in tl:
+            company = 'VEX'
+        else:
+            company = 'VEX Games'
+        return cat, auto, interval, types, company
+
     def _register_channel(self, chat_id, title, chat_type):
-        """تسجيل قناة في bot_channels.csv"""
+        """تسجيل قناة في bot_channels.csv — مع تصنيف تلقائي للفئة والصيغة"""
         # فحص عدم التكرار — في كل القنوات (ليس فقط النشطة)
         all_channels = self.get_bot_channels(active_only=False)
         for ch in all_channels:
@@ -7468,9 +7523,23 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 # القناة موجودة — فعّلها لو كانت معطلة
                 if ch.get('is_active') != 'yes':
                     self.update_channel_settings(ch.get('id'), 'is_active', 'yes')
+                # ترحيل التصنيف لو كانت القناة قديمة بدون فئة
+                if not str(ch.get('category') or '').strip():
+                    cat, auto, interval, types, company = self._classify_new_channel(
+                        title or ch.get('title'), chat_type or ch.get('type'))
+                    for fld, val in (('category', cat),
+                                     ('auto_post_enabled', auto),
+                                     ('auto_post_interval_min', interval),
+                                     ('auto_post_types', types),
+                                     ('company_name', company)):
+                        try:
+                            self.update_channel_settings(ch.get('id'), fld, val)
+                        except Exception:
+                            pass
                 return  # موجودة بالفعل
 
         ch_id = f"CH{str(int(datetime.now().timestamp()))[-6:]}"
+        cat, auto, interval, types, company = self._classify_new_channel(title, chat_type)
         try:
             # قراءة fieldnames الحالية + ترحيل
             fieldnames = ['id', 'chat_id', 'title', 'type', 'is_active', 'added_at',
@@ -7513,19 +7582,19 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 writer.writeheader()
                 for row in rows:
                     writer.writerow({k: row.get(k, '') for k in fieldnames})
-                # إضافة القناة الجديدة
+                # إضافة القناة الجديدة (مصنّفة تلقائياً)
                 writer.writerow({
                     'id': ch_id, 'chat_id': chat_id, 'title': title, 'type': chat_type,
                     'is_active': 'yes', 'added_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
                     'relay_to_users': 'yes', 'relay_to_channels': 'yes',
                     'forward_mode': 'all', 'welcome_text': '',
-                    'category': '', 'ai_enabled': 'no', 'channel_role': 'both',
+                    'category': cat, 'ai_enabled': 'no', 'channel_role': 'both',
                     'ai_provider': '', 'brand_voice': '', 'platform': 'telegram',
                     'owner_admin_id': '', 'managed_by_admin_ids': '',
                     'allow_subadmin_publish': 'yes', 'ai_agent_id': '', 'platform_account_id': '',
-                    'company_name': '', 'download_link': '', 'promo_code': '', 'affiliate_link': '',
-                    'auto_post_enabled': 'yes', 'auto_post_interval_min': '120',
-                    'auto_post_types': 'info|question|prediction|analysis|engagement'
+                    'company_name': company, 'download_link': '', 'promo_code': '', 'affiliate_link': '',
+                    'auto_post_enabled': auto, 'auto_post_interval_min': interval,
+                    'auto_post_types': types
                 })
         except Exception as e:
             logger.error(f"خطأ في تسجيل القناة: {e}")

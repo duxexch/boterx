@@ -29,13 +29,13 @@ class AIProvider:
         """معالجة نص وإرجاع النتيجة"""
         raise NotImplementedError
 
-    def _make_request(self, url, payload, headers=None):
+    def _make_request(self, url, payload, headers=None, timeout=60):
         """طلب HTTP عام"""
         if not headers:
             headers = {'Content-Type': 'application/json'}
         data = json.dumps(payload).encode('utf-8')
         req = urllib.request.Request(url, data=data, headers=headers)
-        with urllib.request.urlopen(req, timeout=60) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             return json.loads(response.read().decode('utf-8'))
 
 
@@ -45,7 +45,7 @@ class OpenAIProvider(AIProvider):
     display_name = '🤖 OpenAI (GPT)'
     api_key_env = 'OPENAI_API_KEY'
 
-    def process(self, text, instructions):
+    def process(self, text, instructions, timeout=60):
         if not self.is_available():
             return None
         try:
@@ -64,7 +64,7 @@ class OpenAIProvider(AIProvider):
                 'Content-Type': 'application/json',
                 'Authorization': f'Bearer {self.api_key}'
             }
-            result = self._make_request(url, payload, headers)
+            result = self._make_request(url, payload, headers, timeout=timeout)
             content = result.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
             return content if len(content) > 10 else None
         except Exception as e:
@@ -78,7 +78,7 @@ class ClaudeProvider(AIProvider):
     display_name = '🧠 Claude (Anthropic)'
     api_key_env = 'CLAUDE_API_KEY'
 
-    def process(self, text, instructions):
+    def process(self, text, instructions, timeout=60):
         if not self.is_available():
             return None
         try:
@@ -97,7 +97,7 @@ class ClaudeProvider(AIProvider):
                 'x-api-key': self.api_key,
                 'anthropic-version': '2023-06-01'
             }
-            result = self._make_request(url, payload, headers)
+            result = self._make_request(url, payload, headers, timeout=timeout)
             content = result.get('content', [{}])[0].get('text', '').strip()
             return content if len(content) > 10 else None
         except Exception as e:
@@ -111,7 +111,7 @@ class KimiProvider(AIProvider):
     display_name = '🌙 Kimi (Moonshot)'
     api_key_env = 'KIMI_API_KEY'
 
-    def process(self, text, instructions):
+    def process(self, text, instructions, timeout=60):
         if not self.is_available():
             return None
         try:
@@ -130,7 +130,7 @@ class KimiProvider(AIProvider):
                 'Content-Type': 'application/json',
                 'Authorization': f'Bearer {self.api_key}'
             }
-            result = self._make_request(url, payload, headers)
+            result = self._make_request(url, payload, headers, timeout=timeout)
             content = result.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
             return content if len(content) > 10 else None
         except Exception as e:
@@ -168,7 +168,7 @@ class OpenRouterProvider(AIProvider):
             pass
         return ''
 
-    def process(self, text, instructions):
+    def process(self, text, instructions, timeout=60):
         if not self.is_available():
             return None
         try:
@@ -189,7 +189,7 @@ class OpenRouterProvider(AIProvider):
                 'HTTP-Referer': 'https://vex.deals',
                 'X-Title': 'VEX Games AI'
             }
-            result = self._make_request(url, payload, headers)
+            result = self._make_request(url, payload, headers, timeout=timeout)
             content = result.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
             return content if len(content) > 10 else None
         except Exception as e:
@@ -242,10 +242,11 @@ class AIManager:
                 return provider
         return None
 
-    def process(self, text, instructions, provider_name=None):
+    def process(self, text, instructions, provider_name=None, timeout=60):
         """
         معالجة نص باستخدام AI
         - provider_name: لو محدد، يستخدم مزود معين. لو None، يستخدم النشط
+        - timeout: مهلة الطلب بالثواني (تُستخدم مدة قصيرة في مسارات النشر)
         """
         if provider_name:
             provider = self.providers.get(provider_name)
@@ -260,7 +261,7 @@ class AIManager:
             logger.warning("لا يوجد مزود AI متاح")
             return None, None
 
-        result = provider.process(text, instructions)
+        result = provider.process(text, instructions, timeout=timeout)
         return result, provider.name
 
     def test_provider(self, provider_name=None):
