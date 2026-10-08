@@ -47,3 +47,10 @@ recovery_uploads/
 # نظام العملاء — بيانات حساسة (توكنات + هاشات كلمات مرور)
 clients.csv
 clients/
+
+# Runtime artifacts (locks, sqlite WAL, upload leftovers)
+*.upload_tmp
+*.lock
+*.db-shm
+*.db-wal
+.source_health_state.json
