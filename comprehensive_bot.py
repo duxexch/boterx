@@ -8057,7 +8057,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'relay_log.csv')
             with open(filepath, 'r', encoding='utf-8-sig') as f:
                 for row in _csv.DictReader(f):
-                    cid = (row.get('source_chat_id') or '').strip()
+                    # العمود الفعلي يحمل chat_id هو target_chat (يكتب في _log_channel_post)
+                    cid = (row.get('target_chat') or row.get('source_chat_id') or '').strip()
                     ts = (row.get('timestamp') or '')
                     if cid == str(chat_id) and ts.startswith(today):
                         n += 1
