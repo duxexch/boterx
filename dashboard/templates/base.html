@@ -1,32 +1,39 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl" x-data="baseApp()" :lang="lang" :dir="lang === 'ar' ? 'rtl' : 'ltr'" :class="darkMode ? '' : 'light-mode'">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>{% block title %}VEX Dashboard{% endblock %}</title>
     <meta name="robots" content="noindex, nofollow">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.build.css') }}?v=20260818">
-    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.build.css') }}?v=20260831a">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}?v=20260831a">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260815a" defer></script>
+    <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260831a" defer></script>
+    <script src="{{ url_for('static', filename='js/i18n-admin-lexicon.js') }}?v=20260831a" defer></script>
+    <script src="{{ url_for('static', filename='js/admin-phrases.js') }}?v=20260831a" defer></script>
+    <script src="{{ url_for('static', filename='js/i18n-admin-runtime.js') }}?v=20260831a" defer></script>
+    <script src="{{ url_for('static', filename='js/base-app.js') }}?v=20260831a" defer></script>
     <script src="{{ url_for('static', filename='vendor/alpine.min.js') }}" defer></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260818">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260831a">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}?v=20260831a">
     <!-- PWA & SEO -->
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
+    <meta name="permanent-token" content="eyJzY29wZSI6ImRlY2siLCJleHAiOjAsIm5vbmNlIjoibVFxSFp1aWdLTjVIIiwicGVybWFuZW50Ijp0cnVlfQ.9575f071aa4c3fb15a9c6c5fce498148e2a53749aa1ea6d3bb05f205cf7faf51">
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
     <meta name="theme-color" content="#00e701">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="VEX Games">
-    <meta name="description" content="منصة VEX Games — ألعاب مثيرة وجوائز حقيقية عبر تيليغرام">
-    <meta property="og:title" content="VEX Games — العب واربح">
-    <meta property="og:description" content="منصة ألعاب تيليغرام الأكثر إثارة — مناجم، كراش، بلينكو، يانصيب وأكثر">
+    <meta name="description" content="Ù…Ù†ØµØ© VEX Games â€” Ø£Ù„Ø¹Ø§Ø¨ Ù…Ø«ÙŠØ±Ø© ÙˆØ¬ÙˆØ§Ø¦Ø² Ø­Ù‚ÙŠÙ‚ÙŠØ© Ø¹Ø¨Ø± ØªÙŠÙ„ÙŠØºØ±Ø§Ù…">
+    <meta property="og:title" content="VEX Games â€” Ø§Ù„Ø¹Ø¨ ÙˆØ§Ø±Ø¨Ø­">
+    <meta property="og:description" content="Ù…Ù†ØµØ© Ø£Ù„Ø¹Ø§Ø¨ ØªÙŠÙ„ÙŠØºØ±Ø§Ù… Ø§Ù„Ø£ÙƒØ«Ø± Ø¥Ø«Ø§Ø±Ø© â€” Ù…Ù†Ø§Ø¬Ù…ØŒ ÙƒØ±Ø§Ø´ØŒ Ø¨Ù„ÙŠÙ†ÙƒÙˆØŒ ÙŠØ§Ù†ØµÙŠØ¨ ÙˆØ£ÙƒØ«Ø±">
     <meta property="og:type" content="website">
+    <meta property="og:image" content="https://vex.deals/static/icons/og-image.jpg?v=20260821b">
+    <meta name="twitter:image" content="https://vex.deals/static/icons/og-image.jpg?v=20260821b">
     <meta name="twitter:card" content="summary">
     <style>
         [dir="rtl"] .sidebar-container { right: 0; }
@@ -65,15 +72,18 @@
             [dir="rtl"] .main-wrap.full { margin-right: 0; }
             [dir="ltr"] .main-wrap.full { margin-left: 0; }
         }
-        .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 40; }
+        .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 40; backdrop-filter: blur(2px); }
         [dir="rtl"] .notif-dd { left: 0; right: auto; }
         [dir="ltr"] .notif-dd { right: 0; left: auto; }
+        .vex-loader-logo { width: 34px; height: 35px; object-fit: contain; animation: vexLogoPulse 1.4s ease-in-out infinite; }
+        @keyframes vexLogoPulse { 0%,100% { opacity:.45; transform:scale(.92); } 50% { opacity:1; transform:scale(1); } }
     </style>
+<link rel="stylesheet" href="/static/css/bg-logo.css?v=1">
 </head>
 <body class="bg-slate-900 text-slate-100 font-cairo" :class="darkMode ? 'dark' : ''">
 
 <!-- Toast container for real-time notifications -->
-<div id="toastContainer" style="position:fixed;top:0;inset-inline-end:0;z-index:9999;pointer-events:none"></div>
+<div id="toastContainer"></div>
 
 <!-- Mobile sidebar overlay -->
 <div x-show="mobileSidebar" x-transition.opacity class="sidebar-backdrop lg:hidden" style="display:none" @click="mobileSidebar = false"></div>
@@ -102,128 +112,55 @@
          Visibility rules (default-deny for assigned roles; empty admin_perms = super_admin = show all):
          - not admin_perms → context processor returned {} (super_admin or unauthenticated) → show link
          - admin_perms.get(perm, False) → True only if the role explicitly grants it
+         - admin_sections: empty list = super_admin (all allowed); non-empty = only listed sections shown
     -->
+    {# Macro: sidebar_link — combines permission + section checks. label_key = i18n key for Alpine t() #}
+    {% macro sidebar_link(url, active_key, icon, label_key, perm=None, section=None) %}
+      {% set _perm_ok = (not perm) or (not admin_perms) or admin_perms.get(perm, False) %}
+      {% set _sec_ok = (not section) or (not admin_sections) or (section in admin_sections) %}
+      {% if _perm_ok and _sec_ok %}
+        <a href="{{ url }}" class="sidebar-link {% if active_page == active_key %}active{% endif %}">
+            <i class="{{ icon }} w-5 text-center"></i> <span x-text="t('{{ label_key }}')"></span>
+        </a>
+      {% endif %}
+    {% endmacro %}
+
     <nav class="p-3 flex-1 overflow-y-auto">
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2" data-i18n="operations">Operations</p>
-        <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
-            <i class="fas fa-chart-pie w-5 text-center"></i> <span x-text="t('dashboard')"></span>
-        </a>
-        {# Financial operations — visible to finance_admin (approve/reject) and view_financial roles #}
-        {% if not admin_perms or admin_perms.get('approve_deposits') or admin_perms.get('reject_deposits') or admin_perms.get('view_financial') %}
-        <a href="{{ url_for('page_transactions') }}" class="sidebar-link {% if active_page == 'transactions' %}active{% endif %}">
-            <i class="fas fa-money-bill-transfer w-5 text-center"></i> <span x-text="t('transactions')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('view_financial') or admin_perms.get('approve_deposits') %}
-        <a href="{{ url_for('page_matching') }}" class="sidebar-link {% if active_page == 'matching' %}active{% endif %}">
-            <i class="fas fa-arrows-rotate w-5 text-center"></i> <span x-text="t('matching')"></span>
-        </a>
-        <a href="{{ url_for('page_agents') }}" class="sidebar-link {% if active_page == 'agents' %}active{% endif %}">
-            <i class="fas fa-robot w-5 text-center"></i> <span>وكلاء المطابقة</span>
-        </a>
-        <a href="{{ url_for('page_trading') }}" class="sidebar-link {% if active_page == 'trading' %}active{% endif %}">
-            <i class="fas fa-coins w-5 text-center"></i> <span x-text="t('trading')"></span>
-        </a>
-        {% endif %}
+        {{ sidebar_link(url_for('dashboard'), 'dashboard', 'fas fa-chart-pie', 'dashboard') }}
+        {{ sidebar_link(url_for('page_transactions'), 'transactions', 'fas fa-money-bill-transfer', 'transactions', perm='approve_deposits', section='transactions') }}
+        {{ sidebar_link(url_for('page_matching'), 'matching', 'fas fa-arrows-rotate', 'matching', perm='view_financial', section='matching') }}
+        {{ sidebar_link(url_for('page_agents'), 'agents', 'fas fa-robot', 'agents', perm='view_financial', section='agents') }}
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="management">Management</p>
-        {# Users page — support can see users; ban requires ban_users #}
-        {% if not admin_perms or admin_perms.get('ban_users') or admin_perms.get('view_financial') %}
-        <a href="{{ url_for('page_users') }}" class="sidebar-link {% if active_page == 'users' %}active{% endif %}">
-            <i class="fas fa-users w-5 text-center"></i> <span x-text="t('users')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('view_financial') or admin_perms.get('approve_deposits') %}
-        <a href="{{ url_for('page_svrp') }}" class="sidebar-link {% if active_page == 'svrp' %}active{% endif %}">
-            <i class="fas fa-gem w-5 text-center"></i> <span x-text="t('svrp')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_games') %}
-        <a href="{{ url_for('page_lottery') }}" class="sidebar-link {% if active_page == 'lottery' %}active{% endif %}">
-            <i class="fas fa-dice w-5 text-center"></i> <span x-text="t('lottery')"></span>
-        </a>
-        <a href="{{ url_for('page_wheel') }}" class="sidebar-link {% if active_page == 'wheel' %}active{% endif %}">
-            <i class="fas fa-circle-notch w-5 text-center"></i> <span x-text="t('wheel')"></span>
-        </a>
-        {% endif %}
+        {{ sidebar_link(url_for('page_users'), 'users', 'fas fa-users', 'users', perm='ban_users', section='users') }}
+        {{ sidebar_link(url_for('page_games'), 'games', 'fas fa-gamepad', 'games', perm='manage_games', section='games_admin') }}
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="system">System</p>
-        {% if not admin_perms or admin_perms.get('manage_companies') %}
-        <a href="{{ url_for('page_companies') }}" class="sidebar-link {% if active_page == 'companies' %}active{% endif %}">
-            <i class="fas fa-building w-5 text-center"></i> <span x-text="t('companies')"></span>
-        </a>
-        <a href="{{ url_for('page_payment_methods') }}" class="sidebar-link {% if active_page == 'payment_methods' %}active{% endif %}">
-            <i class="fas fa-credit-card w-5 text-center"></i> <span x-text="t('payment_methods')"></span>
-        </a>
-        <a href="{{ url_for('page_apps') }}" class="sidebar-link {% if active_page == 'apps' %}active{% endif %}">
-            <i class="fas fa-mobile-screen w-5 text-center"></i> <span x-text="t('apps')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_games') %}
-        <a href="{{ url_for('page_games_admin') }}" class="sidebar-link {% if active_page == 'games_admin' %}active{% endif %}">
-            <i class="fas fa-gamepad w-5 text-center"></i> <span>VEX Games</span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_companies') %}
-        <a href="{{ url_for('page_referrals') }}" class="sidebar-link {% if active_page == 'referrals' %}active{% endif %}">
-            <i class="fas fa-gift w-5 text-center"></i> <span x-text="t('referrals')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('send_broadcast') %}
-        <a href="{{ url_for('page_channels') }}" class="sidebar-link {% if active_page == 'channels' %}active{% endif %}">
-            <i class="fas fa-bullhorn w-5 text-center"></i> <span x-text="t('channels')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_bots') %}
-        <a href="{{ url_for('page_bots') }}" class="sidebar-link {% if active_page == 'bots' %}active{% endif %}">
-            <i class="fas fa-robot w-5 text-center"></i> <span x-text="t('bots')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('ban_users') %}
-        <a href="{{ url_for('page_complaints') }}" class="sidebar-link {% if active_page == 'complaints' %}active{% endif %}">
-            <i class="fas fa-exclamation-circle w-5 text-center"></i> <span x-text="t('complaints')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('send_broadcast') %}
-        <a href="{{ url_for('page_broadcast') }}" class="sidebar-link {% if active_page == 'broadcast' %}active{% endif %}">
-            <i class="fas fa-tower-broadcast w-5 text-center"></i> <span x-text="t('broadcast')"></span>
-        </a>
-        {% endif %}
-        
+        {{ sidebar_link(url_for('page_companies'), 'companies', 'fas fa-building', 'companies', perm='manage_companies', section='companies') }}
+        {{ sidebar_link(url_for('page_payment_methods'), 'payment_methods', 'fas fa-credit-card', 'payment_methods', perm='manage_companies', section='payment_methods') }}
+        {{ sidebar_link(url_for('page_apps'), 'apps', 'fas fa-mobile-screen', 'apps', perm='manage_companies', section='apps') }}
+        {{ sidebar_link(url_for('page_referrals'), 'referrals', 'fas fa-gift', 'referrals', perm='manage_companies', section='referrals') }}
+        {{ sidebar_link(url_for('page_compensation'), 'compensation', 'fas fa-hand-holding-dollar', 'compensation', perm='view_financial', section='referrals') }}
+        {{ sidebar_link(url_for('page_channels'), 'channels', 'fas fa-bullhorn', 'channels', perm='send_broadcast', section='channels') }}
+        {{ sidebar_link(url_for('page_browser'), 'browser', 'fas fa-globe', 'browser', perm='manage_bots', section='browser') }}
+        {{ sidebar_link(url_for('page_rental'), 'rental', 'fas fa-building', 'rental', perm='manage_bots', section='clients') }}
+        {{ sidebar_link(url_for('page_complaints'), 'complaints', 'fas fa-exclamation-circle', 'complaints', perm='ban_users', section='complaints') }}
+        {{ sidebar_link(url_for('page_tickets'), 'tickets', 'fas fa-ticket-alt', 'tickets', perm='ban_users', section='tickets') }}
+        {{ sidebar_link(url_for('page_broadcast'), 'broadcast', 'fas fa-tower-broadcast', 'broadcast', perm='send_broadcast', section='broadcast') }}
+        {{ sidebar_link(url_for('page_news'), 'news', 'fas fa-newspaper', 'news', perm='send_broadcast', section='channels') }}
+
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="advanced_system">Advanced System</p>
-        {% if not admin_perms or admin_perms.get('view_statistics') %}
-        <a href="{{ url_for('page_statistics') }}" class="sidebar-link {% if active_page == 'statistics' %}active{% endif %}">
-            <i class="fas fa-chart-bar w-5 text-center"></i> <span x-text="t('statistics')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_admins') %}
-        <a href="{{ url_for('page_admins') }}" class="sidebar-link {% if active_page == 'admins' %}active{% endif %}">
-            <i class="fas fa-user-shield w-5 text-center"></i> <span x-text="t('admins')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_settings') %}
-        <a href="{{ url_for('page_themes') }}" class="sidebar-link {% if active_page == 'themes' %}active{% endif %}">
-            <i class="fas fa-palette w-5 text-center"></i> <span x-text="t('themes')"></span>
-        </a>
-        <a href="{{ url_for('page_exchange_addresses') }}" class="sidebar-link {% if active_page == 'exchange_addresses' %}active{% endif %}">
-            <i class="fas fa-location-dot w-5 text-center"></i> <span x-text="t('exchange_addresses')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('send_broadcast') %}
-        <a href="{{ url_for('page_send_message') }}" class="sidebar-link {% if active_page == 'send_message' %}active{% endif %}">
-            <i class="fas fa-paper-plane w-5 text-center"></i> <span x-text="t('send_message')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_admins') %}
-        <a href="{{ url_for('page_backup') }}" class="sidebar-link {% if active_page == 'backup' %}active{% endif %}">
-            <i class="fas fa-database w-5 text-center"></i> <span x-text="t('backup')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_settings') %}
-        <a href="{{ url_for('page_settings') }}" class="sidebar-link {% if active_page == 'settings' %}active{% endif %}">
-            <i class="fas fa-gear w-5 text-center"></i> <span x-text="t('settings')"></span>
-        </a>
-        {% endif %}
+        {{ sidebar_link(url_for('page_statistics'), 'statistics', 'fas fa-chart-bar', 'statistics', perm='view_statistics', section='statistics') }}
+        {{ sidebar_link(url_for('page_admins'), 'admins', 'fas fa-user-shield', 'admins', perm='manage_admins', section='admins') }}
+        {{ sidebar_link(url_for('page_admin_center'), 'admin_center', 'fas fa-users-cog', 'admin_center', perm='manage_admins', section='admin_center') }}
+        {{ sidebar_link(url_for('page_themes'), 'themes', 'fas fa-palette', 'themes', perm='manage_settings', section='themes') }}
+        {{ sidebar_link(url_for('page_exchange_addresses'), 'exchange_addresses', 'fas fa-location-dot', 'exchange_addresses', perm='manage_settings', section='exchange_addresses') }}
+        {{ sidebar_link(url_for('page_send_message'), 'send_message', 'fas fa-paper-plane', 'send_message', perm='send_broadcast', section='send_message') }}
+        {{ sidebar_link(url_for('page_backup'), 'backup', 'fas fa-database', 'backup', perm='manage_admins', section='backup') }}
+        {{ sidebar_link(url_for('page_settings'), 'settings', 'fas fa-gear', 'settings', perm='manage_settings', section='settings') }}
+        {{ sidebar_link(url_for('page_ai_api_keys'), 'ai_api_keys', 'fas fa-key', 'ai_api_keys', perm='manage_settings', section='ai_api_keys') }}
+        {{ sidebar_link(url_for('page_seo_dashboard'), 'seo_dashboard', 'fas fa-search', 'seo_dashboard', perm='manage_settings', section='ai_api_keys') }}
     </nav>
 
     <!-- Sidebar footer -->
@@ -277,7 +214,7 @@
                             <div class="p-3 text-center text-slate-400 text-sm"><i class="fas fa-spinner fa-spin"></i></div>
                         </template>
                         <template x-if="!loading && results.length === 0">
-                            <div class="p-3 text-center text-slate-500 text-sm">لا توجد نتائج</div>
+                            <div class="p-3 text-center text-slate-500 text-sm" x-text="t('no_results')">Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬</div>
                         </template>
                         <template x-for="r in results" :key="r.type + r.id">
                             <a :href="r.url" class="block p-2 hover:bg-slate-700/50 border-b border-slate-700/30">
@@ -295,7 +232,7 @@
                 </div>
 
                 <!-- Language toggle -->
-                <button @click="toggleLang()" class="text-slate-400 hover:text-emerald-400 transition px-2 py-1 rounded text-sm font-bold" x-text="lang === 'ar' ? 'EN' : 'ع'" :title="lang === 'ar' ? 'Switch to English' : 'تحويل للعربية'"></button>
+                <button @click="toggleLang()" class="text-slate-400 hover:text-emerald-400 transition px-2 py-1 rounded text-sm font-bold" x-text="lang === 'ar' ? 'EN' : 'Ø¹'" :title="lang === 'ar' ? 'Switch to English' : 'ØªØ­ÙˆÙŠÙ„ Ù„Ù„Ø¹Ø±Ø¨ÙŠØ©'"></button>
 
                 <!-- Dark/light toggle -->
                 <button @click="toggleDarkMode()" class="text-slate-400 hover:text-emerald-400 transition" :title="t('connected')">
@@ -307,6 +244,12 @@
                 <button @click="toggleFullscreen()" class="text-slate-400 hover:text-emerald-400 transition">
                     <i class="fas fa-expand text-lg" x-show="!isFullscreen"></i>
                     <i class="fas fa-compress text-lg" x-show="isFullscreen"></i>
+                </button>
+
+                <!-- Publishing global toggle — يوقف كل النشر -->
+                <button @click="togglePublishing()" :class="publishingEnabled ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-red-400 border-red-500/30 bg-red-500/10 animate-pulse'" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-bold transition" :title="publishingEnabled ? 'النشر يعمل — انقر للإيقاف' : 'النشر متوقف — انقر للتفعيل'">
+                    <i class="fas" :class="publishingEnabled ? 'fa-broadcast-tower' : 'fa-ban'"></i>
+                    <span x-text="publishingEnabled ? 'النشر يعمل' : 'النشر متوقف'" class="hidden sm:inline"></span>
                 </button>
 
                 <!-- Notification bell -->
@@ -326,12 +269,17 @@
                         </div>
                         <div id="notificationsList" class="space-y-2">
                             <template x-for="n in notifications" :key="n.id">
-                                <div class="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 transition cursor-pointer text-sm">
+                                <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-slate-600 transition cursor-pointer text-sm" :style="n.meta ? 'border-left:3px solid ' + n.meta.color : ''">
                                     <div class="flex items-start gap-2">
-                                        <i class="fas mt-0.5" :class="n.icon || 'fa-info-circle text-blue-400'"></i>
-                                        <div class="flex-1">
-                                            <p class="font-medium" x-text="n.title"></p>
-                                            <p class="text-xs text-slate-400" x-text="n.message"></p>
+                                        <template x-if="n.meta">
+                                            <div class="w-7 h-7 rounded-full flex items-center justify-center text-sm shadow-sm flex-shrink-0" :style="'background:' + n.meta.color + '22; color:' + n.meta.color" x-text="n.meta.icon"></div>
+                                        </template>
+                                        <template x-if="!n.meta">
+                                            <i class="fas fa-bell text-emerald-400 w-7 h-7 flex items-center justify-center text-sm"></i>
+                                        </template>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="font-bold text-slate-100 truncate" x-text="n.title"></p>
+                                            <p class="text-xs text-slate-400 truncate mt-0.5" x-text="n.message"></p>
                                             <p class="text-[10px] text-slate-600 mt-1" x-text="n.time"></p>
                                         </div>
                                     </div>
@@ -339,6 +287,21 @@
                             </template>
                             <p x-show="notifications.length === 0" class="text-xs text-slate-400 text-center py-4" data-i18n="no_notifications">No notifications</p>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Copy Permanent Demo Link -->
+                <button @click="copyPermanentDemoLink()" class="relative ml-3 text-slate-400 hover:text-emerald-400 transition" title="Ù†Ø³Ø® Ø±Ø§Ø¨Ø· Ø§Ù„Ø¹Ø±Ø¶ Ø§Ù„Ø¯Ø§Ø¦Ù…" data-i18n-title="copy_permanent_link">
+                    <i class="fas fa-link text-lg"></i>
+                    <span x-show="copied" class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs bg-emerald-500 text-white px-2 py-1 rounded">ØªÙ… Ø§Ù„Ù†Ø³Ø®!</span>
+                </button>
+
+                <!-- Live Clock -->
+                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-700/50 border border-slate-600/40" id="liveClockBox">
+                    <i class="fas fa-clock text-emerald-400 text-sm"></i>
+                    <div class="flex flex-col leading-none">
+                        <span id="liveClockTime" class="text-sm font-mono font-bold text-white tracking-wider"></span>
+                        <span id="liveClockDate" class="text-[10px] text-slate-400"></span>
                     </div>
                 </div>
 
@@ -361,6 +324,10 @@
                 <span data-i18n="connected">Connected</span>
             </span>
             <span id="liveStats" class="flex-shrink-0" data-i18n="loading">Loading...</span>
+            <span class="flex items-center gap-1 flex-shrink-0 text-slate-500">
+                <i class="fas fa-server text-[10px]"></i>
+                <span id="serverTimeDisplay">UTC --:--</span>
+            </span>
             <div class="flex-1 overflow-hidden hidden lg:block">
                 <div class="flex items-center gap-2" x-show="activityTicker.length > 0" style="display:none">
                     <span class="text-slate-500 flex-shrink-0" data-i18n="last_activity">Last activity:</span>
@@ -390,6 +357,15 @@
         {% endif %}
     {% endwith %}
 
+    {% if showcase_readonly %}
+    <div class="px-4 lg:px-6 pt-4">
+        <div class="p-3 rounded-lg text-sm bg-amber-900/40 text-amber-200 border border-amber-700/60 flex items-center justify-between gap-3">
+            <span>ÙˆØ¶Ø¹ Ø§Ù„Ø¹Ø±Ø¶ ÙÙ‚Ø·: Ù‡Ø°Ù‡ Ø¬Ù„Ø³Ø© Ù‚Ø±Ø§Ø¡Ø© ÙÙ‚Ø·ØŒ Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªÙ†ÙÙŠØ° Ø£ÙŠ ØªØ¹Ø¯ÙŠÙ„ Ø£Ùˆ Ø¥Ø±Ø³Ø§Ù„ Ø£Ùˆ Ø­Ø°Ù.</span>
+            <a href="{{ url_for('logout') }}" class="text-amber-100 underline">Ø¥Ù†Ù‡Ø§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø©</a>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Page content -->
     <main class="p-4 lg:p-6">
         {% block content %}{% endblock %}
@@ -413,6 +389,7 @@ function baseApp() {
         mobileSidebar: false,
         darkMode: localStorage.getItem('darkMode') !== 'false',
         isFullscreen: false,
+        publishingEnabled: true,
         notifCount: 0,
         notifications: [],
         activityTicker: [],
@@ -423,6 +400,7 @@ function baseApp() {
             this.applyDarkMode();
             this.applyLang();
             this.startLiveStats();
+            this.fetchPublishingStatus();
         },
 
         t(key) { return tr(key); },
@@ -461,6 +439,28 @@ function baseApp() {
             } else {
                 document.exitFullscreen().then(() => { this.isFullscreen = false; });
             }
+        },
+
+        async fetchPublishingStatus() {
+            try {
+                const r = await fetch('/api/publishing/status', {credentials:'same-origin'});
+                if (r.ok) { const d = await r.json(); this.publishingEnabled = !!d.enabled; }
+            } catch(e) {}
+        },
+        async togglePublishing() {
+            const next = !this.publishingEnabled;
+            const msg = next ? 'تفعيل النشر؟' : 'إيقاف كل النشر؟ سيتوقف البث والنشر التلقائي والقنوات.';
+            if (!confirm(msg)) return;
+            try {
+                const r = await fetch('/api/publishing/toggle', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({enabled: next})});
+                const d = await r.json();
+                if (r.ok && d.success) {
+                    this.publishingEnabled = !!d.enabled;
+                    this.notify(d.enabled ? '✅ تم تفعيل النشر' : '⛔ تم إيقاف النشر', d.enabled ? 'success' : 'warning');
+                } else {
+                    alert(d.error || 'فشل التبديل');
+                }
+            } catch(e) { alert('خطأ في الاتصال'); }
         },
 
         startLiveStats() {
@@ -505,12 +505,12 @@ function baseApp() {
             const bar = document.getElementById('liveStats');
             if (bar) {
                 const parts = [];
-                if (s.users?.total !== undefined) parts.push('👥 ' + s.users.total + ' ' + tr('users'));
-                if (s.transactions?.pending !== undefined) parts.push('⏳ ' + s.transactions.pending + ' ' + tr('pending'));
-                if (s.matches?.active !== undefined) parts.push('🔄 ' + s.matches.active + ' ' + tr('matching'));
-                if (s.lottery?.participants !== undefined) parts.push('🎰 ' + s.lottery.participants + ' ' + tr('participants'));
-                if (s.wheel?.participants !== undefined) parts.push('🎡 ' + s.wheel.participants + ' ' + tr('wheel_players'));
-                if (s.lottery?.distributed) parts.push('💰 ' + s.lottery.distributed.toFixed(0) + ' ' + tr('distributed'));
+                if (s.users?.total !== undefined) parts.push('ðŸ‘¥ ' + s.users.total + ' ' + tr('users'));
+                if (s.transactions?.pending !== undefined) parts.push('â³ ' + s.transactions.pending + ' ' + tr('pending'));
+                if (s.matches?.active !== undefined) parts.push('ðŸ”„ ' + s.matches.active + ' ' + tr('matching'));
+                if (s.lottery?.participants !== undefined) parts.push('ðŸŽ° ' + s.lottery.participants + ' ' + tr('participants'));
+                if (s.wheel?.participants !== undefined) parts.push('ðŸŽ¡ ' + s.wheel.participants + ' ' + tr('wheel_players'));
+                if (s.lottery?.distributed) parts.push('ðŸ’° ' + s.lottery.distributed.toFixed(0) + ' ' + tr('distributed'));
                 bar.textContent = parts.join(' | ') || tr('no_data');
             }
             // Update notification count
@@ -522,9 +522,10 @@ function baseApp() {
             }
             // Push notifications
             if (s.transactions?.pending > 0 && this.notifications.length === 0) {
+                const m = this.notifMeta('deposit');
                 this.notifications.unshift({
                     id: Date.now(),
-                    icon: 'fa-clock text-emerald-400',
+                    meta: m,
                     title: 'معاملات معلقة',
                     message: s.transactions.pending + ' معاملة بانتظار المراجعة',
                     time: 'الآن'
@@ -546,13 +547,11 @@ function baseApp() {
                         this.showToast(d);
                         // Increment notification count
                         this.notifCount++;
-                        // Add to notifications list
+                        // Add to notifications list with rich meta
+                        const m = this.notifMeta(d.type);
                         this.notifications.unshift({
                             id: Date.now(),
-                            icon: d.type.includes('deposit') ? 'fa-money-bill-wave text-green-400' :
-                                  d.type.includes('withdrawal') ? 'fa-hand-holding-usd text-red-400' :
-                                  d.type === 'broadcast' ? 'fa-bullhorn text-amber-400' :
-                                  'fa-bell text-emerald-400',
+                            meta: m,
                             title: d.title || 'إشعار',
                             message: d.message || '',
                             time: 'الآن'
@@ -580,7 +579,7 @@ function baseApp() {
                 if (!res.ok) return;
                 const data = await res.json();
                 const logs = data.notifications || [];
-                // Show last 3 as toasts (only if they're recent — within 5 minutes)
+                // Show last 3 as toasts (only if they're recent â€” within 5 minutes)
                 const now = Date.now();
                 for (const log of logs.slice(0, 3).reverse()) {
                     try {
@@ -589,7 +588,7 @@ function baseApp() {
                         if (ageMin < 5) { // Only show notifications from the last 5 minutes
                             this.showToast({
                                 type: log.type || 'notification',
-                                title: log.type_label || 'إشعار',
+                                title: log.type_label || 'Ø¥Ø´Ø¹Ø§Ø±',
                                 message: log.message_preview || log.message || ''
                             });
                         }
@@ -601,20 +600,44 @@ function baseApp() {
         showToast(d) {
             const container = document.getElementById('toastContainer');
             if (!container) return;
+            const m = this.notifMeta(d.type);
             const toast = document.createElement('div');
-            toast.className = 'fixed top-4 right-4 z-[9999] bg-slate-800 border border-slate-600 rounded-xl p-4 shadow-2xl transition-all duration-300';
-            toast.style.cssText = 'min-width:280px;max-width:360px;transform:translateX(0);opacity:1';
-            const color = d.type.includes('approve') ? '#34d399' : d.type.includes('reject') ? '#ef4444' : '#00e701';
+            toast.className = 'fixed top-4 right-4 z-[9999] rounded-2xl p-4 shadow-2xl border transition-all duration-300';
+            toast.style.cssText = 'min-width:280px;max-width:360px;opacity:0;transform:translateX(100%);background:linear-gradient(135deg,#0f172a,#1e293b);border-left:4px solid ' + m.color;
             toast.innerHTML = `
-                <div style="display:flex;align-items:start;gap:8px">
-                    <div style="width:8px;height:8px;border-radius:50%;background:${color};margin-top:6px;flex-shrink:0"></div>
+                <div style="display:flex;align-items:flex-start;gap:10px">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-base shadow-md" style="background:${m.color}22;color:${m.color}">${m.icon}</div>
                     <div style="flex:1">
-                        <div style="font-weight:700;font-size:13px;color:#f1f5f9">${d.title||''}</div>
-                        <div style="font-size:12px;color:#94a3b8;margin-top:2px">${d.message||''}</div>
+                        <div style="font-weight:800;font-size:13.5px;color:#f8fafc">${d.title||''}</div>
+                        <div style="font-size:12px;color:#94a3b8;margin-top:2px;line-height:1.4">${d.message||''}</div>
                     </div>
                 </div>`;
             container.appendChild(toast);
-            setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; setTimeout(() => toast.remove(), 300); }, 5000);
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(0)';
+            });
+            // Auto dismiss
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 6000);
+        },
+
+        notifMeta(type) {
+            const t = (type || '').toLowerCase();
+            if (t.includes('news') && !t.includes('monitor')) return { icon: '⚽', color: '#38bdf8', label: 'خبر رياضي' };
+            if (t.includes('news_monitor') || t.includes('source_health')) return { icon: '🩺', color: '#34d399', label: 'فحص دوري' };
+            if (t.includes('auto_post')) return { icon: '📣', color: '#fbbf24', label: 'منشور تلقائي' };
+            if (t.includes('source_alert')) return { icon: '⚠️', color: '#f87171', label: 'تنبيه مصادر' };
+            if (t.includes('deposit')) return { icon: '💰', color: '#34d399', label: 'إيداع' };
+            if (t.includes('withdrawal')) return { icon: '💸', color: '#f87171', label: 'سحب' };
+            if (t.includes('broadcast')) return { icon: '📢', color: '#a78bfa', label: 'بث' };
+            if (t.includes('approve')) return { icon: '✅', color: '#34d399', label: 'موافقة' };
+            if (t.includes('reject')) return { icon: '❌', color: '#f87171', label: 'رفض' };
+            return { icon: '🔔', color: '#00e701', label: 'إشعار' };
         },
 
         playNotifSound(type) {
@@ -622,7 +645,23 @@ function baseApp() {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const now = ctx.currentTime;
                 
-                if (type === 'broadcast') {
+                if (type === 'news') {
+                    // News: bright major arpeggio + soft chime
+                    [523, 659, 784, 1047, 1319].forEach((freq, i) => {
+                        const o = ctx.createOscillator(), g = ctx.createGain();
+                        o.connect(g); g.connect(ctx.destination);
+                        o.frequency.value = freq; o.type = 'sine';
+                        g.gain.setValueAtTime(0.18, now + i * 0.08);
+                        g.gain.exponentialRampToValueAtTime(0.01, now + i * 0.08 + 0.2);
+                        o.start(now + i * 0.08); o.stop(now + i * 0.08 + 0.2);
+                    });
+                    const chime = ctx.createOscillator(), cGain = ctx.createGain();
+                    chime.connect(cGain); cGain.connect(ctx.destination);
+                    chime.frequency.value = 1568; chime.type = 'sine';
+                    cGain.gain.setValueAtTime(0.15, now + 0.4);
+                    cGain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+                    chime.start(now + 0.4); chime.stop(now + 0.9);
+                } else if (type === 'broadcast') {
                     // Broadcast fanfare: 5 ascending notes + chime
                     [392, 523, 659, 784, 1047].forEach((freq, i) => {
                         const o = ctx.createOscillator(), g = ctx.createGain();
@@ -682,11 +721,50 @@ function baseApp() {
                     }, 150);
                 }
             } catch(e) {}
-        }
+        },
+
+        // Copy permanent demo link to clipboard
+        copyPermanentDemoLink() {
+            // Check if we have a permanent token in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            let token = urlParams.get('k');
+            
+            // If no token in URL, try to get from localStorage or use a default permanent token
+            if (!token) {
+                // Try to get from meta tag or data attribute
+                const metaToken = document.querySelector('meta[name="permanent-token"]');
+                if (metaToken) token = metaToken.getAttribute('content');
+            }
+            
+            // If still no token, use the permanent token we know
+            if (!token) {
+                // Default permanent token (exp=0, permanent=true)
+                token = 'eyJzY29wZSI6ImRlY2siLCJleHAiOjAsIm5vbmNlIjoibVFxSFp1aWdLTjVIIiwicGVybWFuZW50Ijp0cnVlfQ.9575f071aa4c3fb15a9c6c5fce498148e2a53749aa1ea6d3bb05f205cf7faf51';
+            }
+            
+            const currentLang = localStorage.getItem('lang') || 'ar';
+            const baseUrl = window.location.origin;
+            const demoUrl = baseUrl + '/x/showcase?k=' + token + '&lang=' + currentLang;
+            const adminUrl = baseUrl + '/x/showcase/admin-session?k=' + token + '&next=/dashboard';
+            
+            const textToCopy = 'Ø±Ø§Ø¨Ø· Ø§Ù„Ø¹Ø±Ø¶ Ø§Ù„Ø¯Ø§Ø¦Ù… (AR): ' + demoUrl + '\n' +
+                              'Permanent Demo Link (EN): ' + baseUrl + '/x/showcase?k=' + token + '&lang=en\n' +
+                              'Admin Tour (Read-Only): ' + adminUrl;
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                this.copied = true;
+                this.showToast({ type: 'success', title: 'ØªÙ… Ø§Ù„Ù†Ø³Ø®', message: 'ØªÙ… Ù†Ø³Ø® Ø±ÙˆØ§Ø¨Ø· Ø§Ù„Ø¹Ø±Ø¶ Ø§Ù„Ø¯Ø§Ø¦Ù…Ø©' });
+                setTimeout(() => { this.copied = false; }, 2000);
+            }).catch(() => {
+                this.showToast({ type: 'error', title: 'ÙØ´Ù„ Ø§Ù„Ù†Ø³Ø®', message: 'ÙØ´Ù„ Ù†Ø³Ø® Ø§Ù„Ø±Ø§Ø¨Ø·' });
+            });
+        },
+        
+        copied: false,
     }
 }
 </script>
-<!-- RBAC helper — injected once, available on every page via rbac('perm') -->
+<!-- RBAC helper â€” injected once, available on every page via rbac('perm') -->
 <script>
 const _RBAC = {{ admin_perms | tojson }};
 function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
@@ -753,5 +831,420 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
 })();
 </script>
 {% block scripts %}{% endblock %}
+
+<!-- ===== AI ASSISTANT FLOATING CHAT v4 ===== -->
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+.ai-chat *{box-sizing:border-box}
+.ai-chat{--ac:#8b5cf6;--radius:12px}
+.ai-chat[data-theme="dark"]{--bg:#090b10;--surface:#111827;--surface2:#1a2234;--border:#1f2937;--text:#f1f5f9;--dim:#64748b;--green:#22c55e;--red:#ef4444;--cyan:#06b6d4;--amber:#f59e0b;--shadow:rgba(0,0,0,.6)}
+.ai-chat[data-theme="light"]{--bg:#f8fafc;--surface:#ffffff;--surface2:#f1f5f9;--border:#e2e8f0;--text:#0f172a;--dim:#64748b;--green:#16a34a;--red:#dc2626;--cyan:#0891b2;--d92027;--amber:#d97706;--shadow:rgba(0,0,0,.12)}
+.ai-fab{position:fixed;bottom:24px;right:24px;z-index:99999;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;cursor:pointer;box-shadow:0 4px 24px rgba(124,58,237,.4);display:flex;align-items:center;justify-content:center;font-size:24px;transition:all .2s}
+.ai-fab:hover{transform:scale(1.08);box-shadow:0 6px 32px rgba(124,58,237,.5)}
+.ai-fab:active{transform:scale(.95)}
+.ai-panel{position:fixed;bottom:90px;right:24px;z-index:99998;width:420px;max-width:calc(100vw - 32px);height:min(680px,calc(100vh - 120px));background:var(--bg);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 48px var(--shadow);display:flex;flex-direction:column;overflow:hidden;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;transition:background .3s,border-color .3s}
+.ai-header{padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;transition:background .3s}
+.ai-header-row{display:flex;align-items:center;justify-content:space-between}
+.ai-header-left{display:flex;align-items:center;gap:10px}
+.ai-header-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.ai-header-info h3{font-size:14px;font-weight:600;color:var(--text);margin:0;line-height:1.2}
+.ai-header-info p{font-size:11px;color:var(--dim);margin:0}
+.ai-header-actions{display:flex;gap:3px}
+.ai-header-actions button{width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:14px}
+.ai-header-actions button:hover{background:var(--surface2);color:var(--text)}
+/* Agent tabs */
+.ai-agents{display:flex;gap:6px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;scrollbar-width:none}
+.ai-agents::-webkit-scrollbar{display:none}
+.ai-agent-tab{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--dim);cursor:pointer;font-size:11px;font-weight:500;white-space:nowrap;transition:all .15s;font-family:inherit}
+.ai-agent-tab:hover{background:var(--surface2);color:var(--text)}
+.ai-agent-tab.active{background:var(--surface2);border-color:var(--ac);color:var(--text)}
+.ai-agent-tab .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+/* Command palette */
+.ai-commands{padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;max-height:200px;overflow-y:auto}
+.ai-commands::-webkit-scrollbar{width:3px}
+.ai-commands::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.ai-cmd-cat{margin-bottom:8px}
+.ai-cmd-cat:last-child{margin-bottom:0}
+.ai-cmd-cat-title{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:flex;align-items:center;gap:4px}
+.ai-cmd-grid{display:flex;flex-wrap:wrap;gap:4px}
+.ai-cmd-btn{padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--dim);cursor:pointer;font-size:10px;font-family:inherit;transition:all .15s;white-space:nowrap}
+.ai-cmd-btn:hover{border-color:var(--ac);color:var(--text);background:var(--bg)}
+.ai-cmd-toggle{width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--dim);cursor:pointer;font-size:11px;font-family:inherit;transition:all .15s;text-align:center;margin-bottom:6px}
+.ai-cmd-toggle:hover{border-color:var(--ac);color:var(--text)}
+/* Messages */
+.ai-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.ai-messages::-webkit-scrollbar{width:4px}
+.ai-messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.ai-msg{display:flex;gap:8px;max-width:92%}
+.ai-msg.user{align-self:flex-end;flex-direction:row-reverse}
+.ai-msg-avatar{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+.ai-msg.user .ai-msg-avatar{background:var(--ac);color:#fff}
+.ai-msg-bubble{padding:10px 14px;border-radius:var(--radius);font-size:13px;line-height:1.7;color:var(--text);word-break:break-word}
+.ai-msg.user .ai-msg-bubble{background:var(--ac);color:#fff;border-bottom-right-radius:4px}
+.ai-msg.assistant .ai-msg-bubble{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:4px}
+.ai-msg-meta{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:10px;color:var(--dim)}
+.ai-msg-meta .agent-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600}
+.ai-msg-actions{display:flex;gap:2px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(127,127,127,.1)}
+.ai-msg-actions button{padding:4px 8px;border-radius:6px;border:none;background:transparent;color:var(--dim);cursor:pointer;font-size:12px;transition:all .15s}
+.ai-msg-actions button:hover{background:rgba(127,127,127,.1);color:var(--text)}
+.ai-typing{display:flex;gap:8px;align-items:flex-start}
+.ai-typing-dots{display:flex;gap:4px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);border-bottom-left-radius:4px}
+.ai-typing-dots span{width:6px;height:6px;border-radius:50%;background:var(--dim);animation:aiBounce 1.4s infinite}
+.ai-typing-dots span:nth-child(2){animation-delay:.2s}
+.ai-typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes aiBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+.ai-welcome{text-align:center;padding:24px 16px}
+.ai-welcome-icon{font-size:48px;margin-bottom:12px;display:block}
+.ai-welcome h4{font-size:15px;font-weight:600;color:var(--text);margin:0 0 4px}
+.ai-welcome p{font-size:12px;color:var(--dim);margin:0 0 16px}
+.ai-quick{display:flex;flex-direction:column;gap:6px}
+.ai-quick button{text-align:right;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--dim);cursor:pointer;font-size:12px;font-family:inherit;transition:all .15s;display:flex;align-items:center;gap:8px}
+.ai-quick button:hover{border-color:var(--ac);color:var(--text);background:var(--surface2)}
+.ai-input-wrap{padding:10px 16px 12px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;transition:background .3s}
+.ai-input-row{display:flex;align-items:center;gap:8px}
+.ai-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
+.ai-input:focus{border-color:var(--ac)}
+.ai-input::placeholder{color:var(--dim)}
+.ai-send{width:38px;height:38px;border-radius:10px;border:none;background:var(--ac);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.ai-send:hover{opacity:.9;transform:scale(1.05)}
+.ai-send:disabled{opacity:.3;cursor:not-allowed;transform:none}
+.ai-input-hint{font-size:10px;color:var(--dim);margin-top:6px;text-align:center}
+.ai-input-hint code{background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:9px}
+.ai-correction{margin-top:6px;display:flex;gap:4px}
+.ai-correction input{flex:1;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11px;font-family:inherit;outline:none}
+.ai-correction button{padding:4px 10px;border-radius:6px;border:none;background:rgba(239,68,68,.12);color:var(--red);font-size:11px;cursor:pointer;font-family:inherit}
+.ai-consult-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 0}
+.ai-consult-panel h5{font-size:11px;font-weight:600;color:var(--dim);margin:0 0 8px}
+.ai-consult-agent{display:flex;gap:8px;padding:8px;border-radius:8px;background:var(--surface2);margin-bottom:6px}
+.ai-consult-agent:last-child{margin-bottom:0}
+.ai-consult-agent .ca-emoji{font-size:16px;flex-shrink:0}
+.ai-consult-agent .ca-body{flex:1}
+.ai-consult-agent .ca-name{font-size:11px;font-weight:600;margin-bottom:2px}
+.ai-consult-agent .ca-text{font-size:12px;color:var(--dim);line-height:1.5}
+@media(max-width:480px){.ai-panel{right:8px;bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:12px}}
+</style>
+
+<div class="ai-chat" :data-theme="theme" x-data="aiChat()" x-init="init()">
+  <button class="ai-fab" @click="toggle()" x-show="!open" x-transition><span>🤖</span></button>
+
+  <div class="ai-panel" x-show="open" x-cloak x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 translate-y-4 scale-95" x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+    x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 translate-y-4">
+
+    <!-- Header -->
+    <div class="ai-header">
+      <div class="ai-header-row">
+        <div class="ai-header-left">
+          <div class="ai-header-avatar" :style="'background:'+activeAgent.color+'20;color:'+activeAgent.color" x-text="activeAgent.emoji"></div>
+          <div class="ai-header-info">
+            <h3 x-text="activeAgent.name_ar"></h3>
+            <p x-text="activeAgent.role_ar"></p>
+          </div>
+        </div>
+        <div class="ai-header-actions">
+          <button @click="showCmds=!showCmds" title="الأوامر">⚡</button>
+          <button @click="showLearning=!showLearning" title="التعلم">🧠</button>
+          <button @click="toggleTheme()" :title="theme==='dark'?'الوضع النهاري':'الوضع الليلي'" x-text="theme==='dark'?'☀️':'🌙'"></button>
+          <button @click="clearChat()" title="مسح">🗑️</button>
+          <button @click="open=false" title="إغلاق">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agent Tabs -->
+    <div class="ai-agents">
+      <template x-for="a in agents" :key="a.id">
+        <button class="ai-agent-tab" :class="activeAgent.id===a.id && 'active'" @click="switchAgent(a.id)">
+          <span class="dot" :style="'background:'+a.color"></span>
+          <span x-text="a.emoji"></span>
+          <span x-text="a.name_ar"></span>
+        </button>
+      </template>
+    </div>
+
+    <!-- Command Palette -->
+    <div class="ai-commands" x-show="showCmds" x-transition>
+      <template x-for="cat in commandCategories" :key="cat.title">
+        <div class="ai-cmd-cat">
+          <div class="ai-cmd-cat-title"><span x-text="cat.icon"></span> <span x-text="cat.title"></span></div>
+          <div class="ai-cmd-grid">
+            <template x-for="cmd in cat.commands" :key="cmd.label">
+              <button class="ai-cmd-btn" @click="send(cmd.prompt)" x-text="cmd.label"></button>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Messages -->
+    <div class="ai-messages" x-ref="msgs">
+      <template x-if="messages.length===0 && !showLearning">
+        <div class="ai-welcome">
+          <span class="ai-welcome-icon" x-text="activeAgent.emoji"></span>
+          <h4>مرحباً! أنا <span x-text="activeAgent.name_ar"></span></h4>
+          <p x-text="activeAgent.description_ar"></p>
+          <div class="ai-quick">
+            <button @click="send('كم عدد المستخدمين والإيرادات؟')"><span>📊</span> الإحصائيات العامة</button>
+            <button @click="send('اعرض الطلبات المعلقة')"><span>⏳</span> الطلبات المعلقة</button>
+            <button @click="send('اعرض القنوات المتاحة')"><span>📋</span> القنوات</button>
+            <button @click="send('اكتب بوست ترحيبي')"><span>✍️</span> اكتب بوست</button>
+            <button @click="send('عرض المستخدمين')"><span>👥</span> المستخدمون</button>
+            <button @click="send('عرض المعاملات')"><span>💰</span> المعاملات</button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Learning Stats -->
+      <template x-if="showLearning">
+        <div style="padding:8px">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px">
+            <h4 style="font-size:14px;font-weight:600;margin:0 0 12px;color:var(--text)">🧠 إحصائيات التعلم</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--green)" x-text="learnStats.total_actions||0"></div><div style="font-size:10px;color:var(--dim)">إجراءات</div></div>
+              <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--cyan)" x-text="learnStats.learned_patterns||0"></div><div style="font-size:10px;color:var(--dim)">أنماط</div></div>
+              <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--amber)" x-text="learnStats.knowledge_facts||0"></div><div style="font-size:10px;color:var(--dim)">معلومات</div></div>
+              <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--ac)" x-text="learnStats.corrections||0"></div><div style="font-size:10px;color:var(--dim)">تصحيحات</div></div>
+            </div>
+            <div style="margin-top:12px;font-size:11px;color:var(--dim);text-align:center">👍 <span x-text="learnStats.positive_feedback||0"></span> · 👎 <span x-text="learnStats.negative_feedback||0"></span></div>
+            <button @click="showLearning=false" style="width:100%;margin-top:12px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--dim);cursor:pointer;font-size:12px;font-family:inherit">إغلاق</button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Messages -->
+      <template x-for="(msg,idx) in messages" :key="idx">
+        <div class="ai-msg" :class="msg.role">
+          <div class="ai-msg-avatar" :style="msg.role==='user'?'':'background:'+(msg.agent_color||'#8b5cf6')+'20;color:'+(msg.agent_color||'#8b5cf6')" x-text="msg.role==='user'?'👤':(msg.agent_emoji||activeAgent.emoji)"></div>
+          <div style="flex:1;min-width:0">
+            <div class="ai-msg-bubble" x-html="fmt(msg.content)"></div>
+            <div class="ai-msg-meta" x-show="msg.role==='assistant'">
+              <span class="agent-badge" x-show="msg.agent_name" :style="'background:'+(msg.agent_color||'#8b5cf6')+'15;color:'+(msg.agent_color||'#8b5cf6')" x-text="(msg.agent_emoji||'')+' '+(msg.agent_name||'')"></span>
+              <span x-show="msg.action_taken" style="opacity:.5" x-text="'⚡'+msg.action_taken"></span>
+            </div>
+            <div class="ai-msg-actions" x-show="msg.role==='assistant' && !msg.feedback && idx>0">
+              <button @click="feedback(idx,3)">👍</button>
+              <button @click="feedback(idx,1)">👎</button>
+            </div>
+            <div x-show="msg.feedback===3" style="font-size:10px;color:var(--green);opacity:.7;margin-top:4px">✓ شكراً على التقييم</div>
+            <div x-show="msg.feedback===1" class="ai-correction">
+              <input x-model="corrections[idx]" @keydown.enter="sendCorrection(idx,msg)" placeholder="ما الذي كان خاطئاً؟">
+              <button @click="sendCorrection(idx,msg)">إرسال</button>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div class="ai-msg assistant" x-show="typing">
+        <div class="ai-msg-avatar" :style="'background:'+(activeAgent.color||'#8b5cf6')+'20;color:'+(activeAgent.color||'#8b5cf6')" x-text="activeAgent.emoji"></div>
+        <div class="ai-typing-dots"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="ai-input-wrap">
+      <div class="ai-input-row">
+        <input type="file" id="aiFileInput" accept=".xlsx,.xls,.csv" @change="handleFileUpload($event)" style="display:none">
+        <button @click="document.getElementById('aiFileInput').click()" style="width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;transition:all .15s" title="رفع ملف اكسل">📎</button>
+        <input class="ai-input" x-model="input" x-ref="chatIn" @keydown.enter.prevent="send()" :placeholder="'اكتب لـ '+activeAgent.name_ar+'...'" :disabled="typing">
+        <button class="ai-send" @click="send()" :disabled="!input.trim()||typing">
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+        </button>
+      </div>
+      <div class="ai-input-hint">💡 <code>⚡</code> الأوامر | <code>@الكاتب</code>وكيل | <code>📎</code> رفع ملف اكسل</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function aiChat(){
+  return{
+    open:false,input:'',messages:[],typing:false,corrections:{},showLearning:false,showCmds:false,
+    theme: localStorage.getItem('ai_theme')||'dark',
+    agents:[],
+    activeAgent:{id:'commander',name_ar:'القائد',emoji:'🎯',color:'#8b5cf6',role_ar:'المدير العام',description_ar:'المنسق الرئيسي. يتحكم في كل شيء.'},
+    learnStats:{},
+    commandCategories:[
+      {icon:'📊',title:'الإحصائيات',commands:[
+        {label:'📈 الإحصائيات العامة',prompt:'اعرض الإحصائيات العامة'},
+        {label:'📊 إحصائيات تفصيلية',prompt:'إحصائيات تفصيلية لآخر أسبوع'},
+        {label:'🖥️ إحصائيات المنصة',prompt:'إحصائيات المنصة الكاملة'},
+        {label:'🎮 إحصائيات الألعاب',prompt:'إحصائيات الألعاب'},
+        {label:'🤝 إحصائيات الوكلاء',prompt:'إحصائيات وكلاء المطابقة'},
+      ]},
+      {icon:'👥',title:'المستخدمون',commands:[
+        {label:'👥 عرض المستخدمين',prompt:'اعرض المستخدمين'},
+        {label:'🚫 حظر مستخدم',prompt:'حظر المستخدم'},
+        {label:'✅ إلغاء حظر',prompt:'إلغاء حظر المستخدم'},
+        {label:'👤 تفاصيل مستخدم',prompt:'تفاصيل المستخدم'},
+        {label:'✉️ إرسال رسالة',prompt:'إرسال رسالة لمستخدم'},
+      ]},
+      {icon:'📋',title:'القنوات',commands:[
+        {label:'📋 عرض القنوات',prompt:'اعرض جميع القنوات'},
+        {label:'➕ إضافة قناة',prompt:'إضافة قناة جديدة'},
+        {label:'🔄 تفعيل/تعطيل',prompt:'تفعيل أو تعطيل قناة'},
+        {label:'🗑️ حذف قناة',prompt:'حذف قناة'},
+      ]},
+      {icon:'💰',title:'المعاملات',commands:[
+        {label:'💰 عرض المعاملات',prompt:'اعرض المعاملات'},
+        {label:'⏳ المعلقة فقط',prompt:'المعاملات المعلقة فقط'},
+        {label:'✅ الموافقة على معاملة',prompt:'الموافقة على المعاملة'},
+        {label:'❌ رفض معاملة',prompt:'رفض المعاملة'},
+        {label:'📦 موافقة جماعية',prompt:'الموافقة الجماعية على الإيداعات المعلقة'},
+      ]},
+      {icon:'🔗',title:'المطابقة',commands:[
+        {label:'🔗 عرض المطابقات',prompt:'اعرض المطابقات'},
+        {label:'✅ الموافقة على مطابقة',prompt:'الموافقة على المطابقة'},
+        {label:'❌ رفض مطابقة',prompt:'رفض المطابقة'},
+        {label:'⚖️ حل نزاع',prompt:'حل النزاع'},
+      ]},
+      {icon:'📤',title:'المنشورات المتعددة',commands:[
+        {label:'📤 إنشاء منشور',prompt:'أنشئ منشور متعدد المنصات'},
+        {label:'📋 المنشورات المحفوظة',prompt:'اعرض المنشورات المحفوظة'},
+        {label:'👁️ معاينة لمنصة',prompt:'معاينة المنشور لتليجرام'},
+        {label:'🚀 نشر على منصة',prompt:'نشر المنشور على تليجرام'},
+        {label:'✈️ تنسيق تليجرام',prompt:'معاينة المحتوى لتليجرام'},
+        {label:'📱 تنسيق واتساب',prompt:'معاينة المحتوى لواتساب'},
+        {label:'📸 تنسيق إنستجرام',prompt:'معاينة المحتوى لإنستجرام'},
+        {label:'🐦 تنسيق تويتر',prompt:'معاينة المحتوى لتويتر'},
+      ]},
+      {icon:'✍️',title:'المحتوى',commands:[
+        {label:'✍️ اكتب بوست',prompt:'اكتب بوست ترحيبي'},
+        {label:'🤖 توليد بالذكاء',prompt:'ولّد بوست عن'},
+        {label:'📢 بث رسالة',prompt:'بث رسالة جماعية'},
+        {label:'📋 طابور البث',prompt:'اعرض طابور البث'},
+        {label:'🌐 ترجمة',prompt:'ترجم النص إلى الإنجليزية'},
+      ]},
+      {icon:'👥',title:'جهات الاتصال',commands:[
+        {label:'📥 استيراد جهات اتصال',prompt:'استيراد جهات اتصال من ملف اكسل'},
+        {label:'📋 عرض الاستيرادات',prompt:'اعرض الاستيرادات السابقة'},
+        {label:'📊 إحصائيات جهات الاتصال',prompt:'إحصائيات جهات الاتصال'},
+        {label:'📤 إرسال لجهات اتصال',prompt:'إرسال رسالة لجهات الاتصال من ملف'},
+        {label:'🛡️ حالة الحماية',prompt:'حالة الحماية من الحظر لتليجرام'},
+        {label:'📋 سجل الحماية',prompt:'سجل الحماية من الحظر'},
+      ]},
+      {icon:'🎫',title:'التذاكر',commands:[
+        {label:'🎫 عرض التذاكر',prompt:'اعرض التذاكر المفتوحة'},
+        {label:'💬 رد على تذكرة',prompt:'رد على التذكرة'},
+        {label:'🔒 إغلاق تذكرة',prompt:'إغلاق التذكرة'},
+      ]},
+      {icon:'⚙️',title:'النظام',commands:[
+        {label:'⚙️ الإعدادات',prompt:'اعرض الإعدادات'},
+        {label:'💾 نسخ احتياطي',prompt:'إنشاء نسخة احتياطية'},
+        {label:'📋 النسخ الاحتياطية',prompt:'اعرض النسخ الاحتياطية'},
+        {label:'🏢 الشركات',prompt:'اعرض الشركات'},
+        {label:'👤 الأدمنز',prompt:'اعرض الأدمنز'},
+        {label:'🎮 تفعيل/تعطيل لعبة',prompt:'تفعيل أو تعطيل لعبة'},
+      ]},
+      {icon:'🔄',title:'النقل والترحيل',commands:[
+        {label:'🔄 عرض عمليات النقل',prompt:'اعرض عمليات النقل المتاحة'},
+        {label:'📊 إحصائيات النقل',prompt:'إحصائيات عمليات النقل'},
+        {label:'📋 سجل النقل',prompt:'سجل عمليات النقل الأخيرة'},
+        {label:'👁️ معاينة نقل',prompt:'معاينة محتوى عبر عملية نقل'},
+      ]},
+      {icon:'🌐',title:'المتصفح',commands:[
+        {label:'🌐 فتح موقع',prompt:'افتح المتصفح على موقع'},
+        {label:'📸 لقطة شاشة',prompt:'خذ لقطة شاشة من المتصفح'},
+        {label:'📋 حالة النوافذ',prompt:'اعرض حالة نوافذ المتصفح'},
+        {label:'🖥️ حالة Daemon',prompt:'اعرض حالة Daemon المتصفح'},
+        {label:'😴 إدخال الكل في النوم',prompt:'أدخل كل المتصفحات في النوم'},
+        {label:'☀️ إيقاظ الكل',prompt:'أيقظ كل المتصفحات'},
+        {label:'🧠 تحليل الموقع',prompt:'حلّل الصفحة الحالية'},
+        {label:'📄 استخراج محتوى',prompt:'استخرج محتوى الصفحة الحالية'},
+        {label:'📊 المعرفة المحفوظة',prompt:'اعرض كل المواقع المعرفة'},
+      ]},
+    ],
+
+    async init(){
+      try{const r=await fetch('/api/ai/assistant/agents',{credentials:'same-origin'});const d=await r.json();if(d.success){this.agents=d.agents;if(d.agents.length)this.activeAgent=d.agents[0]}}catch(e){}
+      this.$watch('open',v=>{if(v){this.loadLearning();this.$nextTick(()=>{this.$refs.chatIn?.focus();this.scroll()})}});
+    },
+
+    toggle(){this.open=!this.open},
+    toggleTheme(){this.theme=this.theme==='dark'?'light':'dark';localStorage.setItem('ai_theme',this.theme)},
+
+    switchAgent(id){const a=this.agents.find(x=>x.id===id);if(a)this.activeAgent=a;this.messages=[];this.loadHistory(id)},
+
+    async loadHistory(agentId){
+      try{const r=await fetch('/api/ai/assistant/history?agent_id='+agentId+'&limit=30',{credentials:'same-origin'});const d=await r.json();
+      if(d.success){this.messages=d.history.map(h=>({role:h.role,content:h.content,action_taken:h.action_taken,agent_id:h.agent_id||agentId,agent_emoji:this.getAgentEmoji(h.agent_id||agentId),agent_name:this.getAgentName(h.agent_id||agentId),agent_color:this.getAgentColor(h.agent_id||agentId)}))}}catch(e){}
+    },
+
+    async loadLearning(){try{const r=await fetch('/api/ai/assistant/learning',{credentials:'same-origin'});const d=await r.json();if(d.success)this.learnStats=d.stats||{}}catch(e){}},
+
+    getAgentEmoji(id){const a=this.agents.find(x=>x.id===id);return a?a.emoji:'🎯'},
+    getAgentName(id){const a=this.agents.find(x=>x.id===id);return a?a.name_ar:'القائد'},
+    getAgentColor(id){const a=this.agents.find(x=>x.id===id);return a?a.color:'#8b5cf6'},
+
+    scroll(){this.$nextTick(()=>{const el=this.$refs.msgs;if(el)el.scrollTop=el.scrollHeight})},
+
+    fmt(t){
+      if(!t)return'';
+      if(t.includes('استشارة الفريق')){
+        const parts=t.split('\n\n');let out='';let consultBlock=false;
+        for(const p of parts){
+          if(p.includes('استشارة الفريق')){out+='<div class="ai-consult-panel"><h5>💬 استشارة الفريق</h5>';consultBlock=true}
+          else if(consultBlock && p.match(/^[🎯✍️📊🛡️⚙️]/)){const lines=p.split('\n');const emoji=lines[0].match(/^[🎯✍️📊🛡️⚙️]/)?.[0]||'';const name=lines[0].replace(emoji,'').trim();const body=lines.slice(1).join('\n').trim();out+='<div class="ai-consult-agent"><span class="ca-emoji">'+emoji+'</span><div class="ca-body"><div class="ca-name">'+name+'</div><div class="ca-text">'+this._esc(body)+'</div></div></div>'}
+          else if(consultBlock && !p.match(/^[🎯✍️📊🛡️⚙️]/) && p.trim()){out+='</div><div style="margin-top:8px">'+this._simpleFmt(p)+'</div>';consultBlock=false}
+          else{out+=this._simpleFmt(p)}
+        }
+        if(consultBlock)out+='</div>';return out;
+      }
+      return this._simpleFmt(t);
+    },
+
+    _simpleFmt(t){t=t.replace(/\n/g,'<br>');t=t.replace(/\*\*(.*?)\*\*/g,'<b style="color:var(--text)">$1</b>');t=t.replace(/`(.*?)`/g,'<code style="background:var(--surface);padding:1px 5px;border-radius:4px;font-size:11px;color:var(--cyan)">$1</code>');t=t.replace(/^• /gm,'<span style="color:var(--ac);margin-left:2px">•</span> ');return t},
+    _esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')},
+
+    send(text){
+      const msg=text||this.input.trim();if(!msg||this.typing)return;
+      this.messages.push({role:'user',content:msg});this.input='';this.typing=true;this.scroll();
+      fetch('/api/ai/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,agent_id:this.activeAgent.id}),credentials:'same-origin'})
+      .then(r=>r.json()).then(d=>{
+        if(d.success){this.messages.push({role:'assistant',content:d.reply||'تم',action_taken:d.action_taken||null,agent_id:d.agent_id||this.activeAgent.id,agent_emoji:d.agent_emoji||this.activeAgent.emoji,agent_name:d.agent_name||this.activeAgent.name_ar,agent_color:d.agent_color||this.activeAgent.color});
+          if(d.agent_id&&d.agent_id!==this.activeAgent.id){const a=this.agents.find(x=>x.id===d.agent_id);if(a)this.activeAgent=a}}
+        else{this.messages.push({role:'assistant',content:'❌ '+(d.error||'حدث خطأ'),agent_emoji:'❌',agent_name:'System',agent_color:'#ef4444'})}
+      }).catch(()=>{this.messages.push({role:'assistant',content:'❌ خطأ في الاتصال',agent_emoji:'❌',agent_name:'System',agent_color:'#ef4444'})})
+      .finally(()=>{this.typing=false;this.scroll()});
+    },
+
+    async clearChat(){if(!confirm('مسح المحادثة؟'))return;try{await fetch('/api/ai/assistant/clear',{method:'POST',credentials:'same-origin'})}catch(e){}this.messages=[]},
+
+    async feedback(idx,rating){const msg=this.messages[idx];msg.feedback=rating;try{await fetch('/api/ai/assistant/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msg.message_id,rating:rating,action_taken:msg.action_taken}),credentials:'same-origin'})}catch(e){}},
+
+    async sendCorrection(idx,msg){const text=this.corrections[idx];if(!text)return;try{await fetch('/api/ai/assistant/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msg.message_id,rating:1,correction:text,action_taken:msg.action_taken}),credentials:'same-origin'});this.corrections[idx]='';msg.feedback=1;this.messages.push({role:'assistant',content:'✅ تم حفظ التصحيح.',agent_emoji:'🧠',agent_name:'System',agent_color:'#22c55e'});this.scroll()}catch(e){}},
+
+    async handleFileUpload(event){
+      const file=event.target.files[0];if(!file)return;
+      this.messages.push({role:'user',content:'📎 جاري رفع الملف: '+file.name});
+      this.typing=true;this.scroll();
+      const formData=new FormData();formData.append('file',file);
+      try{
+        const r=await fetch('/api/contacts/import',{method:'POST',body:formData,credentials:'same-origin'});
+        const d=await r.json();
+        if(d.success){
+          this.messages.push({role:'assistant',content:'✅ <b>تم الاستيراد بنجاح!</b>\n\n• الملف: '+d.filename+'\n• الإجمالي: <b>'+d.total+'</b> جهة اتصال\n• تليجرام: <b>'+d.telegram+'</b>\n• واتساب: <b>'+d.whatsapp+'</b>\n• كلاهما: <b>'+d.both+'</b>\n\nمعرّف الاستيراد: <code>'+d.import_id+'</code>',
+            agent_emoji:'📥',agent_name:this.activeAgent.name_ar,agent_color:this.activeAgent.color});
+        }else{
+          this.messages.push({role:'assistant',content:'❌ خطأ: '+(d.error||'فشل الاستيراد'),agent_emoji:'❌',agent_name:'System',agent_color:'#ef4444'});
+        }
+      }catch(e){
+        this.messages.push({role:'assistant',content:'❌ خطأ في رفع الملف',agent_emoji:'❌',agent_name:'System',agent_color:'#ef4444'});
+      }
+      this.typing=false;this.scroll();
+      event.target.value='';
+    }
+  };
+}
+</script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+

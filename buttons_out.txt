@@ -1,0 +1,9 @@
+Button: {'text': 'الحملات', 'dataI18n': 'campaigns_tab', 'className': 'px-4 py-2 rounded-lg text-sm font-medium transition bg-green-600 text-white'}
+Button: {'text': 'القنوات', 'dataI18n': 'channels_tab', 'className': 'px-4 py-2 rounded-lg text-sm font-medium transition text-slate-400'}
+Button: {'text': 'المجموعات', 'dataI18n': 'groups_tab', 'className': 'px-4 py-2 rounded-lg text-sm font-medium transition text-slate-400'}
+Button: {'text': 'الأرشيف', 'dataI18n': 'vault_tab', 'className': 'px-4 py-2 rounded-lg text-sm font-medium transition text-slate-400'}
+Button: {'text': 'AI', 'dataI18n': 'ai_tab', 'className': 'px-4 py-2 rounded-lg text-sm font-medium transition text-slate-400'}
+Button: {'text': 'التقرير', 'dataI18n': 'report_tab', 'className': 'px-4 py-2 rounded-lg text-sm font-medium transition text-slate-400'}
+Button: {'text': 'تحليلات', 'dataI18n': 'analytics_tab', 'className': 'px-4 py-2 rounded-lg text-sm font-medium transition text-slate-400'}
+Button: {'text': 'الشبكة', 'dataI18n': 'ainet_tab', 'className': 'px-4 py-2 rounded-lg text-sm font-medium transition text-slate-400'}
+Button: {'text': 'السوشيال', 'dataI18n': 'social_tab', 'className': 'px-4 py-2 rounded-lg text-sm font-medium transition text-slate-400'}

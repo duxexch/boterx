@@ -1,13 +1,21 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js?v=20260823"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
+<meta property="og:title" content="VEX Games — العب واربح">
+<meta property="og:description" content="منصة ألعاب تيليغرام الأقوى — جوائز حقيقية وألعاب مثيرة">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://vex.deals/static/icons/og-domino.jpg?v=20260821b">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://vex.deals/static/icons/og-domino.jpg?v=20260821b">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>اخطف الهدية — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
+<title data-i18n="x031">اخطف الهدية — VEX</title>
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260816logo">
 <style>
 *{box-sizing:border-box}
 .game-area{position:relative;overflow:hidden;touch-action:none;flex:1;display:flex;flex-direction:column}
@@ -29,6 +37,7 @@
 .start-btn:active{transform:scale(.97)}
 .result-btn{padding:14px 28px;border-radius:var(--radius);font-size:16px;font-weight:900;border:none;cursor:pointer;background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
 </style>
+<link rel="stylesheet" href="/static/css/bg-logo.css?v=1">
 </head>
 <body>
 <div id="app" style="display:none;flex-direction:column;height:100dvh">
@@ -53,33 +62,33 @@
 
     <!-- Start Overlay -->
     <div class="overlay" id="startOverlay">
-      <div class="overlay-title">🎁 اخطف الهدايا!</div>
-      <div class="overlay-sub">اضغط على الهدايا لاختطافها قبل أن تختفي</div>
+      <div class="overlay-title" data-i18n="x214">🎁 اخطف الهدايا!</div>
+      <div class="overlay-sub" data-i18n="x037">اضغط على الهدايا لاختطافها قبل أن تختفي</div>
       <div class="bet-row-ov">
         <button class="ctrl-btn-ov" onclick="adjustBet('betInpOv',0.5)">½</button>
         <input type="number" class="bet-inp-ov" id="betInpOv" value="10" min="1">
         <button class="ctrl-btn-ov" onclick="adjustBet('betInpOv',2)">2×</button>
       </div>
-      <button class="start-btn" onclick="startGame()">🚀 ابدأ اللعبة</button>
+      <button class="start-btn" onclick="startGame()" data-i18n="x284">🚀 ابدأ اللعبة</button>
     </div>
 
     <!-- Result Overlay -->
     <div class="overlay" id="resultOverlay" style="display:none">
-      <div class="overlay-title" id="resultTitle">انتهت اللعبة!</div>
+      <div class="overlay-title" id="resultTitle" data-i18n="x062">انتهت اللعبة!</div>
       <div class="overlay-score" id="resultScore">0</div>
       <div class="overlay-payout" id="resultPayout"></div>
       <div class="overlay-sub" id="resultSub"></div>
-      <button class="result-btn" onclick="resetGame()">🔄 العب مرة أخرى</button>
+      <button class="result-btn" onclick="resetGame()" data-i18n="x274">🔄 العب مرة أخرى</button>
     </div>
   </div>
 </div>
-<div id="loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);flex-direction:column;gap:12px">
-  <div style="font-size:40px">🎁</div>
-  <div style="color:var(--text-dim);font-size:14px">جارٍ التحميل...</div>
+<div id="loading" class="loader-screen">
+  <div style="color:var(--text-dim);font-size:14px" data-i18n="x096">جارٍ التحميل...</div>
 </div>
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260819b"></script>
 <script>
 'use strict';
+pfGameName='snatch';
 var canvas = document.getElementById('gameCanvas');
 var ctx = canvas.getContext('2d');
 var gameRunning = false;
@@ -146,7 +155,7 @@ function startGame() {
   }).catch(function() {
     // Network error at spin — no session was created so nothing was deducted.
     // Do NOT enter offline play mode since there is no server-tracked session.
-    showToast('تعذّر الاتصال. تحقق من الشبكة وأعد المحاولة.', 'error');
+    showToast(I18N.t('y038'), 'error');
   });
 }
 
@@ -162,7 +171,7 @@ function startGame() {
   var payoutEl  = document.getElementById('resultPayout');
   if (!overlayEl) return;
   overlayEl.style.display = 'flex';
-  if (subEl)    subEl.textContent    = 'جارٍ استكمال الجلسة السابقة…';
+  if (subEl)    subEl.textContent    = I18N.t('y048');
   if (payoutEl) payoutEl.textContent = '—';
 
   snatchSessionId = pending.sid;
@@ -179,21 +188,36 @@ function startGame() {
         ? ('+ ' + fmtAmount(payout) + ' ' + gameCurrency)
         : ('0 ' + gameCurrency);
       if (subEl) subEl.textContent = payout > 0
-        ? 'تمت المكافأة من الجلسة السابقة!'
-        : 'انتهت الجلسة السابقة بدون مكافأة.';
+        ? I18N.t('y046')
+        : I18N.t('y032');
+      // تفصيل بونص المهارة — يُزال القديم أولاً (النافذة تُعاد استخدامها)
+      var oldDetail = document.getElementById('skillBonusDetail');
+      if (oldDetail && oldDetail.parentNode) oldDetail.parentNode.removeChild(oldDetail);
+      if (payout > 0 && d.skill_bonus > 0 && typeof d.base_payout === 'number') {
+        var detail = document.createElement('div');
+        detail.id = 'skillBonusDetail';
+        detail.style.cssText = 'font-size:12px;color:#8794a3;margin-top:4px;font-weight:600';
+        detail.innerHTML = '🏅 جائزة: ' + fmtAmount(d.base_payout)
+          + ' + بونص مهارة: <b style="color:#00e701">+' + fmtAmount(payout - d.base_payout) + '</b>'
+          + ' (نقاط: ' + (d.score || 0) + ')';
+        if (payoutEl && payoutEl.parentNode) payoutEl.parentNode.insertBefore(detail, payoutEl.nextSibling);
+      }
+      if(typeof addGameRound==='function'){
+        addGameRound({game:'snatch',bet:0,payout:payout,multiplier:d.multiplier||0,result:d.won!==false?'win':'lose'});
+      }
       loadBalance();
     } else if (d && d.error && /settled|refunded|not found/i.test(d.error)) {
       snatchSessionId = null; snatchFinalScore = 0; _clearPendingSession();
-      if (subEl) subEl.textContent = 'الجلسة السابقة تم تسويتها بالفعل.';
+      if (subEl) subEl.textContent = I18N.t('y025');
       if (payoutEl) payoutEl.textContent = '—';
       loadBalance();
     } else {
       // Still failing — leave localStorage intact, show retry button
-      if (subEl) subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+      if (subEl) subEl.textContent = I18N.t('y037');
       if (!document.getElementById('snatchRetryBtn')) {
         var btn = document.createElement('button');
         btn.id = 'snatchRetryBtn';
-        btn.textContent = '🔄 إعادة المحاولة';
+        btn.textContent = I18N.t('y153');
         btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
         btn.onclick = function() {
           btn.disabled = true;
@@ -203,11 +227,11 @@ function startGame() {
       }
     }
   }).catch(function() {
-    if (subEl) subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+    if (subEl) subEl.textContent = I18N.t('y037');
     if (!document.getElementById('snatchRetryBtn')) {
       var btn = document.createElement('button');
       btn.id = 'snatchRetryBtn';
-      btn.textContent = '🔄 إعادة المحاولة';
+      btn.textContent = I18N.t('y153');
       btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
       btn.onclick = function() { btn.disabled = true; location.reload(); };
       overlayEl.appendChild(btn);
@@ -359,10 +383,10 @@ function endGame() {
   var subEl     = document.getElementById('resultSub');
   var overlayEl = document.getElementById('resultOverlay');
 
-  titleEl.textContent  = lives <= 0 ? '💀 نفدت الحياة!' : '⏰ انتهى الوقت!';
-  scoreEl.textContent  = score + ' نقطة';
+  titleEl.textContent  = lives <= 0 ? I18N.t('y142') : I18N.t('y113');
+  scoreEl.textContent  = score + I18N.t('y003');
   payoutEl.textContent = '';
-  subEl.textContent    = 'جارٍ حساب مكافأتك…';
+  subEl.textContent    = I18N.t('y051');
   overlayEl.style.display = 'flex';
 
   var finalScore = score;
@@ -390,11 +414,11 @@ function endGame() {
           var payout = (typeof d.payout === 'number') ? d.payout : 0;
           if (payout > 0) {
             payoutEl.textContent = '+ ' + fmtAmount(payout) + ' ' + gameCurrency;
-            subEl.textContent = 'أحسنت! الرصيد تم تحديثه';
+            subEl.textContent = I18N.t('y006');
             soundWin(payout > betAmount); hapticNotif('success');
           } else {
             payoutEl.textContent = '0 ' + gameCurrency;
-            subEl.textContent = 'حاول مرة أخرى!';
+            subEl.textContent = I18N.t('y054');
             hapticNotif('error');
           }
           // Remove retry button if visible
@@ -424,16 +448,16 @@ function endGame() {
 
     function _showEndRetry(sid, sc) {
       payoutEl.textContent = '—';
-      subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+      subEl.textContent = I18N.t('y037');
       hapticNotif('error');
       var existing = document.getElementById('snatchRetryBtn');
       if (!existing) {
         var btn = document.createElement('button');
         btn.id = 'snatchRetryBtn';
-        btn.textContent = '🔄 إعادة المحاولة';
+        btn.textContent = I18N.t('y153');
         btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
         btn.onclick = function() {
-          subEl.textContent = 'جارٍ المحاولة…';
+          subEl.textContent = I18N.t('y050');
           btn.disabled = true;
           _doEndRequest(sid, sc).finally(function() { btn.disabled = false; });
         };
@@ -447,7 +471,7 @@ function endGame() {
   } else {
     // Offline / no session — show placeholder; no financial outcome
     payoutEl.textContent = '—';
-    subEl.textContent = 'وضع غير متصل — لا توجد جلسة نشطة';
+    subEl.textContent = I18N.t('y109');
     addHistItem(document.querySelector('.hist-bar') || document.createElement('div'), Math.max(1, finalScore * 0.1));
   }
 }
@@ -490,5 +514,7 @@ loadBalance();
 setInterval(loadBalance, 10000);
 initBackButton();
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
+<script src="/static/js/auth-gate.js?v=20260818a"></script>
 </body>
 </html>

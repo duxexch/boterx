@@ -17,7 +17,7 @@ from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'vex_games.db')
+DB_PATH = os.path.join(BASE_DIR, 'boterx.db')
 CSV_ENCODING = 'utf-8-sig'
 
 _db_lock = threading.Lock()
@@ -236,6 +236,67 @@ def _init_db():
                 expires_at  REAL NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_nonces_exp ON auth_nonces(expires_at);
+
+            -- AI API Keys for multi-provider LLM integration
+            CREATE TABLE IF NOT EXISTS ai_api_keys (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                key_name         TEXT NOT NULL,
+                provider         TEXT NOT NULL,
+                api_key          TEXT NOT NULL,
+                base_url         TEXT DEFAULT '',
+                default_model    TEXT NOT NULL,
+                priority         INTEGER NOT NULL DEFAULT 10,
+                temperature      REAL NOT NULL DEFAULT 0.7,
+                max_tokens       INTEGER NOT NULL DEFAULT 4096,
+                timeout_seconds  INTEGER NOT NULL DEFAULT 60,
+                is_active        INTEGER NOT NULL DEFAULT 1,
+                models_list      TEXT DEFAULT '[]',
+                requests_today   INTEGER NOT NULL DEFAULT 0,
+                tokens_today     INTEGER NOT NULL DEFAULT 0,
+                cost_estimate_usd REAL NOT NULL DEFAULT 0.0,
+                created_at       TEXT NOT NULL,
+                updated_at       TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_ai_keys_provider ON ai_api_keys(provider);
+            CREATE INDEX IF NOT EXISTS idx_ai_keys_active ON ai_api_keys(is_active);
+
+            -- Social Media Accounts for sub-agents
+            CREATE TABLE IF NOT EXISTS social_accounts (
+                id                TEXT PRIMARY KEY,
+                platform          TEXT NOT NULL,
+                account_name      TEXT NOT NULL,
+                handle            TEXT NOT NULL,
+                sub_agent_id      TEXT NOT NULL,
+                sub_agent_name    TEXT NOT NULL,
+                access_token      TEXT NOT NULL,
+                page_id           TEXT DEFAULT '',
+                phone_number_id   TEXT DEFAULT '',
+                business_account_id TEXT DEFAULT '',
+                posting_permissions TEXT NOT NULL DEFAULT 'full',
+                content_categories TEXT DEFAULT '',
+                is_active         TEXT NOT NULL DEFAULT 'yes',
+                followers         INTEGER NOT NULL DEFAULT 0,
+                last_sync         TEXT DEFAULT '',
+                created_at        TEXT NOT NULL,
+                updated_at        TEXT NOT NULL,
+                created_by        TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_social_accounts_platform ON social_accounts(platform);
+            CREATE INDEX IF NOT EXISTS idx_social_accounts_agent ON social_accounts(sub_agent_id);
+            CREATE INDEX IF NOT EXISTS idx_social_accounts_active ON social_accounts(is_active);
+
+            -- Social Media Posts Log
+            CREATE TABLE IF NOT EXISTS social_posts (
+                id                TEXT PRIMARY KEY,
+                account_id        TEXT NOT NULL,
+                content           TEXT,
+                media_urls        TEXT,
+                status            TEXT NOT NULL,
+                posted_at         TEXT NOT NULL,
+                created_at        TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_social_posts_account ON social_posts(account_id);
+            CREATE INDEX IF NOT EXISTS idx_social_posts_posted ON social_posts(posted_at);
         ''')
         conn.commit()
     finally:
@@ -803,6 +864,85 @@ class GameDB:
                 'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?', (uid,)
             ).fetchone()
             return True, float(bal_row[0]) if bal_row else amt
+
+    def transfer_svrp_frozen_p2p(self, transfer_id, sender_uid, receiver_uid,
+                                 amount, unlock_bonus=0.0):
+        """Atomic peer-to-peer frozen-balance transfer with unlock bonus.
+
+        In ONE SAVEPOINT:
+          - verify sender frozen_balance >= amount + unlock_bonus (SQLite is
+            authoritative — not the CSV mirror)
+          - debit sender frozen by (amount + unlock_bonus), credit sender
+            total_used by unlock_bonus (the 5% unlock rule)
+          - credit receiver frozen + total_earned by amount
+          - record transfer_id in svrp_p2p_transfer_log (PRIMARY KEY) for
+            idempotency — a replay returns True without re-applying.
+
+        Returns (True, sender_frozen_after) or (False, error_msg).
+        """
+        s_uid, r_uid = str(sender_uid), str(receiver_uid)
+        amt = float(_money(amount))
+        bonus = float(_money(unlock_bonus))
+        if amt <= 0 or bonus < 0:
+            return False, 'المبلغ غير صالح'
+        conn = self._conn()
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with _db_lock:
+            conn.execute(
+                'CREATE TABLE IF NOT EXISTS svrp_p2p_transfer_log ('
+                ' transfer_id TEXT PRIMARY KEY, sender_uid TEXT, receiver_uid TEXT,'
+                ' amount REAL, unlock_bonus REAL, created_at TEXT)'
+            )
+            existing = conn.execute(
+                'SELECT sender_uid FROM svrp_p2p_transfer_log WHERE transfer_id = ?',
+                (transfer_id,)).fetchone()
+            if existing:
+                bal = conn.execute(
+                    'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?',
+                    (s_uid,)).fetchone()
+                return True, float(bal[0]) if bal else 0.0
+            conn.execute('SAVEPOINT svrp_p2p')
+            try:
+                for u in (s_uid, r_uid):
+                    conn.execute(
+                        'INSERT OR IGNORE INTO svrp_wallet_balance '
+                        '(uid, frozen_balance, total_earned, total_used, '
+                        ' wagering_required, wagering_completed) '
+                        'VALUES (?, 0, 0, 0, 3, 0)', (u,))
+                res = conn.execute(
+                    'UPDATE svrp_wallet_balance SET '
+                    'frozen_balance = frozen_balance - ?, '
+                    'total_used = total_used + ? '
+                    'WHERE uid = ? AND frozen_balance >= ?',
+                    (amt + bonus, bonus, s_uid, amt + bonus))
+                if res.rowcount != 1:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_p2p')
+                    conn.execute('RELEASE SAVEPOINT svrp_p2p')
+                    conn.commit()
+                    return False, 'الرصيد المجمد غير كافٍ'
+                conn.execute(
+                    'UPDATE svrp_wallet_balance SET '
+                    'frozen_balance = frozen_balance + ?, '
+                    'total_earned = total_earned + ? WHERE uid = ?',
+                    (amt, amt, r_uid))
+                conn.execute(
+                    'INSERT INTO svrp_p2p_transfer_log '
+                    '(transfer_id, sender_uid, receiver_uid, amount, unlock_bonus, created_at) '
+                    'VALUES (?, ?, ?, ?, ?, ?)',
+                    (transfer_id, s_uid, r_uid, amt, bonus, now))
+                conn.execute('RELEASE SAVEPOINT svrp_p2p')
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_p2p')
+                    conn.execute('RELEASE SAVEPOINT svrp_p2p')
+                except Exception:
+                    pass
+                raise
+            conn.commit()
+            bal = conn.execute(
+                'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?',
+                (s_uid,)).fetchone()
+            return True, float(bal[0]) if bal else 0.0
 
     def debit_svrp_balance_for_transfer(self, transfer_id, uid, amount):
         """Debit frozen balance and CAS transfer pending→debited atomically.
@@ -1506,7 +1646,10 @@ class GameDB:
             for row in rows:
                 tid = row.get('telegram_id', '')
                 if tid in bal_map:
-                    row['game_balance'] = f"{bal_map[tid]:.2f}"
+                    try:
+                        row['game_balance'] = f"{float(bal_map[tid]):.2f}"
+                    except (ValueError, TypeError):
+                        row['game_balance'] = "0.00"
 
             # Atomic write
             import tempfile
@@ -1614,6 +1757,53 @@ def has_permission(uid: str, permission: str) -> bool:
     """Return True if the admin has the given permission."""
     role_data = get_admin_role(uid)
     return bool(role_data['permissions'].get(permission, False))
+
+
+# ── Admin Sections — controls which pages a sub-admin can access ─────────────
+# All available section keys (must match sidebar route names)
+ALL_SECTIONS = [
+    'dashboard', 'transactions', 'matching', 'agents', 'trading',
+    'users', 'svrp', 'lottery', 'wheel', 'companies', 'payment_methods',
+    'apps', 'referrals', 'channels', 'bots', 'browser', 'clients',
+    'complaints', 'tickets', 'broadcast', 'statistics',
+    'admins', 'admin_center', 'themes', 'exchange_addresses',
+    'send_message', 'backup', 'settings', 'ai_api_keys', 'games_admin',
+]
+
+def get_admin_sections(uid: str) -> list:
+    """Return list of allowed section keys for an admin.
+    Empty list = super_admin (all sections allowed).
+    """
+    role_data = get_admin_role(uid)
+    perms = role_data.get('permissions', {})
+    sections = perms.get('__sections__', [])
+    if role_data.get('role') == 'super_admin':
+        return []  # empty = all allowed
+    return sections if isinstance(sections, list) else []
+
+
+def set_admin_sections(uid: str, sections: list) -> bool:
+    """Update allowed sections for an admin. Preserves other permissions."""
+    import json as _json
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            'SELECT role, permissions FROM admin_roles WHERE uid=?', (str(uid),)
+        ).fetchone()
+        if not row:
+            return False
+        perms = _json.loads(row['permissions'] or '{}')
+        perms['__sections__'] = sections
+        conn.execute(
+            'UPDATE admin_roles SET permissions=? WHERE uid=?',
+            (_json.dumps(perms), str(uid))
+        )
+        conn.commit()
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
 
 
 def log_admin_action(uid: str, action: str, target: str = '',

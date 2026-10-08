@@ -1,0 +1,17 @@
+/dashboard: 200
+/users: 200
+/transactions: 200
+/agents: 200
+/companies: 200
+/payment-methods: 200
+/apps: 200
+/broadcast: 200
+/channels: 200
+/ai-api-keys: 200
+/lottery: 200
+/wheel: 200
+/matching: 200
+/trading: 200
+/svrp: 200
+/referrals: 200
+/games-admin: 200

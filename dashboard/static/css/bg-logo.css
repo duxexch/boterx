@@ -1,0 +1,10 @@
+/* VEX — fixed background (no image for fast loading) */
+html::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  background: #05080b;
+  pointer-events: none;
+}
+body { background: transparent !important; }

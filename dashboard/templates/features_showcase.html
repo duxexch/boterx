@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boterx Admin Panel — Platform Features</title>
+<style>
+:root{
+  --bg:#0b0f14;--card:#111820;--card2:#0a1016;--border:#1e2a38;--fg:#e8eef4;--muted:#8b9bb3;
+  --accent:#00d4aa;--accent-dim:rgba(0,212,170,.12);--warn:#ffb800;--danger:#ff4d6a;
+  --info:#3b82f6;--purple:#a78bfa;--radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);line-height:1.65;padding:28px;max-width:1240px;margin:0 auto}
+h1{font-size:clamp(30px,4.5vw,44px);font-weight:800;background:linear-gradient(135deg,var(--accent),#00f5c8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.subtitle{color:var(--muted);margin:10px 0 34px;font-size:16px;max-width:820px}
+
+.hero{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:36px}
+.pill{background:var(--card);border:1px solid var(--border);border-radius:999px;padding:8px 18px;font-size:13px;color:var(--accent);font-weight:700}
+
+details.section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:18px;overflow:hidden}
+details.section[open]{border-color:rgba(0,212,170,.35)}
+summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:14px;padding:20px 24px;font-size:19px;font-weight:700;user-select:none}
+summary::-webkit-details-marker{display:none}
+summary .icon{font-size:26px}
+summary .chev{margin-inline-start:auto;color:var(--muted);transition:transform .25s;font-size:14px}
+details[open] summary .chev{transform:rotate(180deg)}
+summary .count{margin-inline-start:auto;background:var(--accent-dim);color:var(--accent);font-size:12px;padding:4px 12px;border-radius:999px;font-weight:700}
+details[open] summary .count{display:none}
+.section-intro{padding:0 24px 6px;color:var(--muted);font-size:14px;border-bottom:1px dashed var(--border);padding-bottom:16px;margin-bottom:18px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;padding:0 24px 24px}
+.feat{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:20px;transition:border-color .2s}
+.feat:hover{border-color:var(--accent)}
+.feat h4{font-size:15.5px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:9px}
+.feat h4 .fi{font-size:19px}
+.feat p{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:10px}
+.feat ul{margin:8px 0 12px;padding-inline-start:0;list-style:none}
+.feat ul li{font-size:12.5px;color:var(--fg);opacity:.85;padding:3px 0;display:flex;gap:8px}
+.feat ul li::before{content:"✓";color:var(--accent);font-weight:800;flex-shrink:0}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+.tag{font-size:11px;padding:3px 10px;border-radius:6px;background:var(--accent-dim);color:var(--accent);font-weight:600}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:26px 0}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center}
+.stat .num{font-size:30px;font-weight:800;color:var(--accent)}
+.stat .lbl{font-size:12px;color:var(--muted);margin-top:4px}
+
+.flow{display:flex;flex-direction:column;gap:12px;padding:0 24px 24px}
+.flow-step{display:flex;gap:16px;padding:16px;background:var(--card2);border-radius:12px;border-inline-start:3px solid var(--accent)}
+.flow-step .num{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#000;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0}
+.flow-step h4{font-size:14px;font-weight:700;margin-bottom:3px}
+.flow-step p{font-size:12.5px;color:var(--muted)}
+
+.footer{text-align:center;padding:28px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);margin-top:34px}
+@media(max-width:640px){body{padding:16px}.grid{padding:0 14px 14px}summary{padding:16px}}
+</style>
+</head>
+<body>
+
+<h1>Boterx Admin Panel</h1>
+<p class="subtitle">A complete operations platform for betting &amp; casino affiliate businesses — Telegram-native broadcasting, agent networks, white-label client dashboards, granular staff permissions, wallets, live match monitoring and AI-generated content.</p>
+
+<div class="hero">
+  <span class="pill">Telegram-first</span>
+  <span class="pill">Multi-company</span>
+  <span class="pill">White-label ready</span>
+  <span class="pill">RBAC staff roles</span>
+  <span class="pill">Agent networks</span>
+  <span class="pill">AI content engine</span>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="num">8+</div><div class="lbl">Connected companies</div></div>
+  <div class="stat"><div class="num">25+</div><div class="lbl">API endpoints</div></div>
+  <div class="stat"><div class="num">100%</div><div class="lbl">Automated publishing</div></div>
+  <div class="stat"><div class="num">4-tier</div><div class="lbl">Permission system</div></div>
+  <div class="stat"><div class="num">24/7</div><div class="lbl">Live monitoring</div></div>
+</div>
+
+<!-- ==================== 1. AGENTS & MATCHING ==================== -->
+<details class="section" open>
+<summary><span class="icon">🤝</span>Agents &amp; Matching Network <span style="font-size:12px;color:var(--muted);font-weight:400">(the feature most platforms don't have)</span><span class="chev">▼</span></summary>
+<p class="section-intro">Build a real human distribution network on top of the bot. Every agent gets their own tracked referral identity, their own player base, and a commission ledger — while matching agents bridge players between your platform and external bookmakers with automatic reconciliation.</p>
+<div class="grid">
+
+  <div class="feat"><h4><span class="fi">👤</span>Agent Management</h4>
+    <p>Register, approve and manage a hierarchy of agents who promote your offers through their own channels and personal networks.</p>
+    <ul>
+      <li>Agent profiles with company assignment, icon and contact details</li>
+      <li>Approve / suspend / reactivate agents from one screen</li>
+      <li>Each agent gets a unique referral link + promo code</li>
+      <li>Per-agent performance dashboard: signups, deposits, GGR</li>
+    </ul>
+    <div class="tags"><span class="tag">Hierarchy</span><span class="tag">Referral links</span><span class="tag">Performance</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">🔀</span>Matching Agents (P2P Exchange)</h4>
+    <p>Specialized agents who manually match deposit/withdrawal requests between players and exchanges — the trust layer that makes local payments work where card payments can't.</p>
+    <ul>
+      <li>Pending-match queue: every request visible with amount &amp; method</li>
+      <li>Auto-assignment rules or manual claim by matching agent</li>
+      <li>Two-sided confirmation flow with dispute flagging</li>
+      <li>Full audit trail per match: who matched, when, at what rate</li>
+      <li>Commission per completed match credited automatically</li>
+    </ul>
+    <div class="tags"><span class="tag">Match queue</span><span class="tag">Disputes</span><span class="tag">Auto-commission</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">💸</span>Commission Engine</h4>
+    <p>Every action a player takes flows back to the owning agent according to configurable rules.</p>
+    <ul>
+      <li>CPA, RevShare or hybrid plans per agent or per company</li>
+      <li>Tiered rates based on monthly volume</li>
+      <li>Hold periods &amp; clawback for chargebacks/fraud</li>
+      <li>One-click payout batch to agent wallets</li>
+    </ul>
+    <div class="tags"><span class="tag">CPA / RevShare</span><span class="tag">Tiers</span><span class="tag">Batch payouts</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">📊</span>Network Analytics</h4>
+    <p>See the whole network at a glance — which agents grow, which churn, which companies convert.</p>
+    <ul>
+      <li>Leaderboards by deposits, active players, retention</li>
+      <li>Cohort view: player lifetime value per agent</li>
+      <li>Fraud signals: same-device clusters, bonus abuse patterns</li>
+    </ul>
+    <div class="tags"><span class="tag">LTV per agent</span><span class="tag">Fraud signals</span><span class="tag">Leaderboards</span></div>
+  </div>
+
+</div>
+</details>
+
+<!-- ==================== 2. CLIENT ADMIN DASHBOARDS (WHITE-LABEL) ==================== -->
+<details class="section">
+<summary><span class="icon">🏛️</span>Client Admin Dashboards — White-Label Access<span class="chev">▼</span></summary>
+<p class="section-intro">Grant any client (a company owner, a big affiliate partner, a franchise operator) their own isolated admin dashboard inside your system. They see only their world — you keep the master control.</p>
+<div class="grid">
+
+  <div class="feat"><h4><span class="fi">🔓</span>Dedicated Client Dashboard</h4>
+    <p>Provision a full admin panel instance scoped to one client's data in minutes — no new deployment.</p>
+    <ul>
+      <li>Own login (Telegram OTP or credentials), own branding</li>
+      <li>Sees only their channels, users, campaigns and wallets</li>
+      <li>Data isolation enforced server-side, not just UI-hidden</li>
+      <li>Master panel can revoke or freeze access instantly</li>
+    </ul>
+    <div class="tags"><span class="tag">Isolated data</span><span class="tag">Instant provisioning</span><span class="tag">Revocable</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">🎨</span>Custom Branding per Client</h4>
+    <p>Each client dashboard carries their logo, colors and domain — it looks like their product.</p>
+    <ul>
+      <li>Logo / color theme / custom domain mapping</li>
+      <li>Localized language (Arabic RTL &amp; English LTR)</li>
+      <li>Optional self-hosted deployment export</li>
+    </ul>
+    <div class="tags"><span class="tag">Logo/theme</span><span class="tag">Custom domain</span><span class="tag">AR/EN</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">📑</span>Client Reporting</h4>
+    <p>Clients get automated business reports without touching your raw data.</p>
+    <ul>
+      <li>Scheduled PDF/Excel reports (daily / weekly / monthly)</li>
+      <li>Revenue, players, channel growth, campaign ROI</li>
+      <li>White-labeled exports with their branding</li>
+    </ul>
+    <div class="tags"><span class="tag">Scheduled reports</span><span class="tag">ROI view</span><span class="tag">Branded exports</span></div>
+  </div>
+
+</div>
+</details>
+
+<!-- ==================== 3. STAFF ROLES & PERMISSIONS (RBAC) ==================== -->
+<details class="section">
+<summary><span class="icon">🔐</span>Staff Accounts &amp; Granular Permissions<span class="chev">▼</span></summary>
+<p class="section-intro">Hire a team safely. Create employee accounts, assign each one exactly the sections they need — content only, finance only, support only — and track everything they do.</p>
+<div class="grid">
+
+  <div class="feat"><h4><span class="fi">🧩</span>Section-Level Permissions</h4>
+    <p>Permissions are granted per module, not all-or-nothing. An editor publishes posts but never sees money; an accountant sees wallets but cannot broadcast.</p>
+    <ul>
+      <li>Module toggles: Channels, Broadcast, Campaigns, Users, Wallets, Games, Agents, Reports, Settings</li>
+      <li>Action-level control inside modules: view / create / edit / delete / approve</li>
+      <li>Reusable role templates: Content Editor, Finance, Support, Channel Manager</li>
+      <li>Two-person rule option: sensitive actions require a second approver</li>
+    </ul>
+    <div class="tags"><span class="tag">Per-module</span><span class="tag">CRUD-level</span><span class="tag">Role templates</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">🕵️</span>Staff Activity Audit</h4>
+    <p>Everything an employee touches is recorded and searchable.</p>
+    <ul>
+      <li>Action log: who did what, when, from which IP</li>
+      <li>Before/after diff for edited records</li>
+      <li>Immutable logs — even admins cannot erase history</li>
+      <li>Anomaly alerts: unusual login time, bulk deletes, permission escalation attempts</li>
+    </ul>
+    <div class="tags"><span class="tag">Immutable log</span><span class="tag">Diffs</span><span class="tag">Anomaly alerts</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">⏱️</span>Lifecycle &amp; Safeguards</h4>
+    <p>Onboard and offboard staff without risk.</p>
+    <ul>
+      <li>Invite-by-link onboarding, instant revoke on exit</li>
+      <li>Session limits, forced 2FA, IP allow-listing</li>
+      <li>Shift scheduling awareness (who is on duty now)</li>
+    </ul>
+    <div class="tags"><span class="tag">Instant revoke</span><span class="tag">2FA</span><span class="tag">IP allow-list</span></div>
+  </div>
+
+</div>
+</details>
+
+<!-- ==================== 4. CORE BROADCAST ==================== -->
+<details class="section">
+<summary><span class="icon">📢</span>Broadcasting &amp; Channels<span class="chev">▼</span></summary>
+<p class="section-intro">The heart of the platform: publish anything, anywhere, in every mode Telegram supports — tested end-to-end against real channels.</p>
+<div class="grid">
+
+  <div class="feat"><h4><span class="fi">🎯</span>All Broadcast Modes</h4>
+    <p>Every delivery pattern verified working in production.</p>
+    <ul>
+      <li>Single target · multiple selected · all channels · first-N limit</li>
+      <li>With notification 🔔 or silent 🔇</li>
+      <li>Protect-content (no copy/forward)</li>
+      <li>Photos, videos, documents with HTML captions</li>
+      <li>Advanced formatting: bold, italic, code, spoilers, links, hashtags</li>
+    </ul>
+    <div class="tags"><span class="tag">Single/Multi/Limited</span><span class="tag">Media</span><span class="tag">Protect</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">📺</span>Channel Manager</h4>
+    <p>Central registry of every channel and group the bot administers.</p>
+    <ul>
+      <li>Add/remove channels, verify bot admin rights automatically</li>
+      <li>Per-channel stats: subscribers, views, post reach</li>
+      <li>Assign channels to companies for targeted campaigns</li>
+      <li>Health checks: bot kicked? permissions lost? alerted instantly</li>
+    </ul>
+    <div class="tags"><span class="tag">Auto-verify</span><span class="tag">Reach stats</span><span class="tag">Health alerts</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">🗂️</span>Content Library</h4>
+    <p>A structured media/text library organized by company — the system picks assets automatically when composing posts.</p>
+    <ul>
+      <li>Folders per company: images/, videos/, texts/</li>
+      <li>Random or round-robin asset selection</li>
+      <li>Template variables: {company}, {code}, {link} auto-filled</li>
+    </ul>
+    <div class="tags"><span class="tag">Per-company folders</span><span class="tag">Templates</span><span class="tag">Auto-pick</span></div>
+  </div>
+
+</div>
+</details>
+
+<!-- ==================== 5. AUTOMATION & AI ==================== -->
+<details class="section">
+<summary><span class="icon">🤖</span>Automation &amp; AI Content<span class="chev">▼</span></summary>
+<p class="section-intro">The platform doesn't wait for you to write posts. It watches live football via ESPN's API, generates tailored analysis with your choice of LLM, adapts tone per channel, attaches media, and publishes — only when there is something worth saying.</p>
+<div class="grid">
+
+  <div class="feat"><h4><span class="fi">⚽</span>Live Match Monitoring</h4>
+    <p>Real-time football surveillance across major leagues.</p>
+    <ul>
+      <li>ESPN header API polling — kickoff, goals, cards, final whistle</li>
+      <li>Change-detection state machine → zero duplicate spam</li>
+      <li>Instant channel push within seconds of an event</li>
+    </ul>
+    <div class="tags"><span class="tag">ESPN API</span><span class="tag">Event-driven</span><span class="tag">No spam</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">🧠</span>Multi-LLM Content Engine</h4>
+    <p>Pluggable provider layer: OpenAI GPT-4o, Anthropic Claude, Moonshot Kimi, DeepSeek — whichever key you configure, with automatic fallback.</p>
+    <ul>
+      <li>Match previews with H2H, form, injuries, odds ranges, scoreline prediction</li>
+      <li>Promo copy per brand voice; engagement posts for groups</li>
+      <li>Channel-specific tone profiles (analytical vs promotional vs community)</li>
+      <li>Arabic-first output with correct Telegram HTML entities</li>
+    </ul>
+    <div class="tags"><span class="tag">GPT/Claude/Kimi/DeepSeek</span><span class="tag">Tone profiles</span><span class="tag">Fallback chain</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">📅</span>Scheduling &amp; Rotation</h4>
+    <p>Set it and forget it publishing rhythms.</p>
+    <ul>
+      <li>Cron-style recurring jobs + one-shot scheduled posts</li>
+      <li>Evergreen rotation with anti-repeat memory</li>
+      <li>Peak-hour awareness for maximum reach</li>
+    </ul>
+    <div class="tags"><span class="tag">Cron jobs</span><span class="tag">Anti-repeat</span><span class="tag">Peak hours</span></div>
+  </div>
+
+</div>
+</details>
+
+<!-- ==================== 6. MARKETING ==================== -->
+<details class="section">
+<summary><span class="icon">📈</span>Marketing &amp; Affiliate Tools<span class="chev">▼</span></summary>
+<p class="section-intro">Everything needed to run acquisition at scale across eight connected betting brands — from promo codes to full conversion funnels.</p>
+<div class="grid">
+
+  <div class="feat"><h4><span class="fi">🎁</span>Promo Code Engine</h4>
+    <ul><li>Types: deposit bonus, free bet, cashback</li><li>Usage limits, expiry, per-channel attribution</li><li>Conversion tracking per code</li></ul>
+    <div class="tags"><span class="tag">3 types</span><span class="tag">Attribution</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">🔗</span>Affiliate Tracking</h4>
+    <ul><li>Click → signup → FTD funnel per link</li><li>Multi-tier commissions, LTV reporting</li><li>Sub-ID support for split testing creatives</li></ul>
+    <div class="tags"><span class="tag">FTD funnel</span><span class="tag">Sub-IDs</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">🎯</span>Audience Segments</h4>
+    <ul><li>Segments: registered-not-deposited, active, VIP, dormant</li><li>Broadcast directly to any segment via bot DM</li><li>Export audiences for Meta/TikTok retargeting</li></ul>
+    <div class="tags"><span class="tag">Bot DM blasts</span><span class="tag">Ads export</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">🪤</span>Conversion Funnels</h4>
+    <ul><li>Impression → click → register → deposit → play</li><li>Drop-off analysis per step and per source</li><li>A/B testing hooks on landing variants</li></ul>
+    <div class="tags"><span class="tag">Step analysis</span><span class="tag">A/B hooks</span></div>
+  </div>
+
+</div>
+</details>
+
+<!-- ==================== 7. WALLETS & PAYMENTS ==================== -->
+<details class="section">
+<summary><span class="icon">💰</span>Wallets &amp; Payments<span class="chev">▼</span></summary>
+<p class="section-intro">Local-payment-ready wallet infrastructure built for markets where cards don't work — mobile wallets, crypto, and P2P matching agents under one ledger.</p>
+<div class="grid">
+
+  <div class="feat"><h4><span class="fi">👛</span>Multi-Currency Wallets</h4>
+    <ul><li>EGP mobile wallets: Vodafone Cash, Etisalat, Orange, Access</li><li>Crypto: USDT, BTC, ETH with auto address generation</li><li>Unified internal ledger across all companies</li></ul>
+    <div class="tags"><span class="tag">Vodafone/Etisalat/Orange</span><span class="tag">USDT/BTC/ETH</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">🔁</span>Deposit / Withdraw Flows</h4>
+    <ul><li>Bot-guided flows with screenshot proof upload</li><li>Auto-verification webhooks where available</li><li>Limits, cooling periods, velocity checks</li><li>P2P fallback routed to matching agents (see section 1)</li></ul>
+    <div class="tags"><span class="tag">Proof upload</span><span class="tag">Webhooks</span><span class="tag">Velocity checks</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">🧾</span>Transaction Ledger</h4>
+    <ul><li>Double-entry style records, immutable</li><li>Reconciliation report vs exchange addresses CSV</li><li>Risk flags on unusual patterns</li></ul>
+    <div class="tags"><span class="tag">Immutable</span><span class="tag">Reconciliation</span></div>
+  </div>
+
+</div>
+</details>
+
+<!-- ==================== 8. TECHNICAL ==================== -->
+<details class="section">
+<summary><span class="icon">⚙️</span>Technical &amp; Infrastructure<span class="chev">▼</span></summary>
+<p class="section-intro">Production-grade foundations: secure auth, documented APIs, real-time updates and clean deployment paths.</p>
+<div class="grid">
+
+  <div class="feat"><h4><span class="fi">🔐</span>Telegram OTP Auth</h4>
+    <ul><li>Passwordless admin login via dedicated OTP bot</li><li>6-digit codes, single-use, auto-expiring</li><li>New request invalidates previous code</li></ul>
+    <div class="tags"><span class="tag">Passwordless</span><span class="tag">Single-use codes</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">🌐</span>RESTful API</h4>
+    <ul><li>25+ endpoints: channels, broadcast, users, wallets, games, agents</li><li>Session cookies + rate limiting</li><li>Machine-readable JSON everywhere</li></ul>
+    <div class="tags"><span class="tag">25+ routes</span><span class="tag">Rate limited</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">📡</span>Real-time Layer</h4>
+    <ul><li>Live balance &amp; bet updates</li><li>Goal events pushed to dashboards as they happen</li></ul>
+    <div class="tags"><span class="tag">Live events</span></div>
+  </div>
+
+  <div class="feat"><h4><span class="fi">☁️</span>Deployment</h4>
+    <ul><li>Python/FastAPI backend + PostgreSQL + Redis cache</li><li>Systemd/Docker deploy scripts included</li><li>Environment-based secrets, health checks</li></ul>
+    <div class="tags"><span class="tag">FastAPI</span><span class="tag">PostgreSQL/Redis</span><span class="tag">Docker</span></div>
+  </div>
+
+</div>
+</details>
+
+<!-- ==================== 9. WORKFLOW ==================== -->
+<details class="section">
+<summary><span class="icon">🔄</span>Typical Operating Workflow<span class="chev">▼</span></summary>
+<p class="section-intro">From empty install to revenue-generating machine in four steps.</p>
+<div class="flow">
+  <div class="flow-step"><div class="num">1</div><div><h4>Setup</h4><p>Connect companies → add channels &amp; verify bot admin → create staff accounts with scoped permissions → provision client dashboards if needed.</p></div></div>
+  <div class="flow-step"><div class="num">2</div><div><h4>Content</h4><p>Upload images/videos/copy into per-company folders → define channel tone profiles → load promo codes and referral links.</p></div></div>
+  <div class="flow-step"><div class="num">3</div><div><h4>Automate</h4><p>Enable live-match monitor → attach LLM keys → schedule cron cycles → let matching agents handle P2P payment queue.</p></div></div>
+  <div class="flow-step"><div class="num">4</div><div><h4>Optimize</h4><p>Review funnels and per-agent leaderboards → A/B promos → tune commission tiers → export branded reports for clients.</p></div></div>
+</div>
+</details>
+
+<!-- ==================== 10. COMPANIES ==================== -->
+<details class="section">
+<summary><span class="icon">🏢</span>Pre-Connected Companies<span class="chev">▼</span></summary>
+<p class="section-intro">Eight brands wired in from day one, each with its own folders, codes, channels and commission terms.</p>
+<div class="grid">
+  <div class="feat" style="text-align:center"><h4 style="justify-content:center">1XBET</h4><p>Sportsbook + casino, multi-wallet</p></div>
+  <div class="feat" style="text-align:center"><h4 style="justify-content:center">MELBET</h4><p>Sportsbook, fast games</p></div>
+  <div class="feat" style="text-align:center"><h4 style="justify-content:center">MOSTBET</h4><p>Live casino, slots, Aviator</p></div>
+  <div class="feat" style="text-align:center"><h4 style="justify-content:center">BETJAM</h4><p>Betting, strong bonuses</p></div>
+  <div class="feat" style="text-align:center"><h4 style="justify-content:center">1WIN</h4><p>All-in-one, crypto friendly</p></div>
+  <div class="feat" style="text-align:center"><h4 style="justify-content:center">VEX Platform</h4><p>Wallets, trading, lottery, bots</p></div>
+  <div class="feat" style="text-align:center"><h4 style="justify-content:center">CoraVex</h4><p>Offers channel, free deposits, VIP</p></div>
+  <div class="feat" style="text-align:center"><h4 style="justify-content:center">all_foot_ball</h4><p>Football analysis, live scores</p></div>
+</div>
+</details>
+
+<div class="footer">
+  <strong>Boterx Admin Panel v2.0</strong> — FastAPI · Telegram Bot API · PostgreSQL · Redis<br>
+  White-label ready · Full audit trail · Arabic &amp; English
+</div>
+
+</body>
+</html>

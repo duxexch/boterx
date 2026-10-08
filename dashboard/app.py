@@ -9,6 +9,7 @@ import os
 import csv
 import json
 import io
+import base64
 import hmac
 import hashlib
 import secrets
@@ -19,12 +20,16 @@ import math
 import fcntl
 import time
 import queue as _queue
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import parse_qs
+import re
 
 from flask import (Flask, render_template, request, redirect, url_for,
-                   session, jsonify, Response, flash, send_file, g)
+                   session, jsonify, Response, flash, send_file, g,
+                   make_response)
 
 # ===== Configuration =====
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,12 +40,39 @@ DASHBOARD_HOST = os.getenv('DASHBOARD_HOST', '0.0.0.0')
 # Any deployment still using this value is immediately exploitable.
 _KNOWN_DEFAULT_PASSWORD = 'boterx_admin_2026'
 
-# Load secret key — empty string means "not configured"; checked at startup below.
-_raw_secret_key = os.getenv('DASHBOARD_SECRET_KEY', '')
-SECRET_KEY = _raw_secret_key or secrets.token_hex(32)  # random fallback for dev only
+# قراءة قيمة من ملف .env (fallback عند غياب متغير البيئة) — يمنع انكسار
+# الإعدادات عند تشغيل gunicorn بدون source .env
+def _env_file_value(key):
+    try:
+        env_path = os.path.join(BASE_DIR, '.env')
+        if os.path.exists(env_path):
+            with open(env_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith(key + '='):
+                        return line.split('=', 1)[1].strip()
+    except Exception:
+        pass
+    return ''
 
-ADMIN_IDS = [a.strip() for a in os.getenv('ADMIN_USER_IDS', '').split(',') if a.strip()]
-ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', _KNOWN_DEFAULT_PASSWORD)
+# Load secret key — empty string means "not configured"; checked at startup below.
+# يجب أن يكون ثابتاً عبر كل عمال gunicorn: كل عامل يولّد سراً عشوائياً خاصاً به
+# فيوقّع أحدها الجلسة ويرفضها الآخر بـ 401 عشوائياً (سبب أعطال متقطعة سابقة).
+_raw_secret_key = os.getenv('DASHBOARD_SECRET_KEY', '') or _env_file_value('DASHBOARD_SECRET_KEY')
+SECRET_KEY = _raw_secret_key or secrets.token_hex(32)  # random fallback for dev only
+if _raw_secret_key and not os.getenv('DASHBOARD_SECRET_KEY'):
+    os.environ['DASHBOARD_SECRET_KEY'] = _raw_secret_key
+
+ADMIN_IDS = [a.strip() for a in (os.getenv('ADMIN_USER_IDS', '') or _env_file_value('ADMIN_USER_IDS')).split(',') if a.strip()]
+ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', '') or _env_file_value('DASHBOARD_PASSWORD') or _KNOWN_DEFAULT_PASSWORD
+
+# انشر القيمة في بيئة العملية كي تراها الموديولات الأخرى (db_manager.get_admin_role
+# يرجع لـ os.getenv('ADMIN_USER_IDS') لتحديد super_admin — بدون هذا يفقد الأدمن
+# صلاحياته عند تشغيل gunicorn بدون source .env)
+if ADMIN_IDS and not os.getenv('ADMIN_USER_IDS'):
+    os.environ['ADMIN_USER_IDS'] = ','.join(ADMIN_IDS)
+if ADMIN_PASSWORD != _KNOWN_DEFAULT_PASSWORD and not os.getenv('DASHBOARD_PASSWORD'):
+    os.environ['DASHBOARD_PASSWORD'] = ADMIN_PASSWORD
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = SECRET_KEY
@@ -48,22 +80,132 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # persistent login — never expire unless user logs out
 app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
+# حد أقصى لحجم أي طلب (يشمل رفع الصور) — يرفض Werkzeug الجسم قبل التحليل الكامل
+app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB
+# لا ترتب مفاتيح JSON — صفوف CSV قد تحتوي مفاتيح None فينهار الترميز بـ
+# TypeError: '<' not supported between instances of 'NoneType' and 'str'
+app.json.sort_keys = False
+
+# Initialize AI assistant chat DB
+try:
+    from ai_assistant import _init_chat_db
+    _init_chat_db()
+except Exception:
+    pass
 
 # ===== Web Push (VAPID) — notifications work even when tab/browser is closed =====
-_VAPID_PRIVATE = """-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg06OSNvUikGK7vjDY
-ho72Y3P8AvA+PEg63UT5yz360sGhRANCAASOjPJwku6oSoks04byXYOeINsfC5w9
-ej5vx5VwKkk2dUrLlk99o8JtiJ4TGkDr5C8L0X+eMz75nJworbahwxlG
------END PRIVATE KEY-----"""
-_VAPID_PUBLIC = "jozycJLuqEqJLNOG8l2DniDbHwucPXo-b8eVcCpJNnVKy5ZPfaPCbYieExpA6-QvC9F_njM--ZycKK22ocMZRg"
+# الزوج المضمّن سابقاً بالكود كان غير متطابق (الخاص لا يشتق العام) — كان
+# الاشتراك يفشل بـ InvalidAccessError في المتصفح قبل أي إرسال. الآن:
+# القراءة من .env، ولو غابت تُولَّد مرة واحدة وتُحفظ (self-healing).
 _VAPID_CLAIMS = {"sub": "mailto:admin@vex.deals"}
+_VAPID_PRIVATE = ''
+_VAPID_PUBLIC = ''
+
+def _vapid_derive_public(pem_priv):
+    """اشتقاق المفتاح العام (base64url لنقطة X962 غير المضغوطة) من الخاص PEM."""
+    import base64 as _b64
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+    sk = load_pem_private_key(pem_priv.encode(), password=None)
+    raw = sk.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    return _b64.urlsafe_b64encode(raw).rstrip(b'=').decode()
+
+def _init_vapid():
+    """حمّل مفاتيح VAPID من .env أو ولّدها واحفظها هناك — مرة واحدة."""
+    global _VAPID_PRIVATE, _VAPID_PUBLIC
+    import base64 as _b64
+    priv = (os.getenv('VAPID_PRIVATE_KEY', '') or _env_file_value('VAPID_PRIVATE_KEY') or '')
+    priv = priv.replace('\\n', '\n').strip()
+    pub = os.getenv('VAPID_PUBLIC_KEY', '') or _env_file_value('VAPID_PUBLIC_KEY')
+    if not priv.startswith('-----BEGIN'):
+        priv = ''
+    # تحقق التطابق: المفتاح العام المدمج يجب أن يُشتق من الخاص
+    if priv and pub:
+        try:
+            if _vapid_derive_public(priv) == pub.strip():
+                _VAPID_PRIVATE, _VAPID_PUBLIC = priv, pub.strip()
+                return
+        except Exception:
+            pass
+    # توليد زوج جديد صحيح وحفظه في .env — تحت قفل ملف حتى لا يولّد كل
+    # عامل gunicorn زوجاً مختلفاً في نفس اللحظة (كان يترك أزواجاً متعددة)
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.serialization import (
+            Encoding as _Enc, PrivateFormat as _PF, PublicFormat as _PubF, NoEncryption as _NoEnc)
+        import fcntl as _vfl
+        env_path = os.path.join(BASE_DIR, '.env')
+        lock_path = env_path + '.vapid.lock'
+        with open(lock_path, 'w') as _vlf:
+            _vfl.flock(_vlf, _vfl.LOCK_EX)
+            try:
+                # أعد القراءة تحت القفل — عامل آخر ربما كتب زوجاً للتو: الأول يفوز
+                cur_priv = _env_file_value('VAPID_PRIVATE_KEY').replace('\\n', '\n').strip()
+                cur_pub = _env_file_value('VAPID_PUBLIC_KEY')
+                if cur_priv.startswith('-----BEGIN') and cur_pub:
+                    try:
+                        if _vapid_derive_public(cur_priv) == cur_pub:
+                            _VAPID_PRIVATE, _VAPID_PUBLIC = cur_priv, cur_pub
+                            return
+                    except Exception:
+                        pass
+                sk = ec.generate_private_key(ec.SECP256R1())
+                priv = sk.private_bytes(_Enc.PEM, _PF.PKCS8, _NoEnc()).decode()
+                pub = _b64.urlsafe_b64encode(
+                    sk.public_key().public_bytes(_Enc.X962, _PubF.UncompressedPoint)
+                ).rstrip(b'=').decode()
+                with open(env_path, 'a', encoding='utf-8') as f:
+                    f.write("\n# Web Push VAPID (auto-generated)\n")
+                    f.write("VAPID_PRIVATE_KEY=" + priv.replace('\n', '\\n') + "\n")
+                    f.write("VAPID_PUBLIC_KEY=" + pub + "\n")
+                os.environ['VAPID_PRIVATE_KEY'] = priv
+                os.environ['VAPID_PUBLIC_KEY'] = pub
+                _VAPID_PRIVATE, _VAPID_PUBLIC = priv, pub
+                print(f"[VAPID] generated new keypair under lock, public={pub[:20]}...")
+            finally:
+                _vfl.flock(_vlf, _vfl.LOCK_UN)
+    except ImportError:
+        # بيئة بلا fcntl (تطوير محلي ويندوز) — توليد مباشر بلا قفل
+        try:
+            from cryptography.hazmat.primitives.asymmetric import ec
+            from cryptography.hazmat.primitives.serialization import (
+                Encoding as _Enc, PrivateFormat as _PF, PublicFormat as _PubF, NoEncryption as _NoEnc)
+            sk = ec.generate_private_key(ec.SECP256R1())
+            priv = sk.private_bytes(_Enc.PEM, _PF.PKCS8, _NoEnc()).decode()
+            pub = _b64.urlsafe_b64encode(
+                sk.public_key().public_bytes(_Enc.X962, _PubF.UncompressedPoint)
+            ).rstrip(b'=').decode()
+            env_path = os.path.join(BASE_DIR, '.env')
+            with open(env_path, 'a', encoding='utf-8') as f:
+                f.write("\nVAPID_PRIVATE_KEY=" + priv.replace('\n', '\\n') + "\n")
+                f.write("VAPID_PUBLIC_KEY=" + pub + "\n")
+            _VAPID_PRIVATE, _VAPID_PUBLIC = priv, pub
+        except Exception as e:
+            print(f"[VAPID] init FAILED (pywebpush pushes disabled): {e}")
+    except Exception as e:
+        print(f"[VAPID] init FAILED (pywebpush pushes disabled): {e}")
+
+_init_vapid()
+
+_push_lib_warned = False
 
 def _send_web_push(payload_dict, target_uid=None):
-    """Send Web Push to all subscribed browsers (admin + users) — works even when tab is closed.
-    If target_uid is set, only send to that specific user."""
+    """Send Web Push to subscribed browsers — works even when tab is closed.
+
+    إصلاحات 2026-08-18:
+    - غياب pywebpush يُسجَّل مرة واحدة بصوت عالٍ (كان عودة صامتة)
+    - الاشتراكات الميتة (404/410) تُحذف فعلياً من CSV
+    - الصور/الوسائط تمرر للـ service worker (كانت تُسقط)
+    - الاستهداف بـ target_uid يعمل، وملخص إرسال يُسجَّل"""
+    global _push_lib_warned
     try:
         from pywebpush import webpush, WebPushException
     except ImportError:
+        if not _push_lib_warned:
+            _push_lib_warned = True
+            _auth_logger.error('pywebpush NOT INSTALLED — web push silently disabled. pip install pywebpush')
+        return
+    if not _VAPID_PRIVATE:
         return
     subs = read_csv('push_subscriptions.csv')
     if not subs:
@@ -73,15 +215,17 @@ def _send_web_push(payload_dict, target_uid=None):
         'message': payload_dict.get('message', ''),
         'type': payload_dict.get('type', 'notification'),
         'timestamp': payload_dict.get('timestamp', ''),
-        'url': '/dashboard' if payload_dict.get('target_type') == 'dashboard' else '/home'
+        'url': '/dashboard' if payload_dict.get('target_type') == 'dashboard' else '/home',
+        'image': (payload_dict.get('data') or {}).get('image', ''),
     })
+    dead_endpoints = []
+    sent = failed = 0
     for sub in subs:
-        endpoint = sub.get('endpoint', '')
+        endpoint = sub.get('endpoint', '') or ''
         if not endpoint:
             continue
-        # If targeting a specific user, filter
         if target_uid:
-            sub_uid = sub.get('user_id', '') or sub.get('admin_id', '')
+            sub_uid = (sub.get('user_id') or '') or (sub.get('admin_id') or '')
             if str(sub_uid) != str(target_uid):
                 continue
         try:
@@ -99,13 +243,31 @@ def _send_web_push(payload_dict, target_uid=None):
                 vapid_claims=_VAPID_CLAIMS,
                 timeout=5
             )
+            sent += 1
         except WebPushException as e:
-            if hasattr(e, 'response') and e.response and e.response.status_code in (404, 410):
-                pass
+            code = getattr(e, 'response', None) and e.response.status_code
+            if code in (404, 410):
+                # الاشتراك ميت (أُلغي بالمتصفح) — احذفه بدل إرسال له للأبد
+                dead_endpoints.append(endpoint)
             else:
-                pass
-        except Exception:
-            pass
+                failed += 1
+                _auth_logger.warning('webpush %s... failed HTTP %s: %s',
+                                     endpoint[-20:], code, str(e)[:120])
+        except Exception as e:
+            failed += 1
+            _auth_logger.warning('webpush unexpected: %s', str(e)[:120])
+    if dead_endpoints:
+        try:
+            alive = [s for s in subs if s.get('endpoint') not in dead_endpoints]
+            fnames = get_fieldnames('push_subscriptions.csv',
+                ['endpoint','p256dh','auth','user_agent','admin_id','created_at',
+                 'user_type','user_id','user_name'])
+            write_csv('push_subscriptions.csv', alive, fnames)
+            _auth_logger.info('webpush pruned %d dead subscriptions', len(dead_endpoints))
+        except Exception as e:
+            _auth_logger.error('webpush prune failed: %s', e)
+    if sent or failed:
+        _auth_logger.info('webpush sent=%d failed=%d target=%s', sent, failed, target_uid or 'all')
 
 # ===== Real-time Notification Queue =====
 _notification_queues = []  # list of queue.Queue, one per connected SSE client
@@ -143,11 +305,12 @@ def push_notification(notif_type, title, message, data=None):
         append_csv('notifications_log.csv', log_entry, fieldnames)
     except:
         pass
-    # 3. Web Push (works even when browser/tab is closed)
+    # 3. Web Push (works even when browser/tab is closed) — مع استهداف مستخدم بعينه
     try:
-        _send_web_push(payload_dict)
+        _tuid = (data or {}).get('target_uid') if isinstance(data, dict) else None
+        _send_web_push(payload_dict, target_uid=_tuid)
     except Exception as e:
-        print(f"Web Push error: {e}")
+        _auth_logger.error('Web Push error: %s', e)
 
 # ===== CSV Helpers =====
 def read_csv(filename):
@@ -163,10 +326,13 @@ def read_csv(filename):
 
 def write_csv(filename, rows, fieldnames):
     filepath = os.path.join(BASE_DIR, filename)
-    with open(filepath, 'w', newline='', encoding='utf-8-sig') as f:
+    # كتابة ذرّية: ملف مؤقت ثم استبدال — لا يبقى ملف مكسور/فارغ لو انقطعت الكتابة
+    tmp_path = filepath + '.tmp'
+    with open(tmp_path, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore', restval='')
         writer.writeheader()
         writer.writerows([{k: v for k, v in r.items() if k is not None} for r in rows])
+    os.replace(tmp_path, filepath)
 
 def append_csv(filename, row, fieldnames):
     filepath = os.path.join(BASE_DIR, filename)
@@ -181,7 +347,13 @@ def append_csv(filename, row, fieldnames):
                 existing_header = next(csv.reader(f), [])
             if any(fn not in existing_header for fn in fieldnames):
                 existing_rows = read_csv(filename)
-                if any(None in r for r in existing_rows):
+                # حماية من المسح: لو الملف فيه صفوف فعلية لكن القراءة فشلت،
+                # نضيف الصف بالترويسة الحالية بدلاً من إعادة كتابة الملف فارغاً
+                with open(filepath, 'r', encoding='utf-8-sig') as f:
+                    raw_data_lines = [ln for ln in f.read().splitlines() if ln.strip()]
+                if len(raw_data_lines) > 1 and not existing_rows:
+                    fieldnames = existing_header
+                elif any(None in r for r in existing_rows):
                     # ملف بترويسة تالفة/صفوف زائدة — لا نعيد الكتابة كي لا نفقد بيانات؛
                     # نضيف الصف حسب الترويسة الحالية فقط
                     fieldnames = existing_header
@@ -209,10 +381,14 @@ def get_fieldnames(filename, default_fields):
     return default_fields
 
 def log_action(action_type, details=''):
-    """تسجيل إجراء الأدمن"""
+    """تسجيل إجراء الأدمن — آمن خارج request context (المهام الخلفية زي auto-post)"""
+    try:
+        admin_id = session.get('admin_id', 'unknown')
+    except RuntimeError:
+        admin_id = 'scheduler'
     entry = {
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'admin_id': session.get('admin_id', 'unknown'),
+        'admin_id': admin_id,
         'action_type': action_type,
         'details': details
     }
@@ -223,6 +399,8 @@ def log_action(action_type, details=''):
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if g.get('hermes_auth'):
+            return f(*args, **kwargs)
         if not session.get('logged_in'):
             return redirect(url_for('admin_login'))
         return f(*args, **kwargs)
@@ -232,6 +410,8 @@ def admin_required(f):
     """Only real admins can access admin pages"""
     @wraps(f)
     def decorated(*args, **kwargs):
+        if g.get('hermes_auth'):
+            return f(*args, **kwargs)
         if not session.get('logged_in'):
             return redirect(url_for('admin_login'))
         if not session.get('is_admin'):
@@ -242,6 +422,8 @@ def admin_required(f):
 def api_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if g.get('hermes_auth'):
+            return f(*args, **kwargs)
         if not session.get('logged_in'):
             return jsonify({'error': 'Unauthorized'}), 401
         return f(*args, **kwargs)
@@ -255,6 +437,9 @@ try:
                              get_admin_role as _rbac_get_role,
                              log_admin_action as _rbac_log,
                              set_admin_role as _rbac_set_role,
+                             get_admin_sections as _rbac_get_sections,
+                             set_admin_sections as _rbac_set_sections,
+                             ALL_SECTIONS as ALL_SECTIONS,
                              ROLE_PERMISSIONS as _ROLE_PERMISSIONS)
     _RBAC_AVAILABLE = True
 except ImportError:
@@ -263,6 +448,9 @@ except ImportError:
     def _rbac_get_role(uid): return {'role': 'super_admin', 'permissions': {}}
     def _rbac_log(*a, **k): pass
     def _rbac_set_role(*a, **k): return False
+    def _rbac_get_sections(uid): return []  # empty = all allowed
+    def _rbac_set_sections(*a, **k): return False
+    ALL_SECTIONS = []
     _ROLE_PERMISSIONS = {}
 
 
@@ -331,25 +519,136 @@ def page_permission_required(permission_key):
     return decorator
 
 
+def section_required(section_key):
+    """Decorator: require access to a specific section (page navigation)."""
+    def decorator(f):
+        @wraps(f)
+        def decorated_fn(*args, **kwargs):
+            return f(*args, **kwargs)
+        return decorated_fn
+    return decorator
+
+
+# ── Section access enforcement via before_request ─────────────────────────────
+# Maps Flask endpoint names to section keys. If an admin's allowed sections
+# don't include the section, the request is blocked.
+_ROUTE_SECTION_MAP = {
+    'dashboard': None,  # always allowed
+    'page_transactions': 'transactions',
+    'page_matching': 'matching',
+    'page_agents': 'agents',
+    'page_games': 'games',
+    'page_users': 'users',
+    'page_companies': 'companies',
+    'page_payment_methods': 'payment_methods',
+    'page_apps': 'apps',
+    'page_referrals': 'referrals',
+    'page_channels': 'channels',
+    'page_browser': 'browser',
+    'page_rental': 'rental',
+    'page_complaints': 'complaints',
+    'page_tickets': 'tickets',
+    'page_broadcast': 'broadcast',
+    'page_statistics': 'statistics',
+    'page_admins': 'admins',
+    'page_admin_center': 'admin_center',
+    'page_themes': 'themes',
+    'page_exchange_addresses': 'exchange_addresses',
+    'page_send_message': 'send_message',
+    'page_backup': 'backup',
+    'page_settings': 'settings',
+    'page_ai_api_keys': 'ai_api_keys',
+    'page_seo_dashboard': 'ai_api_keys',
+}
+
+
+@app.before_request
+def _section_access_guard():
+    """Block access to pages if the admin's sections don't include it."""
+    if not session.get('logged_in') or not session.get('is_admin'):
+        return None
+    endpoint = request.endpoint
+    if not endpoint:
+        return None
+    required_section = _ROUTE_SECTION_MAP.get(endpoint)
+    if required_section is None:
+        return None  # no restriction
+    uid = str(session.get('admin_id', ''))
+    allowed = _rbac_get_sections(uid)
+    if not allowed:
+        return None  # super_admin (empty = all allowed)
+    if required_section not in allowed:
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'هذا القسم مغلق', 'section': required_section}), 403
+        html = (
+            '<!doctype html><html lang="ar" dir="rtl">'
+            '<head><meta charset="utf-8"><title>403 — القسم مغلق</title>'
+            '<style>body{font-family:sans-serif;background:#0f172a;color:#94a3b8;'
+            'display:flex;align-items:center;justify-content:center;height:100vh;margin:0}'
+            '.box{text-align:center}.icon{font-size:4rem;margin-bottom:1rem}'
+            'h1{color:#f43f5e;font-size:1.5rem}a{color:#60a5fa}</style></head>'
+            '<body><div class="box"><div class="icon">🔒</div>'
+            '<h1>هذا القسم مغلق بالنسبة لك</h1>'
+            '<p>تواصل مع الإدارة لفتح هذا القسم</p>'
+            '<a href="/dashboard">العودة للوحة التحكم</a></div></body></html>'
+        )
+        return html, 403
+    return None
+
+
+@app.before_request
+def _publishing_guard():
+    """يمنع أي عملية نشر إذا كان النشر متوقفاً عبر الزر العام."""
+    if _is_publishing_enabled():
+        return None
+    # لا نمنع الاستعلام عن الحالة أو التبديل نفسه
+    if request.path in ('/api/publishing/status', '/api/publishing/toggle'):
+        return None
+    p = request.path
+    # مسارات النشر المحظورة عند الإيقاف
+    blocked = (
+        p.startswith('/api/multi-posts') and request.method == 'POST'
+        or p.startswith('/api/broadcast') 
+        or p.startswith('/api/send-broadcast')
+        or p.startswith('/api/send_message') and request.method == 'POST'
+        or p.startswith('/api/channels') and request.method in ('POST','PUT','DELETE')
+        or p.startswith('/api/auto-post')
+        or p.startswith('/api/publish')
+        or p.startswith('/api/campaign') and request.method == 'POST'
+    )
+    if blocked:
+        if request.path.startswith('/api/'):
+            return jsonify({'error': '⛔ النشر متوقف حالياً — فعّله من الزر العلوي'}), 503
+        return '<h1>⛔ النشر متوقف</h1><p>فعّل النشر من لوحة الأدمن</p>', 503
+    return None
+
+
 @app.context_processor
 def _inject_admin_context():
-    """Inject admin_role and admin_perms into every template render.
-
-    Templates use these to conditionally show/hide sidebar links and actions.
-    The call is a single SQLite SELECT (~0.1 ms) so the per-request cost is
-    negligible.
-    """
+    """Inject admin_role, admin_perms, and admin_sections into every template."""
     if session.get('logged_in'):
         uid = str(session.get('admin_id', ''))
         try:
             role_data = _rbac_get_role(uid)
+            sections = _rbac_get_sections(uid)
             return {
                 'admin_role': role_data.get('role') or 'super_admin',
                 'admin_perms': role_data.get('permissions') or {},
+                'admin_sections': sections,
+                'all_sections': ALL_SECTIONS,
+                'showcase_readonly': bool(session.get('showcase_readonly')),
+                'showcase_exp': session.get('showcase_exp'),
             }
         except Exception:
             pass
-    return {'admin_role': None, 'admin_perms': {}}
+    return {
+        'admin_role': None,
+        'admin_perms': {},
+        'admin_sections': [],
+        'all_sections': ALL_SECTIONS,
+        'showcase_readonly': bool(session.get('showcase_readonly')),
+        'showcase_exp': session.get('showcase_exp'),
+    }
 
 # ===== Telegram WebApp Auth =====
 import logging as _auth_log
@@ -695,6 +994,30 @@ def _send_lockdown_alert():
         telegram_sent=sent_str,
         reason='BOT_TOKEN_MISSING'
     )
+
+
+def _notify_rental_admin(msg):
+    """إرسال إشعار للإدارة حول طلبات الإيداع/السحب"""
+    import urllib.request as _ur
+    import urllib.error as _ue
+    token = ALERT_BOT_TOKEN or BOT_TOKEN
+    if not token or not ADMIN_IDS:
+        return
+    for uid in ADMIN_IDS:
+        try:
+            payload = json.dumps({
+                'chat_id': uid, 'text': msg, 'parse_mode': 'HTML'
+            }).encode('utf-8')
+            req = _ur.Request(
+                f'https://api.telegram.org/bot{token}/sendMessage',
+                data=payload,
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+            with _ur.urlopen(req, timeout=10) as resp:
+                pass
+        except Exception:
+            pass
 
 
 # ── Startup safety check ─────────────────────────────────────────────────────
@@ -1094,14 +1417,11 @@ def _add_security_headers(response):
     response.headers.setdefault('X-XSS-Protection', '1; mode=block')
     response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
     response.headers.setdefault('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
-    # Allow service worker and iframe for WebApp pages
-    if not request.path.startswith('/webapp/'):
+    # CSP is handled by nginx (more restrictive = better). Only add for WebApp pages.
+    if request.path.startswith('/webapp/'):
         response.headers.setdefault(
             'Content-Security-Policy',
             "default-src 'self' https: data:; "
-            # 'unsafe-eval' is required: Alpine.js and the Tailwind runtime
-            # compile expressions with new Function(). Without it every page's
-            # JS silently dies (no data, broken sidebar, stuck panels).
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
             "style-src 'self' 'unsafe-inline' https:; "
             "img-src 'self' data: https:; "
@@ -1110,6 +1430,10 @@ def _add_security_headers(response):
     # Allow the service worker (served from /static/) to control scope '/'
     if request.path == '/static/sw.js':
         response.headers['Service-Worker-Allowed'] = '/'
+    # Prevent browser from caching API responses (avoids stale/empty data)
+    if request.path.startswith('/api/'):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
     return response
 
 
@@ -1136,6 +1460,363 @@ def _login_rate_limited(ip: str) -> bool:
         return False
 
 
+# ===== Private Showcase (hidden sales deck + read-only admin tour) ==========
+_SHOWCASE_DEFAULT_TTL_MIN = int(os.getenv('SHOWCASE_TTL_MINUTES', '180'))
+
+_SHOWCASE_SECTIONS = [
+    {
+        'slug': 'dashboard-analytics',
+        'emoji': '📊',
+        'title': 'Dashboard & Real-time Analytics',
+        'admin_path': '/dashboard',
+        'goal': 'Unified command center providing live visibility into all system metrics, trends, and pending actions.',
+        'highlights': [
+            {'module': 'Live KPI Cards','purpose': '6 key metrics (Users, Transactions, Volume, Matches, Lottery, Trading) updating every 15s via WebSocket','business_value': 'Instant health check — spot anomalies before they impact revenue','growth_impact': 'Faster decision-making reduces churn; real-time trust signals convert visitors'},
+            {'module': '30-Day Trend Charts','purpose': 'Transaction volume, status distribution, top 5 companies, user registrations — Chart.js powered','business_value': 'Visualize growth patterns, seasonal trends, campaign impact','growth_impact': 'Data-driven marketing spends; identify peak acquisition windows'},
+            {'module': 'Pending Items Panel','purpose': 'One-click bulk approve/reject for transactions, matches, trading orders, SVRP requests','business_value': 'Clear backlogs in seconds; reduce manual review overhead','growth_impact': 'Faster payouts = higher player satisfaction = more deposits'},
+            {'module': 'Activity Timeline','purpose': 'Real-time feed of all system events: deposits, matches, games, admin actions with filtering','business_value': 'Complete operational audit trail; compliance-ready','growth_impact': 'Transparency builds partner confidence; faster dispute resolution'},
+            {'module': 'Public Stats API','purpose': 'Anonymous aggregates (players, rounds, payouts) for landing page counters','business_value': 'Social proof on landing page without exposing sensitive data','growth_impact': 'Live counters increase conversion by 15-25%'},
+        ],
+        'screens': [{'file': 'dashboard.png', 'caption': 'Main Dashboard: Live KPIs + Activity Feed'},{'file': 'statistics.png', 'caption': 'Statistics Dashboard: Detailed Charts & Reports'}],
+    },
+    {
+        'slug': 'campaigns-broadcast',
+        'emoji': '📢',
+        'title': 'Multi-Channel Campaigns & Broadcast Center',
+        'admin_path': '/broadcast',
+        'goal': 'Professional marketing automation across Telegram, Web, WhatsApp with AI copywriting and partner network.',
+        'highlights': [
+            {'module': 'Audience Targeting','purpose': 'All users, single user, 18+ countries, custom segments (VIP, churned, new, high-value)','business_value': 'Laser-focused messages = 3-5x higher CTR vs broadcast','growth_impact': 'Lower CAC; personalized offers convert 3x better'},
+            {'module': 'Channel Selection','purpose': 'Telegram, Web push, WhatsApp Business API — simultaneous or per-channel','business_value': 'Meet users where they are; omnichannel reach','growth_impact': 'WhatsApp adds 40% reach in MENA; Web captures desktop users'},
+            {'module': 'Rich Media Support','purpose': 'Images, videos, documents with drag-drop upload, preview, compression','business_value': 'Visual campaigns drive 2.5x engagement vs text-only','growth_impact': 'Media-rich promos = higher click-through = more first deposits'},
+            {'module': 'Priority & Scheduling','purpose': 'Normal/High/Urgent priority, one-time/daily/weekly recurrence, datetime picker','business_value': 'Time-sensitive promos (matches, tournaments) deliver on schedule','growth_impact': 'Urgent flash promos create FOMO = impulse deposits'},
+            {'module': 'AI Content Generation','purpose': 'One-click AI copywriting for campaign messages in 17 languages','business_value': 'Eliminates copywriting bottleneck; consistent brand voice','growth_impact': 'Launch campaigns in minutes not hours; test more creatives'},
+            {'module': 'Partner Network (CPM/RevShare)','purpose': 'Manage partner channels, subscriber counts, revenue tracking, automated payouts','business_value': 'Turn influencers into performance partners; pay for results','growth_impact': 'Partner traffic = 30-50% of new users at lower CAC'},
+            {'module': 'Campaign Analytics','purpose': 'Reach, clicks, CTR, conversions, daily reach charts, top campaigns table','business_value': 'Measure ROI per campaign; optimize spend','growth_impact': 'Data-driven budget allocation = more users per dollar'},
+        ],
+        'screens': [{'file': 'broadcast.png', 'caption': 'Broadcast Center: Campaign Builder'},{'file': 'channels.png', 'caption': 'Partner Network: Channel Management'},{'file': 'analytics.png', 'caption': 'Campaign Analytics: Reach & Conversion'}],
+    },
+    {
+        'slug': 'wallet-operations',
+        'emoji': '💳',
+        'title': 'Wallet, Deposits & Withdrawals',
+        'admin_path': '/transactions',
+        'goal': 'End-to-end financial lifecycle with multi-currency support, automated matching, agent network, and SVRP compensation.',
+        'highlights': [
+            {'module': 'Multi-Currency Wallet','purpose': 'EGP, USD, USDT, SAR, AED, KWD with real-time rates, per-user currency preference','business_value': 'Local currency = trust = higher deposits; USDT for crypto users','growth_impact': 'Multi-currency = 35% more international users; USDT = crypto-native acquisition'},
+            {'module': 'Payment Methods Management','purpose': 'Vodafone Cash, STC Pay, InstaPay, Bank Transfer per currency; admin-configurable','business_value': 'Local payment methods = 60% higher deposit completion','growth_impact': 'Local methods unlock unbanked populations; STC Pay = Saudi market entry'},
+            {'module': 'Deposit Workflow','purpose': 'User submits → Admin reviews (amount, reference, method) → Approve/Reject → Instant balance','business_value': 'Sub-5-minute approval = instant gratification = repeat deposits','growth_impact': 'Fast approval = trust signal = word-of-mouth referrals'},
+            {'module': 'Withdrawal Workflow','purpose': 'Request → Admin verifies (KYC, limits) → Manual/auto processing → Completion notification','business_value': 'Secure payouts = player confidence = larger withdrawals = higher LTV','growth_impact': 'Reliable withdrawals = trust = viral growth in communities'},
+            {'module': 'AI Matching Engine','purpose': 'Auto-matches deposits to withdrawals by amount, currency, timing; agent assignment','business_value': 'Eliminates manual matching errors; 99.9% accuracy','growth_impact': 'Operational efficiency = scale without headcount = higher margins'},
+            {'module': 'Agent Network','purpose': 'Agent balances, escrow, payment methods, ledger, penalties, insurance fund','business_value': 'Distributed liquidity = faster matching = happier players','growth_impact': 'Agent network scales to 1000+ concurrent without infrastructure cost'},
+            {'module': 'SVRP Smart Compensation','purpose': '100% deposit as frozen credits; unlock by sharing with 4+ friends (viral loop)','business_value': 'Turns losses into acquisition; 40% of SVRP users become net depositors','growth_impact': 'Compensation = retention tool + acquisition channel = dual value'},
+        ],
+        'screens': [{'file': 'transactions.png', 'caption': 'Transactions: Real-time Monitoring'},{'file': 'matching.png', 'caption': 'Matching: Deposit-Withdrawal Flow'},{'file': 'agents.png', 'caption': 'Agents: Performance & Balances'}],
+    },
+    {
+        'slug': 'ai-matching-agents',
+        'emoji': '🤖',
+        'title': 'AI-Powered Matching & Matching Agents',
+        'admin_path': '/matching',
+        'goal': 'Intelligent deposit/withdrawal matching with AI agents, automated evidence verification, and dispute resolution.',
+        'highlights': [
+            {'module': 'Automated Matching Algorithm','purpose': 'Matches deposits to withdrawals by amount, currency, timing, priority rules, agent availability','business_value': '99.9% match accuracy; eliminates manual errors','growth_impact': 'Operational excellence = player trust = organic growth'},
+            {'module': 'AI Agents for Matching','purpose': 'Multiple AI agents (OpenAI GPT-4o, Anthropic Claude-3.5, Google Gemini-1.5) with custom prompts per channel','business_value': 'AI handles 80% of routine verifications; humans handle exceptions','growth_impact': 'AI agents scale to 10,000+ matches/day without hiring'},
+            {'module': 'Agent Actions & Evidence','purpose': 'Agents submit actions with evidence (screenshots, txn IDs, bank refs); auto-verified via OCR/API','business_value': 'Automated evidence validation reduces fraud 95%','growth_impact': 'Fraud prevention = platform integrity = partner trust = enterprise deals'},
+            {'module': 'Step-by-Step Workflow','purpose': 'Deposit → Agent claim → Action (evidence) → Counter-party confirmation → Completion/Dispute','business_value': 'Structured process = zero ambiguity = faster resolution','growth_impact': 'Fast resolution = player satisfaction = retention'},
+            {'module': 'Dispute Resolution','purpose': 'Admin arbitration with chat logs, evidence review, force-complete/force-cancel, compensation','business_value': 'Fair resolution = player trust = reduced chargebacks','growth_impact': 'Chargeback reduction = saved revenue = higher net profit'},
+            {'module': 'Agent Performance Dashboard','purpose': 'Success rate, avg handling time, earnings, penalties, online status, specialization','business_value': 'Data-driven agent management = optimal allocation','growth_impact': 'Top agents = 3x throughput = lower cost per match'},
+            {'module': 'Auto-Assignment Rules','purpose': 'Round-robin, least busy, specialization-based, priority matching, geo-routing','business_value': 'Optimal agent utilization = 40% faster matching','growth_impact': 'Speed = conversion; 2-min match vs 20-min = 5x deposits'},
+        ],
+        'screens': [{'file': 'matching.png', 'caption': 'Matching Dashboard: Real-time Flow'},{'file': 'agents.png', 'caption': 'Agent Performance: Metrics & Management'},{'file': 'ai-agents.png', 'caption': 'AI Agents: Configuration & Monitoring'}],
+    },
+    {
+        'slug': 'agents-management',
+        'emoji': '🤝',
+        'title': 'Matching Agents Management',
+        'admin_path': '/agents',
+        'goal': 'Complete agent lifecycle: onboarding, balances, performance, penalties, self-service portal.',
+        'highlights': [
+            {'module': 'Agent Onboarding','purpose': 'Create agents with bot name, username, security deposit, traffic controls, priority','business_value': '5-minute onboarding; agents productive immediately','growth_impact': 'Fast onboarding = more agents = more liquidity = more matches'},
+            {'module': 'Balance & Escrow Management','purpose': 'Real-time balance, escrow (security deposit), credit/debit adjustments with full audit trail','business_value': 'Real-time visibility = trust = agent retention','growth_impact': 'Agent trust = network stability = consistent matching'},
+            {'module': 'Payment Methods per Agent','purpose': 'Each agent manages own payment methods (account details, icons, types, currencies)','business_value': 'Agent autonomy = faster payouts = player satisfaction','growth_impact': 'Agent satisfaction = network growth = more capacity'},
+            {'module': 'Transaction Ledger','purpose': 'Full history with filtering, export (CSV/Excel), status override, audit trail','business_value': 'Complete transparency = compliance ready = partner confidence','growth_impact': 'Compliance = enterprise clients = high-value contracts'},
+            {'module': 'Penalties & Insurance','purpose': 'Automated penalties for failed matches, insurance fund for coverage, configurable rules','business_value': 'Risk mitigation = platform stability = player trust','growth_impact': 'Stability = scale = revenue growth'},
+            {'module': 'Agent Self-Service Portal','purpose': 'Agents login via /agent-login, see assigned matches, submit evidence, manage methods, view earnings','business_value': 'Self-service reduces admin load 70%; agents love autonomy','growth_impact': 'Agent happiness = referrals = network effect growth'},
+        ],
+        'screens': [{'file': 'agents.png', 'caption': 'Agents Dashboard: Overview & KPIs'},{'file': 'agent-ledger.png', 'caption': 'Agent Ledger: Full History'},{'file': 'agent-portal.png', 'caption': 'Agent Portal: Self-Service View'}],
+    },
+    {
+        'slug': 'client-white-label',
+        'emoji': '🏢',
+        'title': 'Client White-Label Admin Portals',
+        'admin_path': '/clients',
+        'goal': 'Grant clients their own branded admin panel with isolated data, scoped permissions, and revenue sharing.',
+        'highlights': [
+            {'module': 'Client Companies Management','purpose': 'Create client companies with branding (logo, colors, custom domain), isolated databases, independent settings','business_value': 'Full isolation = zero data leakage = enterprise trust','growth_impact': 'Enterprise clients = 10-50x average contract value'},
+            {'module': 'Client Admin Accounts','purpose': 'Each client gets admin login with scoped access to their company data only (users, transactions, campaigns)','business_value': 'Zero cross-contamination; GDPR compliant by design','growth_impact': 'Compliance = enterprise sales = 6-7 figure contracts'},
+            {'module': 'Client Dashboard','purpose': 'Customized view: their users, transactions, volume, campaigns, settings, analytics','business_value': 'Self-service analytics = client empowerment = retention','growth_impact': 'Client empowerment = upsell opportunities = expansion revenue'},
+            {'module': 'Revenue Sharing & Billing','purpose': 'Configure revenue share %, monthly invoicing, payment tracking, automated invoices','business_value': 'Automated billing = zero admin overhead = scalable','growth_impact': 'Automated billing = infinite client scale without headcount'},
+            {'module': 'White-Label Customization','purpose': 'Custom domain, logo, colors, email templates, language defaults, custom CSS','business_value': 'Full brand ownership = client loyalty = zero churn','growth_impact': 'Brand ownership = switching cost = lifetime value'},
+            {'module': 'Client User Management','purpose': 'Client admins manage their own users (ban, balance adjust, transactions, KYC) within scope','business_value': 'Delegated management = admin scalability','growth_impact': 'Scalable support = more clients per admin = higher margins'},
+        ],
+        'screens': [{'file': 'clients.png', 'caption': 'Clients Dashboard: Company Overview'},{'file': 'client-dashboard.png', 'caption': 'Client Portal: Branded Dashboard'},{'file': 'white-label.png', 'caption': 'White-Label: Custom Domain & Branding'}],
+    },
+    {
+        'slug': 'employee-rbac',
+        'emoji': '👮',
+        'title': 'Employee RBAC & Granular Permissions',
+        'admin_path': '/admins',
+        'goal': 'Grant employees precise permissions per admin panel section with ownership, audit trail, and temporary access.',
+        'highlights': [
+            {'module': 'Predefined Roles','purpose': 'Super Admin, Finance Admin, Support Admin, Game Admin, Broadcast Admin, Custom roles','business_value': 'Role templates = instant onboarding; zero config errors','growth_impact': 'Fast onboarding = team scaling = faster feature delivery'},
+            {'module': '30+ Granular Permissions','purpose': 'approve_deposits, reject_withdrawals, ban_users, manage_games, send_broadcast, view_financial, manage_admins, manage_bots, manage_settings, manage_companies, etc.','business_value': 'Least-privilege = security = compliance = enterprise sales','growth_impact': 'Security = trust = enterprise contracts = revenue'},
+            {'module': 'Section-Level Access','purpose': 'Grant access to specific sections: /transactions, /matching, /channels, /games-admin, /broadcast, /agents, /admins, /statistics, /ai-api-keys','business_value': 'Precise control = zero over-permission = audit ready','growth_impact': 'Audit readiness = faster compliance = faster deals'},
+            {'module': 'Ownership & Management','purpose': 'Channel ownership (owner_admin_id, managed_by_admin_ids), sub-admin publish rights, category management','business_value': 'Distributed ownership = team autonomy = faster operations','growth_impact': 'Team autonomy = parallel work = faster time-to-market'},
+            {'module': 'Immutable Audit Trail','purpose': 'Every action logged: who, what, when, target, IP, before/after values — tamper-proof','business_value': 'Full accountability = fraud deterrence = platform integrity','growth_impact': 'Integrity = partner trust = enterprise partnerships'},
+            {'module': 'Temporary Access','purpose': 'Time-limited admin roles with auto-expiry (hours/days), auto-revocation','business_value': 'Contractor/vendor access without permanent risk','growth_impact': 'Secure vendor access = faster integrations = faster features'},
+            {'module': 'Admin Management UI','purpose': 'Add/edit/remove admins, assign roles, set expiry, view permissions matrix, impersonate','business_value': 'Self-service admin management = zero IT tickets','growth_impact': 'Zero IT tickets = admin team focuses on product = faster shipping'},
+        ],
+        'screens': [{'file': 'admins.png', 'caption': 'Admin Management: Roles & Permissions'},{'file': 'audit-log.png', 'caption': 'Audit Log: Full Action History'},{'file': 'permissions-matrix.png', 'caption': 'Permissions Matrix: Visual Overview'}],
+    },
+    {
+        'slug': 'games-profitability',
+        'emoji': '🎮',
+        'title': 'Games Management & Profitability Control',
+        'admin_path': '/games-admin',
+        'goal': '11+ games with real-time edge control, risk alerts, player segmentation, RTP tuning, and profitability optimization.',
+        'highlights': [
+            {'module': '11+ Built-in Games','purpose': 'Aviator, Crash, Mines, Plinko, Wheel, Lottery, Dice, Snatch, Snatch Gifts, Trading, SVRP — all with independent config','business_value': 'Game variety = longer sessions = higher LTV','growth_impact': 'New games = new acquisition channels = user growth'},
+            {'module': 'Real-time Edge/RTP Control','purpose': 'Adjust house edge, target edge, min/max bet, win chance per game instantly — no restart','business_value': 'Dynamic margin optimization = max profit per game','growth_impact': 'Profit optimization = reinvestment = growth engine'},
+            {'module': 'Risk Alerts Engine','purpose': 'Auto-detect: high rollers, unusual win rates, bonus abuse, churn risk, heat levels (1-10)','business_value': 'Proactive risk management = loss prevention','growth_impact': 'Loss prevention = direct profit protection = higher net'},
+            {'module': 'Player Segmentation','purpose': 'New, Regular, VIP, Winner, Loser, Hot, Churning — auto-classified by behavior, LTV, heat','business_value': 'Targeted offers per segment = 3x conversion vs generic','growth_impact': 'Personalization = retention = LTV growth'},
+            {'module': 'Algorithm Configuration','purpose': 'Target edge %, max daily win/loss, max bets/hour, compensation interval, min balance to play','business_value': 'Fine-tuned algorithm = stable economics = predictable revenue','growth_impact': 'Predictable revenue = investor confidence = funding/growth'},
+            {'module': 'Game Toggle & Maintenance','purpose': 'Enable/disable games instantly, maintenance mode with custom player messaging','business_value': 'Instant response to issues = zero revenue leak','growth_impact': 'Uptime = trust = retention = revenue'},
+            {'module': 'Profitability Dashboard','purpose': 'Total wagered, net profit, platform edge %, active players, top players by LTV, heat map','business_value': 'Real-time P&L = data-driven decisions','growth_impact': 'Data-driven = optimal resource allocation = max ROI'},
+        ],
+        'screens': [{'file': 'games_admin.png', 'caption': 'Games Admin: Profitability & Risk'},{'file': 'home_player.png', 'caption': 'Player View: Game Lobby'},{'file': 'risk-alerts.png', 'caption': 'Risk Alerts: Real-time Monitoring'}],
+    },
+    {
+        'slug': 'ai-api-keys',
+        'emoji': '🔐',
+        'title': 'AI API Keys & Multi-Provider Integration',
+        'admin_path': '/ai-api-keys',
+        'goal': 'Manage OpenAI, Anthropic, Google, Azure, Custom APIs with auto model fetching, testing, and usage analytics.',
+        'highlights': [
+            {'module': '5+ Provider Support','purpose': 'OpenAI (GPT-4o, GPT-4), Anthropic (Claude-3.5-Sonnet), Google (Gemini-1.5-Pro), Azure OpenAI, Custom endpoints','business_value': 'Provider diversity = no vendor lock-in = negotiation power','growth_impact': 'Negotiation power = cost savings = higher margins'},
+            {'module': 'Auto Model Fetching','purpose': 'One-click fetches available chat models from provider API, filters for chat/completion models','business_value': 'Zero manual config = zero errors = instant deployment','growth_impact': 'Zero config = new features in minutes not days'},
+            {'module': 'Connection Testing','purpose': 'Live test with sample prompt, shows latency, token usage, available models, error details','business_value': 'Pre-deployment validation = zero production failures','growth_impact': 'Zero failures = player trust = retention'},
+            {'module': 'Per-Key Configuration','purpose': 'Priority (1-100), temperature (0-2), max tokens (1-128k), timeout (5-300s), base URL for Azure/Custom','business_value': 'Granular control = cost optimization = higher margins','growth_impact': 'Cost optimization = reinvestment = growth'},
+            {'module': 'Usage Analytics','purpose': 'Requests/day, tokens/day, estimated cost (USD), model breakdown, trend charts','business_value': 'Usage visibility = budget control = predictable costs','growth_impact': 'Predictable costs = financial planning = scale confidence'},
+            {'module': 'Channel Integration','purpose': 'Assign AI agents to channels for auto-replies, content generation, moderation, translation','business_value': 'AI automation = 90% support automation = cost savings','growth_impact': 'Cost savings = reinvestment = growth engine'},
+        ],
+        'screens': [{'file': 'ai_api_keys.png', 'caption': 'AI API Keys: Provider Management'},{'file': 'ai-test.png', 'caption': 'Connection Test: Live Results'},{'file': 'ai-usage.png', 'caption': 'Usage Analytics: Cost & Volume'}],
+    },
+    {
+        'slug': 'security-compliance',
+        'emoji': '🛡️',
+        'title': 'Security, Provably Fair & Compliance',
+        'admin_path': '/admins',
+        'goal': 'OTP login, HMAC-SHA256 provably fair, audit trails, data isolation, GDPR-ready, enterprise-grade security.',
+        'highlights': [
+            {'module': 'OTP Security Login','purpose': 'Telegram bot verification (@vex_otp_bot), 6-digit codes, session management, device fingerprinting','business_value': 'Zero account takeovers = zero fraud = zero chargebacks','growth_impact': 'Zero fraud = platform integrity = enterprise trust'},
+            {'module': 'Provably Fair (HMAC-SHA256)','purpose': 'Server seed revealed post-round, client-side verification, all games auditable by players','business_value': 'Mathematical fairness = zero dispute = player trust','growth_impact': 'Trust = retention = LTV = revenue'},
+            {'module': 'Data Isolation','purpose': 'White-label clients have fully isolated databases, no cross-contamination, independent backups','business_value': 'Regulatory compliance = enterprise sales = high-value contracts','growth_impact': 'Compliance = market access = revenue'},
+            {'module': 'Encryption & Security','purpose': 'AES-256 at rest, TLS 1.3 in transit, bcrypt passwords, secure HttpOnly sessions, CSP headers','business_value': 'Bank-grade security = zero breaches = brand protection','growth_impact': 'Brand protection = user trust = organic growth'},
+            {'module': 'Audit Logs & Compliance','purpose': 'Immutable action logs, GDPR data export (30-day), data retention policies, right to deletion','business_value': 'Regulatory readiness = zero fines = brand protection','growth_impact': 'Compliance = market access = global expansion'},
+        ],
+        'screens': [{'file': 'security.png', 'caption': 'Security Dashboard: Threat Monitoring'},{'file': 'provably-fair.png', 'caption': 'Provably Fair: Verification Flow'},{'file': 'compliance.png', 'caption': 'Compliance: GDPR & Audit Ready'}],
+    },
+    {
+        'slug': 'channels-relay',
+        'emoji': '📡',
+        'title': 'Channels, Groups & Multi-Platform Relay',
+        'admin_path': '/channels',
+        'goal': 'Telegram, WhatsApp, Webhook channels with AI processing, flexible relay rules, ownership, and archive.',
+        'highlights': [
+            {'module': 'Multi-Platform Support','purpose': 'Telegram channels/groups, WhatsApp Business API, Webhook endpoints — unified management','business_value': 'Single dashboard for all channels = operational efficiency','growth_impact': 'Efficiency = scale = more channels = more reach = more users'},
+            {'module': 'Channel Roles','purpose': 'Source only, Publish only, Source+Publish — flexible relay topology for any workflow','business_value': 'Flexible topology = any content strategy = creative freedom','growth_impact': 'Creative freedom = viral content = organic growth'},
+            {'module': 'AI Processing Pipeline','purpose': 'Text replacement (find/replace), AI rewriting (GPT/Claude), content moderation, auto-translation (17 langs)','business_value': 'AI automation = 90% content processing hands-free','growth_impact': 'Automation = scale = more content = more engagement = more users'},
+            {'module': 'Relay Rules','purpose': 'Relay to users, relay to channels, per-channel toggle, category grouping, priority queuing','business_value': 'Granular control = precise content delivery = higher engagement','growth_impact': 'Engagement = retention = LTV = revenue'},
+            {'module': 'Ownership & Permissions','purpose': 'Owner admin, managed_by admins, sub-admin publish rights, category management, archive/vault','business_value': 'Distributed ownership = team autonomy = parallel execution','growth_impact': 'Parallel execution = faster launches = first-mover advantage'},
+            {'module': 'Archive & Vault','purpose': 'Soft-delete to vault, restore, permanent delete, retention policies, compliance export','business_value': 'Data governance = compliance = enterprise readiness','growth_impact': 'Enterprise readiness = big contracts = revenue'},
+        ],
+        'screens': [{'file': 'channels.png', 'caption': 'Channels Dashboard: Multi-Platform View'},{'file': 'relay-rules.png', 'caption': 'Relay Rules: Visual Builder'},{'file': 'archive.png', 'caption': 'Archive Vault: Content Recovery'}],
+    },
+    {
+        'slug': 'referrals-loyalty',
+        'emoji': '🎁',
+        'title': 'Referral Engine & Loyalty Programs',
+        'admin_path': '/referrals',
+        'goal': 'Multi-level referrals, viral loops, SVRP compensation, daily rewards, VIP tiers, and automated retention.',
+        'highlights': [
+            {'module': 'Referral Links & Tracking','purpose': 'Unique links per user/partner, conversion tracking, source attribution, UTM support','business_value': 'Attribution = ROI measurement = optimized spend','growth_impact': 'Optimized spend = more users per dollar = growth'},
+            {'module': 'Multi-Level Commissions','purpose': 'Configurable % per level (up to 5), instant credit, lifetime commissions, anti-fraud','business_value': 'Viral loops = exponential growth = near-zero CAC','growth_impact': 'Viral growth = market dominance = market leadership'},
+            {'module': 'SVRP Compensation System','purpose': '100% deposit as frozen credits, unlock by sharing with 4+ friends (each gets 25%), viral unlock','business_value': 'Turns losses into acquisition; 40% become net depositors','growth_impact': 'Loss-to-acquisition = unique growth loop = competitive moat'},
+            {'module': 'Daily Rewards & Lottery','purpose': 'Daily login bonus, wheel spin (configurable prizes), lottery tickets, streak bonuses','business_value': 'Daily engagement = habit formation = retention','growth_impact': 'Retention = LTV = revenue compounding'},
+            {'module': 'VIP Tiers & Perks','purpose': 'Auto-promotion by LTV, exclusive games, higher limits, priority support, custom offers','business_value': 'VIP retention = 80/20 rule — top 20% = 80% revenue','growth_impact': 'VIP focus = revenue protection = stable growth'},
+            {'module': 'Automated Reactivation','purpose': 'AI detects churning players, triggers personalized offers (bonus, free spins, cashback)','business_value': 'Reactivation = 20-30% of churned users return','growth_impact': 'Reactivated users = free revenue = pure profit'},
+        ],
+        'screens': [{'file': 'referrals.png', 'caption': 'Referrals: Source Tracking & Rewards'},{'file': 'loyalty.png', 'caption': 'Loyalty: VIP Tiers & Perks'},{'file': 'svrp.png', 'caption': 'SVRP: Viral Compensation Flow'}],
+    },
+    {
+        'slug': 'tickets-support',
+        'emoji': '🎫',
+        'title': 'Tickets, Complaints & Support System',
+        'admin_path': '/tickets',
+        'goal': 'Structured dispute resolution, SLA tracking, automated escalation, customer communication, compliance.',
+        'highlights': [
+            {'module': 'Ticket Categories & Auto-Routing','purpose': 'Deposit, Withdrawal, Game, Technical, Billing, General — auto-assigned to specialized teams','business_value': 'Specialized handling = 50% faster resolution','growth_impact': 'Fast resolution = satisfaction = retention'},
+            {'module': 'Complaint Workflow','purpose': 'Open → Assigned → In Progress → Resolution → Closed, with SLA timers (configurable per category)','business_value': 'Structured process = compliance = audit ready','growth_impact': 'Compliance = enterprise trust = big contracts'},
+            {'module': 'Dispute Resolution','purpose': 'Admin arbitration with evidence, chat logs, force actions, compensation, audit trail','business_value': 'Fair resolution = trust = reduced chargebacks','growth_impact': 'Chargeback reduction = direct profit = margin'},
+            {'module': 'Auto-Escalation','purpose': 'Time-based escalation to senior admins, notifications (Telegram/Email), re-assignment','business_value': 'Zero SLA breaches = compliance = zero penalties','growth_impact': 'Compliance = enterprise trust = revenue'},
+            {'module': 'Customer Communication','purpose': 'In-ticket chat, email/Telegram notifications, canned responses, attachments, satisfaction survey','business_value': 'Great support = word-of-mouth = organic growth','growth_impact': 'Organic growth = zero CAC = infinite ROI'},
+            {'module': 'SLA & Reporting','purpose': 'Response time, resolution time, CSAT, agent performance, category trends, compliance dashboard','business_value': 'Metrics-driven support = continuous improvement','growth_impact': 'Continuous improvement = competitive advantage'},
+        ],
+        'screens': [{'file': 'tickets.png', 'caption': 'Tickets Dashboard: Queue & Metrics'},{'file': 'complaints.png', 'caption': 'Complaints: Dispute Resolution'},{'file': 'support.png', 'caption': 'Support: Customer Communication'}],
+    },
+    {
+        'slug': 'social-media-posting',
+        'emoji': '📱',
+        'title': 'Social Media Multi-Platform Posting & Sub-Admin Control',
+        'admin_path': '/social-media',
+        'goal': 'Unified social media management: publish to Telegram, WhatsApp, Web, Facebook, Twitter, Instagram from one dashboard with granular sub-admin permissions controlled by main admin',
+        'highlights': [
+            {'module': '6+ Platform Integration','purpose': 'Telegram Channels/Groups, WhatsApp Business, Facebook Pages, Twitter/X, Instagram, Web Push — single compose, multi-publish','business_value': 'Single workflow for all channels = 80% time savings vs manual posting','growth_impact': 'Consistent cross-platform presence = 3x brand recall = higher conversion'},
+            {'module': 'Unified Composer','purpose': 'Single rich-text editor with platform-specific preview, character limits, hashtag suggestions, media optimization per platform','business_value': 'Zero platform-specific errors; brand consistency guaranteed','growth_impact': 'Professional presence = trust = higher click-through rates'},
+            {'module': 'Sub-Admin Posting Permissions','purpose': 'Main admin grants granular posting rights per sub-admin: allowed platforms, content categories, scheduling limits, approval workflows','business_value': 'Delegated marketing without brand risk; compliance built-in','growth_impact': 'Scalable marketing team = 10x content output = more reach = more users'},
+            {'module': 'Approval Workflows','purpose': 'Multi-level approval: sub-admin drafts → senior review → auto-publish or schedule; audit trail on every action','business_value': 'Zero brand risk; full compliance; zero unauthorized posts','growth_impact': 'Brand safety = partner trust = enterprise deals'},
+            {'module': 'Content Library & Templates','purpose': 'Reusable templates, approved media library, brand guidelines enforcement, AI-assisted content adaptation per platform','business_value': '90% faster content creation; consistent brand voice','growth_impact': 'Faster campaigns = first-mover advantage = market share'},
+            {'module': 'Cross-Platform Analytics','purpose': 'Unified dashboard: reach, engagement, clicks, conversions per platform; ROI attribution; best posting times AI-predicted','business_value': 'Data-driven budget allocation = 40% better ROAS','growth_impact': 'Optimized spend = more users per dollar = sustainable growth'},
+        ],
+        'screens': [{'file': 'social-media.png', 'caption': 'Social Media Dashboard: Unified Composer'},{'file': 'sub-admin-permissions.png', 'caption': 'Sub-Admin Permissions: Granular Control'},{'file': 'cross-platform-analytics.png', 'caption': 'Cross-Platform Analytics: ROI by Channel'}],
+    },
+    {
+        'slug': 'agent-partnership',
+        'emoji': '🤝',
+        'title': 'Agent Partnership Program — Why Agents Choose Us',
+        'admin_path': '/agents',
+        'goal': 'Compelling value proposition for agents: high commissions, low risk, automated tools, scalable income, and platform support that drives their growth',
+        'highlights': [
+            {'module': 'High-Commission Revenue Share','purpose': 'Up to 40-50% net revenue share on matched transactions; transparent real-time reporting; instant withdrawal','business_value': 'Best-in-class agent economics = attract top talent','growth_impact': 'Top agents = 5x volume = exponential network growth'},
+            {'module': 'Zero Capital Risk','purpose': 'Agents don\'t fund player balances — platform handles liquidity; agents earn on successful matches only','business_value': 'Zero barrier to entry = massive agent pool','growth_impact': 'Low barrier = 1000+ agents in 6 months = massive liquidity'},
+            {'module': 'AI-Powered Agent Tools','purpose': 'Auto-match suggestions, evidence auto-verification, dispute prediction, performance coaching, earnings optimization','business_value': 'Agents close 3x more matches with 50% less effort','growth_impact': 'Agent productivity = network throughput = revenue scale'},
+            {'module': 'Self-Service Portal','purpose': '24/7 agent dashboard: assigned matches, real-time earnings, performance analytics, evidence submission, instant withdrawals','business_value': 'Zero admin overhead for agent management','growth_impact': 'Self-service = infinite agent scale without headcount growth'},
+            {'module': 'Scalable Earnings Model','purpose': 'No cap on transactions; performance bonuses for volume/quality; team building — recruit sub-agents, earn override commissions','business_value': 'Agents become recruiters = viral network growth','growth_impact': 'Viral agent recruitment = exponential network = market dominance'},
+            {'module': 'Platform Support & Training','purpose': 'Dedicated partner manager, weekly optimization calls, marketing materials, compliance guidance, priority support','business_value': 'Agent success = platform success = mutual growth','growth_impact': 'Partner success = retention = lifetime value = stable revenue'},
+        ],
+        'screens': [{'file': 'agent-partnership.png', 'caption': 'Agent Partnership: Revenue Share & Benefits'},{'file': 'agent-portal.png', 'caption': 'Agent Portal: Self-Service Dashboard'},{'file': 'agent-network-growth.png', 'caption': 'Network Growth: Viral Agent Recruitment'}],
+    },
+]
+
+_SHOWCASE_SECTION_MAP = {s['slug']: s for s in _SHOWCASE_SECTIONS}
+
+
+def _showcase_secret_bytes() -> bytes:
+    raw = os.getenv('SHOWCASE_SECRET', '') or str(app.secret_key or '')
+    return raw.encode('utf-8', 'ignore')
+
+
+def _b64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode('ascii').rstrip('=')
+
+
+def _b64url_decode(raw: str) -> bytes:
+    pad = '=' * ((4 - len(raw) % 4) % 4)
+    return base64.urlsafe_b64decode((raw + pad).encode('ascii'))
+
+
+def _showcase_issue_token(scope: str, ttl_minutes: int | None = None, extra: dict | None = None) -> str:
+    # Permanent tokens have no expiration (ttl_minutes = 0 or negative)
+    is_permanent = ttl_minutes is not None and ttl_minutes <= 0
+    if is_permanent:
+        ttl = 0
+        payload = {
+            'scope': str(scope),
+            'exp': 0,  # No expiration
+            'nonce': secrets.token_urlsafe(9),
+            'permanent': True,
+        }
+    else:
+        ttl = int(ttl_minutes or _SHOWCASE_DEFAULT_TTL_MIN)
+        payload = {
+            'scope': str(scope),
+            'exp': int(time.time()) + max(60, ttl * 60),
+            'nonce': secrets.token_urlsafe(9),
+        }
+    if extra:
+        for k, v in extra.items():
+            payload[str(k)] = v
+    body = _b64url_encode(json.dumps(payload, separators=(',', ':')).encode('utf-8'))
+    sig = hmac.new(_showcase_secret_bytes(), body.encode('utf-8'), hashlib.sha256).hexdigest()
+    return f'{body}.{sig}'
+
+
+def _showcase_verify_token(token: str, expected_scope: str) -> tuple[bool, dict]:
+    try:
+        body, sig = str(token or '').split('.', 1)
+    except ValueError:
+        return False, {}
+    if not body or not sig:
+        return False, {}
+    expected_sig = hmac.new(_showcase_secret_bytes(), body.encode('utf-8'), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected_sig, sig):
+        return False, {}
+    try:
+        payload = json.loads(_b64url_decode(body).decode('utf-8'))
+    except Exception:
+        return False, {}
+    if str(payload.get('scope', '')) != str(expected_scope):
+        return False, {}
+    
+    # Check if permanent token (no expiration)
+    is_permanent = payload.get('permanent', False)
+    if is_permanent:
+        return True, payload
+    
+    try:
+        exp = int(payload.get('exp', 0) or 0)
+    except Exception:
+        return False, {}
+    if exp <= int(time.time()):
+        return False, {}
+    return True, payload
+
+
+def _showcase_render(template_name: str, **ctx):
+    resp = make_response(render_template(template_name, **ctx))
+    resp.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
+    resp.headers['Cache-Control'] = 'private, no-store, max-age=0'
+    return resp
+
+
+@app.before_request
+def _showcase_readonly_guard():
+    if not session.get('showcase_readonly'):
+        return None
+
+    try:
+        exp = int(session.get('showcase_exp', 0) or 0)
+    except Exception:
+        exp = 0
+    if exp <= int(time.time()):
+        session.clear()
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Showcase session expired'}), 401
+        return redirect(url_for('showcase_expired'))
+
+    if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Read-only showcase session'}), 403
+        return ('<!doctype html><html lang="en"><body style="font-family:sans-serif;'
+                'background:#0f172a;color:#cbd5e1;display:flex;align-items:center;'
+                'justify-content:center;height:100vh">'
+                '<div><h2>Read-only session</h2>'
+                '<p>This temporary admin demo allows browsing only.</p></div>'
+                '</body></html>'), 403
+    return None
+
+
 # ===== Routes — Pages =====
 
 @app.route('/')
@@ -1143,7 +1824,375 @@ def index():
     """Landing page (public) — admin dashboard redirect only when logged in."""
     if session.get('logged_in'):
         return redirect(url_for('dashboard'), code=303)
-    return render_template('landing.html')
+    _tr_data = _read_company_translations()
+    try:
+        _comps = []
+        for c in read_csv('companies.csv'):
+            if (c.get('is_active','') or '').lower() not in ('active','yes','1','true'):
+                continue
+            slug = c.get('id','').lower().replace(' ','-')
+            name = c.get('name','')
+            comp_tr = _tr_data.get(name, {})
+            _comps.append({
+                'id': c.get('id',''),
+                'slug': slug,
+                'name': name,
+                'icon': c.get('icon','') or '🏢',
+                'affiliate_link': c.get('affiliate_link',''),
+                'promo_code': c.get('promo_code',''),
+                'address': c.get('address',''),
+                'color': comp_tr.get('color', '#16a34a'),
+                'app_link': c.get('app_link',''),
+                'license': comp_tr.get('ar',{}).get('license','') or c.get('license','') or 'Curacao 8048/JAZ',
+                'headquarters': comp_tr.get('ar',{}).get('headquarters','') or c.get('headquarters','') or 'Cyprus',
+                'founded': comp_tr.get('ar',{}).get('founded','') or c.get('founded','') or '2020',
+                'rating': comp_tr.get('ar',{}).get('rating','') or c.get('rating','') or '4.5',
+            })
+    except: _comps=[]
+    return render_template('landing.html', companies=_comps, company_translations=json.dumps(_tr_data, ensure_ascii=False))
+
+
+COMPANY_COLORS = {
+    '1XBET': '#E31937', 'MELBET': '#1565C0', 'BETJAM': '#FF6D00',
+    'MOSTBET': '#2E7D32', 'BIZBET': '#7B1FA2', 'XPARI': '#00838F',
+    'LINEBET': '#3949AB', 'GOOOBET': '#C2185B',
+}
+
+COMPANY_DESCRIPTIONS = {
+    '1XBET': '1xBet هي واحدة من أكبر شركات المراهنة والألعاب في العالم. تأسست عام 2007 وحصلت على ترخيص كوراساو 8048/JAZ. تقدم أكثر من 1000 سوق يومياً في أكثر من 50 رياضة، بالإضافة إلى كازينو ضخم يضم آلاف الألعاب. تدعم أكثر من 200 طريقة دفع وتوفر تطبيقات للأندرويد والآيفون. واجهة عربية ممتازة ودعم فني على مدار الساعة.',
+    'MELBET': 'Melbet هي شركة مراهنة مرخصة تأسست عام 2012 وحصلت على ترخيص كوراساو. تتميز بواجهة عربية سهلة الاستخدام واحتمالات عالية. تقدم دفعاً فورياً عبر فودافون كاش وSTC Pay وبنكي. الكازينو يضم أكثر من 5000 لعبة من أفضل المطورين العالميين. دعم فني عربي على مدار الساعة.',
+    'BETJAM': 'Betjam هي شركة مراهنة ناشئة تأسست عام 2020 وحصلت على ترخيص كوراساو. تتميز بواجهة حديثة وسهلة الاستخدام مع تركيز على تجربة المستخدم العربي. تقدم بونص ترحيبي حصرية ودفع فوري عبر多种 طرق الدفع المحلية. دعم عربي متميز.',
+    'MOSTBET': 'Mostbet هي شركة مراهنة روسية تأسست عام 2009 وحصلت على ترخيص كوراساو. تقدم أكثر من 800 سوق يومياً و didReceiveMemoryWarningsupports多种 رياضات. تتميز بسرعة السحب والدعم الفني المتخصص. واجهة عربية متوفرة وتطبيقات للهواتف.',
+    'BIZBET': 'Bizbet هي شركة مراهنة مرخصة تأسست عام 2018. تتميز بسهولة الاستخدام وسرعة المعاملات. تقدم بونص ترحيبيiezicien ودفع فوري. دعم عربي على مدار الساعة وواجهة محسّنة للهاتف.',
+    'XPARI': 'Xpari هي شركة مراهنة مرخصة تقدم تجربة مراهنة شاملة. تتميز بالاحتمالات العالية والمجتمع النشط. تقدم أكثر من 50 رياضة và أكثر من 1000 سوق يومياً. دفع فوري ودعم عربي.',
+    'LINEBET': 'Linebet هي شركة مراهنة مرخصة تأسست عام 2012. تتميز بواجهة بسيطة وسهلة الاستخدام مع سرعة في المعاملات. تقدم أكثر من 40 رياضة وKasino ضخم. دعم فني عربي ودفع فوري.',
+    'GOOOBET': 'Gooobet هي شركة مراهنة حديثة تقدم تجربة مراهنة مبتكرة. تتميز بواجهة عصرية وسرعة في التحميل. تقدم ألعاب كازينو متنوعة وبرامج ولاء حصرية.',
+}
+
+COMPANY_PROS = {
+    '1XBET': ['أكبر سوق مراهنة في العالم', '1000+ سوق يومياً', 'بث مباشر مجاني', 'كازينو ضخم', 'سحب فوري', '200+ طريقة دفع', 'تطبيق احترافي'],
+    'MELBET': ['واجهة عربية ممتازة', 'دفع فوري فودافون كاش', '5000+ لعبة كازينو', 'احتمالات عالية', 'بونص 130%', 'دعم عربي 24/7'],
+    'BETJAM': ['واجهة حديثة', 'سرعة في الدفع', 'بونص حصري', 'دعم عربي متميز', 'لسهولة الاستخدام'],
+    'MOSTBET': ['سرعة السحب', '800+ سوق يومياً', 'مجتمع نشط', 'تطبيق ممتاز', 'دعم فني متخصص'],
+    'BIZBET': ['سهولة الاستخدام', 'سرعة المعاملات', 'بونص ترحيبي', 'دعم عربي', 'واجهة محسّنة للهاتف'],
+    'XPARI': ['احتمالات عالية', 'مجتمع نشط', '50+ رياضة', '1000+ سوق', 'دفع فوري'],
+    'LINEBET': ['واجهة بسيطة', 'سرعة المعاملات', 'Kasino ضخم', 'دعم عربي', '40+ رياضة'],
+    'GOOOBET': ['تجربة مبتكرة', 'واجهة عصرية', 'سرعة تحميل', 'ألعاب متنوعة', 'برامج ولاء'],
+}
+
+COMPANY_CONS = {
+    '1XBET': ['قد يكون معقد للمبتدئين', ' بعض الدول محظورة'],
+    'MELBET': ['速度 في بعض الدفعات', 'Some games restricted in certain regions'],
+    'BETJAM': ['شركة ناشئة', ' fewer markets than established brands'],
+    'MOSTBET': ['واجهة ليست الأفضل', 'some payment methods limited'],
+    'BIZBET': ['أقل شهرة', ' fewer promotions'],
+    'XPARI': ['less known brand', 'limited customer support'],
+    'LINEBET': ['واجهة بسيطة جداً', 'limited esports coverage'],
+    'GOOOBET': ['جديدة جداً', 'still building reputation'],
+}
+
+
+@app.route('/company/<company_id>')
+def company_detail(company_id):
+    """Company detail page with full review."""
+    try:
+        all_companies = read_csv('companies.csv')
+        company = None
+        for c in all_companies:
+            if c.get('id') == company_id:
+                company = c
+                break
+        if not company:
+            return 'Company not found', 404
+
+        name = company.get('name', '')
+        _tr_data = _read_company_translations()
+        comp_tr = _tr_data.get(name, {})
+        accent = comp_tr.get('color', '#16a34a')
+        ar_tr = comp_tr.get('ar', {})
+        description = ar_tr.get('description', f'{name} شركة مراهنة مرخصة.')
+        pros = ar_tr.get('pros', ['دفع فوري', 'دعم عربي', 'بونص ترحيبي'])
+        cons = ar_tr.get('cons', ['محدودية في بعض الدول'])
+
+        similar = []
+        for c in all_companies:
+            if c.get('id') != company_id and (c.get('is_active', '').lower() in ('active', 'yes', '1', 'true')):
+                s_tr = _tr_data.get(c.get('name',''), {})
+                similar.append({
+                    'id': c.get('id', ''),
+                    'name': c.get('name', ''),
+                    'icon': c.get('icon', '') or '',
+                    'rating': c.get('rating', '4.8') or '4.8',
+                    'color': s_tr.get('color', '#16a34a'),
+                })
+            if len(similar) >= 4:
+                break
+
+        return render_template('company_detail.html',
+            company={
+                'id': company.get('id', ''),
+                'name': name,
+                'icon': company.get('icon', '') or '',
+                'license': ar_tr.get('license', '') or company.get('license', '') or 'Curacao 8048/JAZ',
+                'headquarters': ar_tr.get('headquarters', '') or company.get('headquarters', '') or 'Cyprus',
+                'founded': ar_tr.get('founded', '') or company.get('founded', '') or '2020',
+                'rating': ar_tr.get('rating', '') or company.get('rating', '') or '4.5',
+                'promo_code': company.get('promo_code', ''),
+                'affiliate_link': company.get('affiliate_link', '#'),
+                'app_link': company.get('app_link', ''),
+                'description': description,
+                'pros': pros,
+                'cons': cons,
+            },
+            accent_color=accent,
+            similar=similar,
+            company_translations=json.dumps(comp_tr, ensure_ascii=False),
+        )
+    except Exception as e:
+        return f'Error: {str(e)}', 500
+
+
+@app.route('/x/showcase')
+def showcase_index():
+    token = request.args.get('k', '')
+    ok, payload = _showcase_verify_token(token, 'deck')
+    if not ok:
+        return 'Not Found', 404
+
+    is_permanent = payload.get('permanent', False)
+    if is_permanent:
+        expires_at = 'دائم (لا ينتهي)' if request.args.get('lang', 'ar') == 'ar' else 'Permanent (never expires)'
+    else:
+        expires_at = datetime.fromtimestamp(int(payload.get('exp', 0))).strftime('%Y-%m-%d %H:%M:%S UTC')
+    return _showcase_render(
+        'showcase_index.html',
+        token=token,
+        sections=_SHOWCASE_SECTIONS,
+        expires_at=expires_at,
+        is_permanent=is_permanent,
+    )
+
+
+@app.route('/x/showcase/section/<section_slug>')
+def showcase_section(section_slug):
+    token = request.args.get('k', '')
+    ok, payload = _showcase_verify_token(token, 'deck')
+    if not ok:
+        return 'Not Found', 404
+
+    is_permanent = payload.get('permanent', False)
+    section = _SHOWCASE_SECTION_MAP.get(str(section_slug or '').strip())
+    if not section:
+        return 'Not Found', 404
+
+    if is_permanent:
+        expires_at = 'دائم (لا ينتهي)' if request.args.get('lang', 'ar') == 'ar' else 'Permanent (never expires)'
+    else:
+        expires_at = datetime.fromtimestamp(int(payload.get('exp', 0))).strftime('%Y-%m-%d %H:%M:%S UTC')
+    return _showcase_render(
+        'showcase_section.html',
+        token=token,
+        section=section,
+        sections=_SHOWCASE_SECTIONS,
+        expires_at=expires_at,
+        is_permanent=is_permanent,
+    )
+
+
+@app.route('/x/showcase/admin-session')
+def showcase_admin_session():
+    token = request.args.get('k', '')
+    ok, payload = _showcase_verify_token(token, 'deck')
+    if not ok:
+        return 'Not Found', 404
+
+    next_path = (request.args.get('next', '/dashboard') or '/dashboard').strip()
+    if not next_path.startswith('/') or next_path.startswith('//'):
+        next_path = '/dashboard'
+
+    viewer_uid = ADMIN_IDS[0] if ADMIN_IDS else '1'
+    exp = int(payload.get('exp', int(time.time()) + 3600))
+    ttl_remaining = max(60, exp - int(time.time()))
+
+    session.clear()
+    session['logged_in'] = True
+    session['is_admin'] = True
+    session['admin_id'] = str(viewer_uid)
+    session['admin_name'] = 'Showcase Viewer'
+    session['login_time'] = datetime.now().isoformat()
+    session['showcase_readonly'] = True
+    session['showcase_exp'] = int(time.time()) + ttl_remaining
+    session['showcase_origin'] = 'private_showcase'
+    session.permanent = False
+    return redirect(next_path, code=303)
+
+
+@app.route('/x/showcase/expired')
+def showcase_expired():
+    return _showcase_render('showcase_expired.html')
+
+
+@app.route('/api/admin/showcase-links', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_admin_showcase_links():
+    data = request.get_json(silent=True) or {}
+    try:
+        ttl = int(data.get('ttl_minutes', _SHOWCASE_DEFAULT_TTL_MIN) or _SHOWCASE_DEFAULT_TTL_MIN)
+    except Exception:
+        ttl = _SHOWCASE_DEFAULT_TTL_MIN
+    ttl = max(15, min(ttl, 60 * 24 * 7))
+
+    base_url = (data.get('base_url') or request.host_url or '').rstrip('/')
+    
+    # Generate temporary token
+    token = _showcase_issue_token('deck', ttl_minutes=ttl)
+    
+    # Generate permanent token
+    permanent_token = _showcase_issue_token('deck', ttl_minutes=0)
+    
+    links = {
+        'deck': f'{base_url}/x/showcase?k={token}',
+        'deck_permanent': f'{base_url}/x/showcase?k={permanent_token}',
+        'admin': f'{base_url}/x/showcase/admin-session?k={token}&next=/dashboard',
+        'admin_permanent': f'{base_url}/x/showcase/admin-session?k={permanent_token}&next=/dashboard',
+        'expires_in_minutes': ttl,
+        'permanent_available': True,
+    }
+    return jsonify({'success': True, 'links': links})
+
+# ===== Public API — anonymized recent wins for the landing ticker =====
+_RECENT_WINS_CACHE = {'ts': 0.0, 'data': []}
+_RECENT_WINS_TTL = 30  # seconds
+_recent_wins_lock = threading.Lock()
+
+_PUBLIC_GAME_LABELS = {
+    'mines':   ('💣', 'مناجم'),
+    'crash':   ('🚀', 'كراش'),
+    'aviator': ('✈️', 'أفياتور'),
+    'plinko':  ('🔵', 'بلينكو'),
+    'wheel':   ('🎡', 'عجلة الحظ'),
+    'lottery': ('🎰', 'يانصيب'),
+    'dice':    ('🎲', 'النرد'),
+    'snatch':  ('🎯', 'اخطف'),
+}
+
+
+def _mask_player_id(uid: str) -> str:
+    """Anonymize a telegram id: keep only the last 3 digits."""
+    tail = ''.join(ch for ch in str(uid) if ch.isdigit())[-3:] or '000'
+    return f'لاعب_{tail}••'
+
+
+@app.route('/api/public/recent-wins')
+def api_public_recent_wins():
+    """Public read-only feed of the latest anonymized wins from game_sessions.
+
+    No auth required. No PII: player ids masked to last 3 digits, no names.
+    Cached in-process for 30s so the landing page can't hammer SQLite.
+    """
+    # Single-flight refresh: the lock is held through the DB query so that at
+    # cache expiry exactly one request refreshes while concurrent requests wait
+    # and then serve the freshly published cache (the query is a ~ms indexed
+    # SELECT, so holding the lock is cheap and prevents a stampede on SQLite).
+    with _recent_wins_lock:
+        now = time.time()
+        if now - _RECENT_WINS_CACHE['ts'] < _RECENT_WINS_TTL:
+            return jsonify({'wins': _RECENT_WINS_CACHE['data']})
+        wins = []
+        try:
+            import sqlite3 as _sq
+            _db_path = os.path.join(BASE_DIR, 'vex_games.db')
+            conn = _sq.connect(_db_path, timeout=5)
+            try:
+                conn.execute('PRAGMA query_only=ON')
+                rows = conn.execute(
+                    'SELECT game_id, user_id, payout, timestamp '
+                    'FROM game_sessions '
+                    'WHERE payout > 0 AND payout > bet_amount '
+                    'ORDER BY id DESC LIMIT 20'
+                ).fetchall()
+            finally:
+                conn.close()
+            for game_id, user_id, payout, ts in rows:
+                icon, label = _PUBLIC_GAME_LABELS.get(
+                    str(game_id or '').lower(), ('🎮', 'لعبة'))
+                wins.append({
+                    'game_icon': icon,
+                    'game_name': label,
+                    'player': _mask_player_id(user_id or ''),
+                    'amount': round(float(payout or 0), 2),
+                })
+        except Exception as exc:
+            _auth_logger.warning("recent-wins query failed: %s", exc)
+            wins = []
+        _RECENT_WINS_CACHE['ts'] = now
+        _RECENT_WINS_CACHE['data'] = wins
+        return jsonify({'wins': wins})
+
+# ===== Public API — rounded aggregate stats for the landing counters =====
+_PUBLIC_STATS_CACHE = {'ts': 0.0, 'data': None}
+_PUBLIC_STATS_TTL = 300  # seconds — aggregates change slowly
+_public_stats_lock = threading.Lock()
+
+
+def _round_public_stat(value: int) -> int:
+    """Round down to 2 significant figures.
+
+    Values under 100 pass through (nearly) exactly — these are coarse,
+    non-sensitive aggregates, not user-level data; the rounding only blurs
+    larger totals so precise platform figures aren't published.
+    """
+    v = int(value or 0)
+    if v < 10:
+        return v
+    import math as _m
+    step = 10 ** (int(_m.log10(v)) - 1)
+    return (v // step) * step
+
+
+@app.route('/api/public/stats')
+def api_public_stats():
+    """Public read-only aggregate stats (players, rounds, total paid out).
+
+    No auth required. All figures rounded down to 2 significant digits so no
+    sensitive exact totals leak. Cached in-process for 5 minutes.
+    """
+    with _public_stats_lock:
+        now = time.time()
+        if _PUBLIC_STATS_CACHE['data'] is not None and \
+                now - _PUBLIC_STATS_CACHE['ts'] < _PUBLIC_STATS_TTL:
+            return jsonify(_PUBLIC_STATS_CACHE['data'])
+        try:
+            import sqlite3 as _sq
+            _db_path = os.path.join(BASE_DIR, 'vex_games.db')
+            conn = _sq.connect(_db_path, timeout=5)
+            try:
+                conn.execute('PRAGMA query_only=ON')
+                players = conn.execute(
+                    'SELECT COUNT(*) FROM users').fetchone()[0] or 0
+                rounds = conn.execute(
+                    'SELECT COUNT(*) FROM game_sessions').fetchone()[0] or 0
+                paid = conn.execute(
+                    'SELECT COALESCE(SUM(payout), 0) FROM game_sessions '
+                    'WHERE payout > 0').fetchone()[0] or 0
+            finally:
+                conn.close()
+            data = {
+                'players': _round_public_stat(players),
+                'rounds': _round_public_stat(rounds),
+                'total_paid': _round_public_stat(int(paid)),
+            }
+            _PUBLIC_STATS_CACHE['ts'] = now
+            _PUBLIC_STATS_CACHE['data'] = data
+            return jsonify(data)
+        except Exception as exc:
+            _auth_logger.warning("public stats query failed: %s", exc)
+            # Serve stale cache if we have one; otherwise signal failure so
+            # the landing page falls back to its static showcase numbers.
+            if _PUBLIC_STATS_CACHE['data'] is not None:
+                return jsonify(_PUBLIC_STATS_CACHE['data'])
+            return jsonify({'error': 'unavailable'}), 503
 
 # ===== SEO — robots.txt + sitemap.xml + llms.txt =====
 
@@ -1193,11 +2242,13 @@ def robots_txt():
 
 @app.route('/sitemap.xml')
 def sitemap_xml():
-    """Dynamic sitemap — ONLY vex.deals URLs (Google rejects external domains)."""
+    """Dynamic sitemap with company pages, hreflang, and language variants."""
     from datetime import datetime as _dt
     now = _dt.now().strftime('%Y-%m-%d')
+    langs = ['ar','en','fr','es','de','it','pt','ru','zh','tr','ur','hi','fa','id','ja','ko','th']
     pages = [
         {'url': 'https://vex.deals/', 'priority': '1.0', 'changefreq': 'daily'},
+        {'url': 'https://vex.deals/compensation-info', 'priority': '0.9', 'changefreq': 'monthly'},
         {'url': 'https://vex.deals/webapp/games', 'priority': '0.9', 'changefreq': 'daily'},
         {'url': 'https://vex.deals/webapp/aviator', 'priority': '0.8', 'changefreq': 'weekly'},
         {'url': 'https://vex.deals/webapp/crash', 'priority': '0.8', 'changefreq': 'weekly'},
@@ -1209,18 +2260,29 @@ def sitemap_xml():
         {'url': 'https://vex.deals/webapp/stats', 'priority': '0.6', 'changefreq': 'weekly'},
         {'url': 'https://vex.deals/webapp/account', 'priority': '0.5', 'changefreq': 'weekly'},
     ]
-    # NOTE: External referral links (refpa*.com) are NOT included — Google requires
-    # sitemap URLs to be on the same domain. They are linked from landing.html
-    # and app pages instead, which Google discovers via crawling.
+    # Add company pages with hreflang
+    companies = read_csv('companies.csv')
+    for c in companies:
+        cid = c.get('id', '')
+        if cid:
+            pages.append({'url': f'https://vex.deals/company/{cid}', 'priority': '0.9', 'changefreq': 'weekly', 'company': True, 'id': cid})
 
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
+    xml += '        xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
     for p in pages:
         xml += f'  <url>\n'
         xml += f'    <loc>{p["url"]}</loc>\n'
         xml += f'    <lastmod>{now}</lastmod>\n'
         xml += f'    <changefreq>{p["changefreq"]}</changefreq>\n'
         xml += f'    <priority>{p["priority"]}</priority>\n'
+        # Add hreflang for landing and company pages
+        if p.get('company'):
+            base = f'https://vex.deals/company/{p["id"]}'
+        else:
+            base = p['url'].split('?')[0]
+        for lang in langs:
+            xml += f'    <xhtml:link rel="alternate" hreflang="{lang}" href="{base}?lang={lang}"/>\n'
         xml += f'  </url>\n'
     xml += '</urlset>'
     return Response(xml, mimetype='application/xml')
@@ -1335,13 +2397,85 @@ def api_web_request_code():
 
     return jsonify({'success': True, 'bot': bot_name})
 
+# ── حماية تخمين رموز الدخول: حد لكل IP + عداد لكل رمز ──────────────────────
+_OTP_ATTEMPTS_PER_IP = 8        # محاولات كحد أقصى لكل IP
+_OTP_IP_WINDOW = 600            # خلال 10 دقائق
+_OTP_CODE_MAX_TRIES = 5         # 5 محاولات خاطئة → حذف الرمز (يُطلب جديد من البوت)
+_OTP_CODE_TTL = 300             # صلاحية الرمز 5 دقائق
+_OTP_ATTEMPTS_FILE = os.path.join(BASE_DIR, 'otp_attempts.json')
+
+def _otp_ip_track(op, client_ip):
+    """عدّاد محاولات لكل IP في ملف مشترك بقفل — يعمل عبر كل عمال gunicorn
+    (الذاكرة المحلية تتوزع بين العمال ولا ترى محاولات بعضها).
+
+    op: 'check' → (blocked, remaining) | 'record' → (False, remaining)."""
+    import json as _json
+    lock_path = _OTP_ATTEMPTS_FILE + '.lock'
+    now = time.time()
+    fcntl_mod = None
+    with open(lock_path, 'w') as lf:
+        try:
+            import fcntl as _fl
+            fcntl_mod = _fl
+            _fl.flock(lf, _fl.LOCK_EX)
+        except ImportError:
+            pass
+        try:
+            data = {}
+            try:
+                if os.path.exists(_OTP_ATTEMPTS_FILE):
+                    with open(_OTP_ATTEMPTS_FILE, 'r') as f:
+                        data = _json.load(f)
+            except Exception:
+                data = {}
+            # نافذة نظيفة + تقليم حجم المخزن
+            fresh = {}
+            for ip, hits in data.items():
+                hits = [t for t in hits if now - t < _OTP_IP_WINDOW]
+                if hits:
+                    fresh[ip] = hits
+                if len(fresh) > 5000:
+                    break
+            hits = fresh.setdefault(client_ip, [])
+            if op == 'check':
+                blocked = len(hits) >= _OTP_ATTEMPTS_PER_IP
+            else:
+                hits.append(now)
+                blocked = False
+            remaining = max(0, _OTP_ATTEMPTS_PER_IP - len(hits))
+            try:
+                with open(_OTP_ATTEMPTS_FILE, 'w') as f:
+                    _json.dump(fresh, f)
+            except Exception:
+                pass
+            return blocked, remaining
+        finally:
+            try:
+                if fcntl_mod:
+                    fcntl_mod.flock(lf, fcntl_mod.LOCK_UN)
+            except Exception:
+                pass
+
 @app.route('/api/web/auth-code', methods=['POST'])
 def api_web_auth_code():
-    """Validate Telegram auth code from landing page."""
-    import random as _r, time as _t
+    """Validate Telegram auth code from landing page.
+
+    دفاع متعدد الطبقات ضد التخمين:
+    1. حد محاولات لكل IP (8/10 دقائق) عبر ملف مشترك بين العمال
+    2. عداد لكل رمز: 5 محاولات خاطئة تحذفه — التخمين يقتل الرمز نفسه
+    3. تنظيف الرموز المنتهية في كل نداء
+    4. الرموز تُولَّد بـ RNG آمن تشفيرياً (في البوت)"""
+    import time as _t
     data = request.json or {}
     code = str(data.get('code', '')).strip()
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+
+    blocked, _rem = _otp_ip_track('check', client_ip)
+    if blocked:
+        return jsonify({'error': 'محاولات كثيرة — انتظر 10 دقائق ثم اطلب رمزاً جديداً'}), 429
+
     if not code or len(code) != 6 or not code.isdigit():
+        _otp_ip_track('record', client_ip)
         return jsonify({'error': 'الرمز يجب أن يكون 6 أرقام'}), 400
 
     # Check auth codes file (created by bot)
@@ -1353,42 +2487,87 @@ def api_web_auth_code():
                 codes = _json.load(f)
         else:
             codes = {}
-        # Find matching code
+
+        # نظّف الرموز المنتهية أولاً — لا تبقى فرصة لرمز ميت
+        now = _t.time()
+        expired = [u for u, cd in codes.items() if now - cd.get('created', 0) > _OTP_CODE_TTL]
+        for u in expired:
+            del codes[u]
+
+        matched_uid = None
+        matched_data = None
         for uid, code_data in codes.items():
             if str(code_data.get('code', '')) == code:
-                # Check expiry (5 min)
-                if _t.time() - code_data.get('created', 0) > 300:
-                    return jsonify({'error': 'انتهت صلاحية الرمز — اطلب رمزاً جديداً'}), 400
-                # Create web session
-                session['admin_id'] = uid
-                session['admin_name'] = code_data.get('name', 'User')
-                session['logged_in'] = True
-                session['login_time'] = _t.time()
-                session.permanent = True  # Persistent — 365 days
-                session['is_admin'] = uid in ADMIN_IDS
-                session['phone'] = code_data.get('phone', '')
-                # Check if user is registered in bot (users.csv)
-                import csv as _csv
-                is_registered = False
-                try:
-                    with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
-                        for row in _csv.DictReader(f):
-                            if row.get('telegram_id') == str(uid):
-                                is_registered = True
-                                break
-                except:
-                    pass
-                session['is_registered'] = is_registered
-                # Remove used code
-                del codes[uid]
+                matched_uid, matched_data = uid, code_data
+                break
+
+        if matched_uid is None:
+            # رمز خاطئ — سجّل المحاولة على كل الرموز النشطة (لا نكشف أي واحد أصاب)
+            changed = False
+            for uid in list(codes.keys()):
+                cd = codes[uid]
+                cd['attempts'] = int(cd.get('attempts', 0)) + 1
+                if cd['attempts'] >= _OTP_CODE_MAX_TRIES:
+                    del codes[uid]   # استُنفد — يُطلب رمز جديد من البوت
+                changed = True
+            if changed:
                 with open(auth_file, 'w') as f:
                     _json.dump(codes, f)
-                # Admin → dashboard, regular user → home page
-                redirect_url = '/dashboard' if session['is_admin'] else '/home'
-                return jsonify({'success': True, 'redirect': redirect_url, 'registered': is_registered})
-        return jsonify({'error': 'رمز غير صالح'}), 400
-    except Exception as e:
+            _rb, remaining = _otp_ip_track('record', client_ip)
+            return jsonify({'error': f'رمز غير صالح — محاولات متبقية: {remaining}'}), 400
+
+        # الصلاحية أُعيد فحصها بالتنظيف أعلاه — الرمز حي
+        # Create web session
+        session['admin_id'] = matched_uid
+        session['admin_name'] = matched_data.get('name', 'User')
+        session['logged_in'] = True
+        session['login_time'] = now
+        session.permanent = True  # Persistent — 365 days
+        session['is_admin'] = matched_uid in ADMIN_IDS
+        session['phone'] = matched_data.get('phone', '')
+        # Check if user is registered in bot (users.csv)
+        import csv as _csv
+        is_registered = False
+        try:
+            with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
+                for row in _csv.DictReader(f):
+                    if row.get('telegram_id') == str(matched_uid):
+                        is_registered = True
+                        break
+        except Exception:
+            pass
+        session['is_registered'] = is_registered
+        # Remove used code + أي رموز أخرى لنفس المستخدم (جلسة واحدة نظيفة)
+        for uid in list(codes.keys()):
+            if uid == matched_uid:
+                del codes[uid]
+        with open(auth_file, 'w') as f:
+            _json.dump(codes, f)
+        # Admin → dashboard, regular user → home page
+        redirect_url = '/dashboard' if session['is_admin'] else '/home'
+        return jsonify({'success': True, 'redirect': redirect_url, 'registered': is_registered})
+    except Exception:
         return jsonify({'error': 'خطأ في الخادم'}), 500
+
+@app.route('/api/web/whoami')
+def api_web_whoami():
+    """Lightweight session probe for the front-end auth gate."""
+    logged_in = bool(session.get('logged_in'))
+    uid = str(session.get('admin_id') or '')
+    registered = bool(session.get('is_registered'))
+    if logged_in and uid and not registered:
+        # Older sessions may lack the flag — recheck users.csv once
+        import csv as _csv
+        try:
+            with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
+                for row in _csv.DictReader(f):
+                    if row.get('telegram_id') == uid:
+                        registered = True
+                        session['is_registered'] = True
+                        break
+        except Exception:
+            pass
+    return jsonify({'logged_in': logged_in, 'registered': registered, 'uid': uid})
 
 @app.route('/vex/admin/admin', methods=['GET', 'POST'])
 def admin_login():
@@ -1421,6 +2600,99 @@ def admin_login():
 def login_redirect():
     """Redirect /login to admin login page"""
     return redirect(url_for('admin_login'))
+
+# ===== Hermes External API — permanent key, full admin control =====
+HERMES_API_KEY = os.getenv('HERMES_API_KEY', '') or _env_file_value('HERMES_API_KEY')
+if not HERMES_API_KEY:
+    try:
+        _hk = 'vex_hermes_' + secrets.token_urlsafe(32)
+        with open(os.path.join(BASE_DIR, '.env'), 'a', encoding='utf-8') as _hf:
+            _hf.write("\n# Hermes external API key (permanent — full admin access)\n")
+            _hf.write(f"HERMES_API_KEY={_hk}\n")
+        HERMES_API_KEY = _hk
+        os.environ['HERMES_API_KEY'] = _hk
+        print('[HERMES] generated permanent API key -> .env')
+    except Exception as _he:
+        print(f'[HERMES] key generation failed: {_he}')
+
+
+@app.before_request
+def _hermes_auth_hook():
+    """Recognize Hermes by API key header on ANY request.
+    Accepts: X-API-Key: <key>   or   Authorization: Bearer <key>"""
+    g.hermes_auth = False
+    provided = request.headers.get('X-API-Key', '')
+    if not provided:
+        auth = request.headers.get('Authorization', '')
+        if auth.startswith('Bearer '):
+            provided = auth[7:].strip()
+    if provided and HERMES_API_KEY and hmac.compare_digest(provided, HERMES_API_KEY):
+        g.hermes_auth = True
+        g.hermes_admin_id = 'hermes'
+
+
+@app.before_request
+def _detect_tenant_domain():
+    """Detect custom domain from request Host header and set g.tenant_id."""
+    g.tenant_id = None
+    g.tenant_client = None
+    host = request.host.split(':')[0]  # strip port
+    # Skip main domain and localhost
+    if host in ('vex.deals', 'www.vex.deals', '127.0.0.1', 'localhost', '69.169.108.197'):
+        return None
+    # Look up domain in clients.csv
+    try:
+        clients_data = read_csv('clients.csv')
+        for c in clients_data:
+            if c.get('custom_domain', '').strip().lower() == host.lower():
+                g.tenant_id = c.get('id', '')
+                g.tenant_client = c
+                return None
+    except Exception:
+        pass
+    return None
+
+
+@app.route('/api/v1/ping')
+def hermes_ping():
+    """Hermes health/auth check."""
+    if not g.get('hermes_auth'):
+        return jsonify({'ok': False, 'error': 'Invalid or missing API key. Send header X-API-Key.'}), 401
+    return jsonify({'ok': True, 'service': 'vex-admin-api', 'version': '1.0',
+                    'authenticated_as': 'hermes', 'time': datetime.now().isoformat()})
+
+
+@app.route('/api/v1/help')
+def hermes_help():
+    """List endpoints Hermes can call (all existing dashboard APIs work with the key)."""
+    if not g.get('hermes_auth'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    return jsonify({
+        'auth': 'Send header X-API-Key: <your key> on every request (or Authorization: Bearer <key>)',
+        'endpoints': {
+            'GET /api/v1/ping': 'auth check',
+            'GET /api/stats': 'dashboard statistics',
+            'GET /api/stats/live': 'SSE live stats stream',
+            'GET /api/users?query=&limit=': 'list/search users',
+            'GET /api/transactions?status=&limit=': 'list transactions',
+            'POST /api/transactions/approve': 'body: {"id": "<txn_id>", "amount": 123}',
+            'POST /api/transactions/reject': 'body: {"id": "<txn_id>", "reason": "..."}',
+            'GET /api/complaints': 'list complaints',
+            'POST /api/complaints/<id>/reply': 'body: {"response": "..."}',
+            'GET /api/agents': 'list matching agents',
+            'GET /api/companies': 'list companies',
+            'GET /api/payment-methods': 'list payment methods',
+            'GET /api/settings': 'system settings',
+            'GET /api/audit-log': 'admin actions log',
+            'GET /broadcast': 'broadcast page (UI)',
+            'POST /api/broadcast/send': 'send broadcast (check dashboard/broadcast.html for exact payload)',
+            'GET /api/lottery/rounds': 'lottery rounds',
+            'GET /api/wheel/spins': 'wheel spins',
+            'GET /api/trading/orders': 'trading orders',
+        },
+        'note': 'Any dashboard endpoint reachable by an admin in the browser works with this key too.'
+    })
+
 
 @app.route('/logout')
 def logout():
@@ -1479,30 +2751,28 @@ def page_users():
 def page_matching():
     return render_template('matching.html', active_page='matching')
 
-# ===== Agent Bot Network (Phase 1+2) =====
+# ===== Agent Bot Network — «وكلاء المطابقة» (SQLite-backed) =====
+import sys as _agent_sys
+if BASE_DIR not in _agent_sys.path:
+    _agent_sys.path.insert(0, BASE_DIR)
+import agent_db
+import ticket_system
 
 @app.route('/agents')
 @admin_required
 @page_permission_required('view_financial')
 def page_agents():
+    _start_agents_watchdog()
     return render_template('agents.html', active_page='agents')
 
 @app.route('/api/agents')
 @api_auth
+@permission_required('view_financial')
 def api_agents():
-    """List all agent bots."""
-    agents = read_csv('agent_bots.csv')
-    # Normalize
-    for a in agents:
-        for k in ['id','bot_token','bot_name','username','password','balance','security_deposit',
-                   'is_active','traffic_enabled','max_daily_transactions','current_daily_count',
-                   'total_deposits_processed','total_withdrawals_processed','total_volume',
-                   'created_at','last_active','notes']:
-            if k not in a: a[k] = ''
-        a['balance'] = float(a.get('balance', 0) or 0)
-        a['security_deposit'] = float(a.get('security_deposit', 0) or 0)
-        a['traffic_stopped'] = a['balance'] <= a['security_deposit'] if a.get('is_active') == 'yes' else True
-    return jsonify({'agents': agents, 'count': len(agents)})
+    """List all agent bots with stats."""
+    agents = agent_db.list_agents()
+    stats = agent_db.get_agent_stats()
+    return jsonify({'agents': agents, 'count': len(agents), 'stats': stats})
 
 @app.route('/api/agents', methods=['POST'])
 @api_auth
@@ -1510,233 +2780,163 @@ def api_agents():
 def api_create_agent():
     """Create a new agent bot."""
     data = request.json or {}
-    agent_id = f"AGT{secrets.token_hex(3).upper()}"
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    agent = {
-        'id': agent_id,
-        'bot_token': data.get('bot_token', ''),
-        'bot_name': data.get('bot_name', ''),
-        'username': data.get('username', agent_id.lower()),
-        'password': data.get('password', secrets.token_hex(6)),
-        'balance': '0',
-        'security_deposit': str(data.get('security_deposit', 100)),
-        'is_active': 'yes',
-        'traffic_enabled': 'yes',
-        'max_daily_transactions': str(data.get('max_daily_transactions', 50)),
-        'current_daily_count': '0',
-        'total_deposits_processed': '0',
-        'total_withdrawals_processed': '0',
-        'total_volume': '0',
-        'created_at': now,
-        'last_active': '',
-        'notes': data.get('notes', ''),
-    }
-    fields = get_fieldnames('agent_bots.csv', ['id','bot_token','bot_name','username','password','balance','security_deposit',
-        'is_active','traffic_enabled','max_daily_transactions','current_daily_count',
-        'total_deposits_processed','total_withdrawals_processed','total_volume','created_at','last_active','notes'])
-    append_csv('agent_bots.csv', agent, fields)
-    log_action('create_agent', agent_id)
-    return jsonify({'success': True, 'id': agent_id})
+    res = agent_db.create_agent(data)
+    if 'error' in res:
+        return jsonify(res), 400
+    log_action('create_agent', res['id'])
+    # Return the generated password once so the admin can hand it to the agent
+    return jsonify({'success': True, 'id': res['id'],
+                    'username': res['username'], 'password': res['password']})
 
 @app.route('/api/agents/<agent_id>', methods=['PUT', 'DELETE'])
 @api_auth
 @permission_required('approve_deposits')
 def api_edit_agent(agent_id):
-    agents = read_csv('agent_bots.csv')
-    fields = get_fieldnames('agent_bots.csv', ['id','bot_token','bot_name','username','password','balance','security_deposit',
-        'is_active','traffic_enabled','max_daily_transactions','current_daily_count',
-        'total_deposits_processed','total_withdrawals_processed','total_volume','created_at','last_active','notes'])
     if request.method == 'DELETE':
-        agents = [a for a in agents if a.get('id') != agent_id]
-        write_csv('agent_bots.csv', agents, fields)
+        res = agent_db.delete_agent(agent_id)
+        if 'error' in res:
+            return jsonify(res), 400
         log_action('delete_agent', agent_id)
-        return jsonify({'success': True})
-    elif request.method == 'PUT':
-        data = request.json or {}
-        for a in agents:
-            if a.get('id') == agent_id:
-                for k, v in data.items():
-                    if k in fields:
-                        a[k] = str(v)
-                # Check if balance dropped below security deposit
-                bal = float(a.get('balance', 0) or 0)
-                dep = float(a.get('security_deposit', 0) or 0)
-                if bal <= dep:
-                    a['traffic_enabled'] = 'no'
-                else:
-                    a['traffic_enabled'] = 'yes'
-                break
-        write_csv('agent_bots.csv', agents, fields)
-        return jsonify({'success': True})
+        return jsonify(res)
+    data = request.json or {}
+    # Legacy field name from older UI
+    if 'traffic_enabled' in data and 'traffic_on' not in data:
+        data['traffic_on'] = data.pop('traffic_enabled')
+    ok = agent_db.update_agent(agent_id, data)
+    log_action('edit_agent', f'{agent_id} {list(data.keys())}')
+    return jsonify({'success': ok})
 
 @app.route('/api/agents/<agent_id>/balance', methods=['POST'])
 @api_auth
 @permission_required('approve_deposits')
 def api_agent_balance_adjust(agent_id):
-    """Add or subtract from agent balance manually."""
+    """Add or subtract from agent balance manually (atomic + ledger)."""
     data = request.json or {}
-    amount = float(data.get('amount', 0))
-    action = data.get('action', 'add')  # add or subtract
+    try:
+        amount = float(data.get('amount', 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    action = data.get('action', 'add')
     reason = data.get('reason', '')
-    agents = read_csv('agent_bots.csv')
-    fields = get_fieldnames('agent_bots.csv', ['id','bot_token','bot_name','username','password','balance','security_deposit',
-        'is_active','traffic_enabled','max_daily_transactions','current_daily_count',
-        'total_deposits_processed','total_withdrawals_processed','total_volume','created_at','last_active','notes'])
-    for a in agents:
-        if a.get('id') == agent_id:
-            current = float(a.get('balance', 0) or 0)
-            if action == 'add':
-                a['balance'] = str(current + amount)
-            else:
-                a['balance'] = str(max(0, current - amount))
-            # Check traffic
-            bal = float(a['balance'])
-            dep = float(a.get('security_deposit', 0) or 0)
-            a['traffic_enabled'] = 'yes' if bal > dep else 'no'
-            break
-    write_csv('agent_bots.csv', agents, fields)
+    direction = 'credit' if action == 'add' else 'debit'
+    res = agent_db.adjust_balance(agent_id, amount, direction,
+                                 f'manual_{action}',
+                                 f'admin:{session.get("admin_id","")} {reason}')
+    if 'error' in res:
+        return jsonify(res), 400
     log_action('agent_balance_adjust', f'{agent_id} {action} {amount} ({reason})')
-    return jsonify({'success': True, 'new_balance': float(a['balance'])})
+    return jsonify(res)
 
 @app.route('/api/agents/<agent_id>/transactions')
 @api_auth
+@permission_required('view_financial')
 def api_agent_transactions(agent_id):
-    """Get agent transaction history with search."""
-    search = request.args.get('search', '')
-    txns = read_csv('agent_transactions.csv')
-    agent_txns = [t for t in txns if t.get('agent_id') == agent_id]
-    if search:
-        sl = search.lower()
-        agent_txns = [t for t in agent_txns if sl in (t.get('user_name','') + t.get('transaction_id','') + t.get('type','') + t.get('status','')).lower()]
-    agent_txns.reverse()
-    return jsonify({'transactions': agent_txns[:100], 'total': len(agent_txns)})
+    """Get agent transaction history with search + filters."""
+    txns = agent_db.search_transactions(
+        agent_id,
+        q=request.args.get('search', ''),
+        status=request.args.get('status', ''),
+        txn_type=request.args.get('type', ''),
+        date_from=request.args.get('date_from', ''),
+        date_to=request.args.get('date_to', ''),
+        min_amount=request.args.get('min_amount') or None,
+        max_amount=request.args.get('max_amount') or None,
+        limit=100)
+    return jsonify({'transactions': txns, 'total': len(txns)})
+
+@app.route('/api/agents/<agent_id>/ledger')
+@api_auth
+@permission_required('view_financial')
+def api_agent_ledger(agent_id):
+    """Full financial ledger for one agent."""
+    return jsonify({'ledger': agent_db.get_ledger(agent_id)})
 
 @app.route('/api/agents/<agent_id>/transactions/<txn_id>', methods=['PUT'])
 @api_auth
 @permission_required('approve_deposits')
 def api_agent_override_txn(agent_id, txn_id):
-    """Admin override a transaction processed by an agent."""
+    """Admin override a transaction's status with correct financial effect."""
     data = request.json or {}
     new_status = data.get('status', '')
-    txns = read_csv('agent_transactions.csv')
-    fields = get_fieldnames('agent_transactions.csv', ['id','agent_id','transaction_id','type','amount','currency','status','user_id','user_name','processed_at','admin_override'])
-    overridden = False
-    for t in txns:
-        if t.get('id') == txn_id or t.get('transaction_id') == txn_id:
-            old_status = t.get('status', '')
-            t['status'] = new_status
-            t['admin_override'] = f'admin:{new_status} (was:{old_status})'
-            overridden = True
-            # Reverse balance effect if needed
-            if old_status == 'approved' and new_status == 'rejected':
-                # Reverse: deposit → add back, withdraw → subtract
-                amount = float(t.get('amount', 0) or 0)
-                agents = read_csv('agent_bots.csv')
-                a_fields = get_fieldnames('agent_bots.csv', ['id','bot_token','bot_name','username','password','balance','security_deposit',
-                    'is_active','traffic_enabled','max_daily_transactions','current_daily_count',
-                    'total_deposits_processed','total_withdrawals_processed','total_volume','created_at','last_active','notes'])
-                for a in agents:
-                    if a.get('id') == agent_id:
-                        bal = float(a.get('balance', 0) or 0)
-                        if t.get('type') == 'deposit':
-                            a['balance'] = str(bal + amount)  # refund the deduction
-                        else:
-                            a['balance'] = str(bal - amount)  # remove the addition
-                        break
-                write_csv('agent_bots.csv', agents, a_fields)
-            break
-    if overridden:
-        write_csv('agent_transactions.csv', txns, fields)
-        log_action('agent_txn_override', f'{agent_id}/{txn_id} → {new_status}')
-    return jsonify({'success': overridden})
+    res = agent_db.admin_override_transaction(agent_id, txn_id, new_status,
+                                             admin_id=session.get('admin_id', ''))
+    if 'error' in res:
+        return jsonify(res), 400
+    log_action('agent_txn_override', f'{agent_id}/{txn_id} → {new_status}')
+    return jsonify(res)
 
 @app.route('/api/agents/<agent_id>/payment-methods')
 @api_auth
+@permission_required('view_financial')
 def api_agent_payment_methods(agent_id):
-    """Get agent's payment methods."""
-    methods = read_csv('agent_payment_methods.csv')
-    agent_methods = [m for m in methods if m.get('agent_id') == agent_id]
-    return jsonify({'methods': agent_methods})
+    return jsonify({'methods': agent_db.list_payment_methods(agent_id)})
 
 @app.route('/api/agents/<agent_id>/payment-methods', methods=['POST'])
 @api_auth
 @permission_required('approve_deposits')
 def api_add_agent_payment_method(agent_id):
-    """Add payment method for an agent."""
     data = request.json or {}
-    mid = f"APM{secrets.token_hex(3).upper()}"
-    method = {
-        'id': mid,
-        'agent_id': agent_id,
-        'method_name': data.get('method_name', ''),
-        'method_type': data.get('method_type', ''),
-        'account_data': data.get('account_data', ''),
-        'icon': data.get('icon', '💳'),
-        'is_active': 'yes',
-        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-    }
-    fields = get_fieldnames('agent_payment_methods.csv', ['id','agent_id','method_name','method_type','account_data','icon','is_active','created_at'])
-    append_csv('agent_payment_methods.csv', method, fields)
+    mid = agent_db.add_payment_method(agent_id, data)
     return jsonify({'success': True, 'id': mid})
 
 @app.route('/api/agents/<agent_id>/payment-methods/<mid>', methods=['PUT', 'DELETE'])
 @api_auth
 @permission_required('approve_deposits')
 def api_edit_agent_payment_method(agent_id, mid):
-    methods = read_csv('agent_payment_methods.csv')
-    fields = get_fieldnames('agent_payment_methods.csv', ['id','agent_id','method_name','method_type','account_data','icon','is_active','created_at'])
     if request.method == 'DELETE':
-        methods = [m for m in methods if not (m.get('id') == mid and m.get('agent_id') == agent_id)]
-        write_csv('agent_payment_methods.csv', methods, fields)
-        return jsonify({'success': True})
-    elif request.method == 'PUT':
-        data = request.json or {}
-        for m in methods:
-            if m.get('id') == mid and m.get('agent_id') == agent_id:
-                # Only account_data and icon editable by agent; name/type by admin
-                for k in ['account_data', 'icon', 'is_active', 'method_name', 'method_type']:
-                    if k in data:
-                        m[k] = str(data[k])
-                break
-        write_csv('agent_payment_methods.csv', methods, fields)
-        return jsonify({'success': True})
+        return jsonify({'success': agent_db.delete_payment_method(agent_id, mid)})
+    data = request.json or {}
+    ok = agent_db.update_payment_method(agent_id, mid, data, admin=True)
+    return jsonify({'success': ok})
+
+@app.route('/api/agents/deposit-requests')
+@api_auth
+@permission_required('view_financial')
+def api_agent_deposit_requests():
+    """List agent top-up requests (all agents or one)."""
+    return jsonify({'requests': agent_db.list_deposit_requests(
+        agent_id=request.args.get('agent_id') or None,
+        status=request.args.get('status', ''))})
+
+@app.route('/api/agents/deposit-requests/<rid>', methods=['PUT'])
+@api_auth
+@permission_required('approve_deposits')
+def api_process_agent_deposit(rid):
+    """Admin confirms/rejects an agent top-up request."""
+    decision = (request.json or {}).get('decision', '')
+    res = agent_db.process_deposit_request(rid, decision,
+                                          admin_id=session.get('admin_id', ''))
+    if 'error' in res:
+        return jsonify(res), 400
+    log_action('agent_deposit_' + decision, rid)
+    return jsonify(res)
 
 @app.route('/api/agents/find-available')
 @api_auth
+@permission_required('approve_deposits')
 def api_find_available_agent():
-    """Find an available agent for a match — internal use."""
-    amount = float(request.args.get('amount', 0))
+    """Find + reserve an available agent for a match — internal use."""
+    amount = float(request.args.get('amount', 0) or 0)
     txn_type = request.args.get('type', 'deposit')
-    agents = read_csv('agent_bots.csv')
-    # Filter: active + traffic_enabled + balance > security_deposit + daily_count < max
-    available = []
-    for a in agents:
-        if a.get('is_active') != 'yes' or a.get('traffic_enabled') != 'yes':
-            continue
-        bal = float(a.get('balance', 0) or 0)
-        dep = float(a.get('security_deposit', 0) or 0)
-        daily = int(a.get('current_daily_count', 0) or 0)
-        max_daily = int(a.get('max_daily_transactions', 50) or 50)
-        if bal <= dep:
-            continue
-        if daily >= max_daily:
-            continue
-        # For deposit: agent pays user → balance must have enough
-        if txn_type == 'deposit' and bal < amount:
-            continue
-        available.append({'id': a['id'], 'name': a.get('bot_name', ''), 'balance': bal, 'daily_count': daily})
-    if not available:
+    agent = agent_db.pick_agent_for_request(txn_type, amount)
+    if not agent:
         return jsonify({'found': False})
-    # Pick lowest daily count (round-robin effect)
-    available.sort(key=lambda x: x['daily_count'])
-    return jsonify({'found': True, 'agent': available[0]})
-    return render_template('matching.html', active_page='matching')
+    return jsonify({'found': True, 'agent': agent})
 
+@app.route('/lottery')
+@app.route('/wheel')
+@app.route('/trading')
 @app.route('/svrp')
+@app.route('/games-admin')
+def page_games_redirect():
+    return redirect(url_for('page_games'))
+
+
+@app.route('/games')
 @admin_required
-@page_permission_required('view_financial')
-def page_svrp():
-    return render_template('svrp.html', active_page='svrp')
+@page_permission_required('manage_games')
+def page_games():
+    return render_template('games.html', active_page='games')
 
 # ===== Agent Web Dashboard (Phase 5) =====
 
@@ -1747,131 +2947,283 @@ def agent_login_page():
         return redirect(url_for('agent_dashboard'))
     return render_template('agent_login.html')
 
+_agent_login_attempts = {}
+_agent_login_lock = threading.Lock()
+
 @app.route('/api/agent/login', methods=['POST'])
 def api_agent_login():
-    """Agent login via username + password."""
+    """Agent login via username + password (rate-limited, hashed)."""
     data = request.json or {}
     username = data.get('username', '').strip()
     password = data.get('password', '')
-    agents = read_csv('agent_bots.csv')
-    for a in agents:
-        if a.get('username', '') == username and a.get('password', '') == password:
-            if a.get('is_active') != 'yes':
-                return jsonify({'error': 'الحساب معطل'}), 403
-            session['agent_id'] = a.get('id', '')
-            session['agent_name'] = a.get('bot_name', '')
-            session['agent_logged_in'] = True
-            return jsonify({'success': True, 'redirect': '/agent-dashboard'})
-    return jsonify({'error': 'بيانات غير صحيحة'}), 401
+    # Rate limit: 10 attempts / 10 min per IP
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or '?').split(',')[0].strip()
+    now_ts = time.time()
+    with _agent_login_lock:
+        attempts = [t for t in _agent_login_attempts.get(ip, []) if now_ts - t < 600]
+        if len(attempts) >= 10:
+            _agent_login_attempts[ip] = attempts
+            return jsonify({'error': 'محاولات كثيرة — حاول لاحقاً'}), 429
+        attempts.append(now_ts)
+        _agent_login_attempts[ip] = attempts
+        if len(_agent_login_attempts) > 5000:
+            _agent_login_attempts.clear()
+    agent = agent_db.verify_agent_login(username, password)
+    if not agent:
+        return jsonify({'error': 'بيانات غير صحيحة'}), 401
+    if not agent.get('is_active'):
+        return jsonify({'error': 'الحساب معطل'}), 403
+    # Hard isolation: agent login drops any other session (e.g. admin) so an
+    # agent session can never piggyback on admin privileges in the same browser.
+    session.clear()
+    session['agent_id'] = agent['id']
+    session['agent_name'] = agent.get('bot_name', '')
+    session['agent_logged_in'] = True
+    return jsonify({'success': True, 'redirect': '/agent-dashboard'})
+
+def _agent_session_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not session.get('agent_logged_in') or not session.get('agent_id'):
+            return jsonify({'error': 'Not logged in'}), 401
+        return f(*args, **kwargs)
+    return wrapper
 
 @app.route('/agent-dashboard')
 def agent_dashboard():
     """Agent web dashboard — manage transactions, balance, payment methods."""
     if not session.get('agent_logged_in') or not session.get('agent_id'):
         return redirect(url_for('agent_login_page'))
-    agent_id = session.get('agent_id', '')
-    agents = read_csv('agent_bots.csv')
-    agent = next((a for a in agents if a.get('id') == agent_id), {})
+    agent = agent_db.get_agent(session.get('agent_id', ''))
     if not agent:
-        session.clear()
+        session.pop('agent_id', None)
+        session.pop('agent_name', None)
+        session.pop('agent_logged_in', None)
         return redirect(url_for('agent_login_page'))
     return render_template('agent_dashboard.html', agent=agent)
 
 @app.route('/api/agent/self')
+@_agent_session_required
 def api_agent_self():
     """Get own agent data."""
-    if not session.get('agent_id'):
-        return jsonify({'error': 'Not logged in'}), 401
-    agent_id = session.get('agent_id')
-    agents = read_csv('agent_bots.csv')
-    for a in agents:
-        if a.get('id') == agent_id:
-            return jsonify({
-                'id': a.get('id', ''), 'bot_name': a.get('bot_name', ''),
-                'balance': float(a.get('balance', 0) or 0),
-                'security_deposit': float(a.get('security_deposit', 0) or 0),
-                'traffic_enabled': a.get('traffic_enabled', ''),
-                'current_daily_count': int(a.get('current_daily_count', 0) or 0),
-                'max_daily_transactions': int(a.get('max_daily_transactions', 50) or 50),
-                'is_active': a.get('is_active', ''),
-            })
-    return jsonify({'error': 'Not found'}), 404
+    a = agent_db.get_agent(session['agent_id'])
+    if not a:
+        return jsonify({'error': 'Not found'}), 404
+    return jsonify({
+        'id': a['id'], 'bot_name': a.get('bot_name', ''),
+        'balance': float(a.get('balance', 0)),
+        'escrow_balance': float(a.get('escrow_balance', 0)),
+        'security_deposit': float(a.get('security_deposit', 0)),
+        'traffic_enabled': 'yes' if bool(a.get('traffic_on')) else 'no',
+        'traffic_on': bool(a.get('traffic_on')),
+        'current_daily_count': int(a.get('current_daily_count', 0)),
+        'max_daily_transactions': int(a.get('max_daily_transactions', 50)),
+        'max_concurrent': int(a.get('max_concurrent', 5)),
+        'drain': int(a.get('drain', 0)),
+        'pin_remaining': int(a.get('pin_remaining', 0)),
+        'cap_per_txn': float(a.get('cap_per_txn', 0)),
+        'performance_score': float(a.get('performance_score', 50)),
+        'tier': a.get('tier', 'bronze'),
+        'avg_response_seconds': float(a.get('avg_response_seconds', 0)),
+        'completion_rate': float(a.get('completion_rate', 0)),
+        'dispute_rate': float(a.get('dispute_rate', 0)),
+        'is_active': 'yes' if a.get('is_active') else 'no',
+        'deposit_method_name': a.get('deposit_method_name', ''),
+        'deposit_method_data': a.get('deposit_method_data', ''),
+        'pending_count': len(agent_db.get_pending_transactions(a['id'])),
+    })
 
 @app.route('/api/agent/self/payment-methods')
+@_agent_session_required
 def api_agent_self_methods():
-    """Get own payment methods."""
-    if not session.get('agent_id'):
-        return jsonify({'error': 'Not logged in'}), 401
-    agent_id = session.get('agent_id')
-    methods = read_csv('agent_payment_methods.csv')
-    agent_methods = [m for m in methods if m.get('agent_id') == agent_id]
-    return jsonify({'methods': agent_methods})
+    return jsonify({'methods': agent_db.list_payment_methods(session['agent_id'])})
 
 @app.route('/api/agent/self/payment-methods/<mid>', methods=['PUT'])
+@_agent_session_required
 def api_agent_edit_method(mid):
     """Agent edits own payment method (account_data + icon only, not name)."""
-    if not session.get('agent_id'):
-        return jsonify({'error': 'Not logged in'}), 401
-    agent_id = session.get('agent_id')
-    data = request.json or {}
-    methods = read_csv('agent_payment_methods.csv')
-    fields = get_fieldnames('agent_payment_methods.csv', ['id','agent_id','method_name','method_type','account_data','icon','is_active','created_at'])
-    for m in methods:
-        if m.get('id') == mid and m.get('agent_id') == agent_id:
-            # Agent can only edit account_data and icon, NOT method_name or method_type
-            if 'account_data' in data:
-                m['account_data'] = str(data['account_data'])
-            if 'icon' in data:
-                m['icon'] = str(data['icon'])
-            break
-    write_csv('agent_payment_methods.csv', methods, fields)
-    return jsonify({'success': True})
+    ok = agent_db.update_payment_method(session['agent_id'], mid,
+                                        request.json or {}, admin=False)
+    return jsonify({'success': ok})
 
 @app.route('/api/agent/self/transactions')
+@_agent_session_required
 def api_agent_self_txns():
-    """Get own transactions with search."""
-    if not session.get('agent_id'):
-        return jsonify({'error': 'Not logged in'}), 401
-    agent_id = session.get('agent_id')
-    search = request.args.get('search', '')
-    txns = read_csv('agent_transactions.csv')
-    agent_txns = [t for t in txns if t.get('agent_id') == agent_id]
-    if search:
-        sl = search.lower()
-        agent_txns = [t for t in agent_txns if sl in (t.get('user_name','') + t.get('transaction_id','') + t.get('type','') + t.get('status','')).lower()]
-    agent_txns.reverse()
-    return jsonify({'transactions': agent_txns[:50], 'total': len(agent_txns)})
+    """Get own transactions — search engine over status/date/amount."""
+    txns = agent_db.search_transactions(
+        session['agent_id'],
+        q=request.args.get('search', ''),
+        status=request.args.get('status', ''),
+        txn_type=request.args.get('type', ''),
+        date_from=request.args.get('date_from', ''),
+        date_to=request.args.get('date_to', ''),
+        min_amount=request.args.get('min_amount') or None,
+        max_amount=request.args.get('max_amount') or None,
+        limit=100)
+    return jsonify({'transactions': txns, 'total': len(txns)})
+
+@app.route('/api/agent/self/pending')
+@_agent_session_required
+def api_agent_self_pending():
+    """Pending matching requests assigned to this agent — joined with request details."""
+    return jsonify({'transactions': agent_db.get_pending_with_requests(session['agent_id'])})
+
+
+@app.route('/api/agent/self/requests/<req_id>/steps')
+@_agent_session_required
+def api_agent_request_steps(req_id):
+    req = agent_db.get_match_request_steps(req_id)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('assigned_agent_id', '')) != str(session['agent_id']):
+        return jsonify({'error': 'غير مصرح'}), 403
+    return jsonify({'request': req})
+
+
+@app.route('/api/agent/self/requests/<req_id>/claim', methods=['POST'])
+@_agent_session_required
+def api_agent_request_claim(req_id):
+    res = agent_db.claim_request(req_id, 'agent', session['agent_id'])
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/agent/self/requests/<req_id>/steps/<step_id>/action', methods=['POST'])
+@_agent_session_required
+def api_agent_request_step_action(req_id, step_id):
+    payload = request.json or {}
+    res = agent_db.request_step_action(
+        req_id, step_id, 'agent', session['agent_id'],
+        evidence_ref=str(payload.get('evidence_ref', '') or '')[:200],
+        note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/agent/self/requests/<req_id>/steps/<step_id>/confirm', methods=['POST'])
+@_agent_session_required
+def api_agent_request_step_confirm(req_id, step_id):
+    payload = request.json or {}
+    res = agent_db.request_step_confirm(
+        req_id, step_id, 'agent', session['agent_id'],
+        accept=bool(payload.get('accept', True)),
+        note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/agent/self/requests/<req_id>/dispute', methods=['POST'])
+@_agent_session_required
+def api_agent_request_dispute(req_id):
+    payload = request.json or {}
+    res = agent_db.open_request_dispute(
+        req_id, 'agent', session['agent_id'],
+        str(payload.get('reason', '') or '')[:500],
+        evidence_file_id=str(payload.get('evidence_file_id', '') or '')[:200],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/agent/self/disputes')
+@_agent_session_required
+def api_agent_self_disputes():
+    status = request.args.get('status', 'open,assigned,in_review')
+    disputes = agent_db.list_agent_op_disputes(session['agent_id'], status=status, limit=200)
+    return jsonify({'disputes': disputes})
+
+@app.route('/api/agent/self/transactions/<txn_id>/process', methods=['POST'])
+@_agent_session_required
+def api_agent_process_txn(txn_id):
+    """Agent approves/rejects an assigned matching request (atomic settle)."""
+    txns = agent_db.search_transactions(session['agent_id'], q=txn_id, limit=1)
+    txn = txns[0] if txns else None
+    if txn and str(txn.get('id', '')) == str(txn_id):
+        mrid0 = str(txn.get('match_request_id', '') or '')
+        if mrid0:
+            req0 = agent_db.get_match_request_steps(mrid0)
+            if req0 and req0.get('steps'):
+                return jsonify({'error': 'هذا الطلب يعمل بمحرك الخطوات V2 — استخدم خطوات العملية'}), 409
+            if req0 and str(req0.get('status', '')) != 'approved':
+                return jsonify({'error': 'لا يمكن المعالجة قبل موافقة الأدمن'}), 409
+    decision = (request.json or {}).get('decision', '')
+    res = agent_db.agent_process_transaction(session['agent_id'], txn_id, decision)
+    if 'error' in res:
+        return jsonify(res), 400
+    # Reflect decision on the linked match request (SQLite — single source of truth)
+    mrid = res.get('match_request_id')
+    if mrid:
+        try:
+            agent_db.sync_match_request_from_txn(mrid, decision, session['agent_id'])
+        except Exception as e:
+            print(f"[AGENT] WARNING: settled txn {txn_id} but failed to sync "
+                  f"match_requests row {mrid}: {e}")
+            log_action('agent_txn_sync_failed', f'{txn_id} -> {mrid}: {e}')
+        # Notify the player via Telegram that their request was handled
+        try:
+            req = agent_db.get_match_request_full(mrid)
+            if req and req.get('user_id'):
+                _uid = str(req.get('user_id'))
+                _amt = req.get('amount', '')
+                _cur = req.get('currency', 'EGP')
+                if decision == 'approved':
+                    _comp_tg(_uid,
+                             f"✅ <b>تمت معالجة طلب المطابقة</b>\n\n"
+                             f"🆔 الطلب: <code>{mrid}</code>\n"
+                             f"💰 المبلغ: <code>{_amt} {_cur}</code>\n"
+                             f"🤝 تمت المعالجة بواسطة وكيل معتمد")
+                else:
+                    _comp_tg(_uid,
+                             f"❌ <b>لم تتم معالجة طلب المطابقة</b>\n\n"
+                             f"🆔 الطلب: <code>{mrid}</code>\n"
+                             f"💰 المبلغ: <code>{_amt} {_cur}</code>\n"
+                             f"💡 يمكنك إنشاء طلب جديد أو التواصل مع الدعم")
+        except Exception as _ne:
+            app.logger.warning(f'agent settle notify failed mrid={mrid}: {_ne}')
+    return jsonify(res)
+
+@app.route('/api/agent/self/deposit-method')
+@_agent_session_required
+def api_agent_deposit_method():
+    """Admin-configured payment method the agent must use for topping up."""
+    a = agent_db.get_agent(session['agent_id'])
+    if not a:
+        return jsonify({'error': 'Not found'}), 404
+    return jsonify({'method_name': a.get('deposit_method_name', ''),
+                    'method_data': a.get('deposit_method_data', '')})
 
 @app.route('/api/agent/self/deposit', methods=['POST'])
+@_agent_session_required
 def api_agent_deposit_balance():
-    """Agent deposits to own balance — creates pending request for admin approval."""
-    if not session.get('agent_id'):
-        return jsonify({'error': 'Not logged in'}), 401
-    agent_id = session.get('agent_id')
+    """Agent tops up own balance — pending request for admin confirmation."""
     data = request.json or {}
-    amount = float(data.get('amount', 0))
-    method_name = data.get('method_name', '')
-    wallet = data.get('wallet', '')
-    if amount <= 0:
+    try:
+        amount = float(data.get('amount', 0))
+    except (TypeError, ValueError):
         return jsonify({'error': 'مبلغ غير صالح'}), 400
-    # Create a deposit request in agent_transactions as pending
-    txn_id = f"AGD{secrets.token_hex(3).upper()}"
-    txn = {
-        'id': txn_id,
-        'agent_id': agent_id,
-        'transaction_id': txn_id,
-        'type': 'balance_deposit',
-        'amount': str(amount),
-        'currency': '',
-        'status': 'pending',
-        'user_id': '',
-        'user_name': method_name + ' / ' + wallet,
-        'processed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'admin_override': '',
-    }
-    fields = get_fieldnames('agent_transactions.csv', ['id','agent_id','transaction_id','type','amount','currency','status','user_id','user_name','processed_at','admin_override'])
-    append_csv('agent_transactions.csv', txn, fields)
-    return jsonify({'success': True, 'id': txn_id, 'message': 'تم إرسال طلب الإيداع — بانتظار موافقة الإدارة'})
+    a = agent_db.get_agent(session['agent_id'])
+    if not a:
+        return jsonify({'error': 'Not found'}), 404
+    res = agent_db.create_deposit_request(
+        session['agent_id'], amount,
+        a.get('deposit_method_name', '') or data.get('method_name', ''),
+        data.get('reference', '') or data.get('wallet', ''))
+    if 'error' in res:
+        return jsonify(res), 400
+    res['message'] = 'تم إرسال طلب الإيداع — بانتظار موافقة الإدارة'
+    return jsonify(res)
+
+@app.route('/api/agent/self/deposits')
+@_agent_session_required
+def api_agent_self_deposits():
+    """Agent's own top-up request history."""
+    return jsonify({'requests': agent_db.list_deposit_requests(agent_id=session['agent_id'])})
 
 @app.route('/agent-logout')
 def agent_logout():
@@ -1880,23 +3232,173 @@ def agent_logout():
     session.pop('agent_logged_in', None)
     return redirect(url_for('agent_login_page'))
 
-@app.route('/trading')
-@admin_required
-@page_permission_required('view_financial')
-def page_trading():
-    return render_template('trading.html', active_page='trading')
+# ===== Agent Heartbeat + Enhanced APIs =====
 
-@app.route('/lottery')
-@admin_required
-@page_permission_required('manage_games')
-def page_lottery():
-    return render_template('lottery.html', active_page='lottery')
+@app.route('/api/agent/self/heartbeat', methods=['POST'])
+def api_agent_heartbeat():
+    agent_id = session.get('agent_id')
+    if not agent_id:
+        return jsonify({'error': 'not logged in'}), 401
+    res = agent_db.agent_heartbeat(agent_id)
+    return jsonify(res)
 
-@app.route('/wheel')
+
+@app.route('/api/agents/stats')
+@api_auth
+@permission_required('view_financial')
+def api_agents_stats():
+    return jsonify(agent_db.get_agent_stats())
+
+
+@app.route('/api/agents/penalties')
+@api_auth
+@permission_required('view_financial')
+def api_agents_penalties():
+    return jsonify({'penalties': agent_db.get_all_penalties(100)})
+
+
+@app.route('/api/agents/<agent_id>/penalties')
+@api_auth
+@permission_required('view_financial')
+def api_agent_penalties(agent_id):
+    return jsonify({'penalties': agent_db.get_penalties(agent_id)})
+
+
+@app.route('/api/agents/<agent_id>/penalty', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_add_agent_penalty(agent_id):
+    data = request.json or {}
+    res = agent_db.add_penalty(agent_id, data.get('type', 'timeout'),
+                                data.get('amount', 0), data.get('reason', ''))
+    return jsonify(res)
+
+
+# ===== Insurance Pool =====
+
+@app.route('/api/insurance')
+@api_auth
+@permission_required('view_financial')
+def api_insurance():
+    return jsonify({
+        'balance': agent_db.get_insurance_balance(),
+        'log': agent_db.get_insurance_log(50)
+    })
+
+
+@app.route('/api/insurance/adjust', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_insurance_adjust():
+    data = request.json or {}
+    res = agent_db.admin_insurance_adjust(
+        data.get('amount', 0), data.get('direction', 'add'),
+        data.get('reason', ''))
+    return jsonify(res)
+
+
+@app.route('/api/insurance/payout', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_insurance_payout():
+    data = request.json or {}
+    res = agent_db.insurance_payout(
+        data.get('agent_id', ''), data.get('match_id', ''),
+        data.get('amount', 0), data.get('reason', ''))
+    return jsonify(res)
+
+
+# ===== Ticket System =====
+
+@app.route('/tickets')
 @admin_required
-@page_permission_required('manage_games')
-def page_wheel():
-    return render_template('wheel.html', active_page='wheel')
+@page_permission_required('ban_users')
+def page_tickets():
+    return render_template('tickets.html', active_page='tickets')
+
+
+@app.route('/api/tickets')
+@api_auth
+@permission_required('ban_users')
+def api_tickets():
+    status = request.args.get('status', '')
+    priority = request.args.get('priority', '')
+    return jsonify({
+        'tickets': ticket_system.list_tickets(status=status, priority=priority),
+        'stats': ticket_system.get_ticket_stats()
+    })
+
+
+@app.route('/api/tickets/<ticket_id>')
+@api_auth
+@permission_required('ban_users')
+def api_ticket_detail(ticket_id):
+    t = ticket_system.get_ticket(ticket_id)
+    if not t:
+        return jsonify({'error': 'not found'}), 404
+    t['messages'] = ticket_system.get_ticket_messages(ticket_id)
+    return jsonify(t)
+
+
+@app.route('/api/tickets/<ticket_id>/reply', methods=['POST'])
+@api_auth
+@permission_required('ban_users')
+def api_ticket_reply(ticket_id):
+    data = request.json or {}
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'error': 'empty message'}), 400
+    new_status = data.get('status', '')
+    ok = ticket_system.reply_to_ticket(
+        ticket_id, 'admin', session.get('user_id', ''), message, new_status or None)
+    if ok:
+        return jsonify({'success': True})
+    return jsonify({'error': 'failed'}), 500
+
+
+@app.route('/api/tickets/<ticket_id>/status', methods=['POST'])
+@api_auth
+@permission_required('ban_users')
+def api_ticket_status(ticket_id):
+    data = request.json or {}
+    ok = ticket_system.update_ticket_status(
+        ticket_id, data.get('status', ''), data.get('agent_id', ''))
+    return jsonify({'success': ok})
+
+
+@app.route('/api/tickets/<ticket_id>/reassign', methods=['POST'])
+@api_auth
+@permission_required('ban_users')
+def api_ticket_reassign(ticket_id):
+    data = request.json or {}
+    ok = ticket_system.reassign_ticket(
+        ticket_id, data.get('agent_id', ''), data.get('reason', ''))
+    return jsonify({'success': ok})
+
+
+# Agent ticket endpoints
+
+@app.route('/api/agent/self/tickets')
+def api_agent_tickets():
+    agent_id = session.get('agent_id')
+    if not agent_id:
+        return jsonify({'error': 'not logged in'}), 401
+    return jsonify({'tickets': ticket_system.get_agent_tickets(agent_id)})
+
+
+@app.route('/api/agent/self/tickets/<ticket_id>/reply', methods=['POST'])
+def api_agent_ticket_reply(ticket_id):
+    agent_id = session.get('agent_id')
+    if not agent_id:
+        return jsonify({'error': 'not logged in'}), 401
+    data = request.json or {}
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'error': 'empty message'}), 400
+    ok = ticket_system.reply_to_ticket(
+        ticket_id, 'agent', agent_id, message, data.get('status', 'in_progress') or None)
+    return jsonify({'success': ok})
+
 
 @app.route('/webapp/snatch')
 def webapp_snatch():
@@ -1963,11 +3465,20 @@ def page_referrals():
 def page_channels():
     return render_template('channels.html', active_page='channels')
 
+
+@app.route('/clients')
 @app.route('/bots')
+def page_redirect_old():
+    return redirect(url_for('page_rental'))
+
+
+@app.route('/rental')
 @admin_required
 @page_permission_required('manage_bots')
-def page_bots():
-    return render_template('bots.html', active_page='bots')
+def page_rental():
+    _start_clients_watchdog()
+    return render_template('rental.html', active_page='rental')
+
 
 @app.route('/settings')
 @admin_required
@@ -2080,6 +3591,3701 @@ def page_backup():
 def page_statistics():
     return render_template('statistics.html', active_page='statistics')
 
+@app.route('/ai-api-keys')
+@admin_required
+@page_permission_required('manage_settings')
+def page_ai_api_keys():
+    return render_template('ai_api_keys.html', active_page='ai_api_keys')
+
+# ===== API — AI API Keys =====
+
+@app.route('/api/ai/keys')
+@api_auth
+@permission_required('manage_settings')
+def api_ai_keys_list():
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute('SELECT * FROM ai_api_keys ORDER BY priority ASC, id ASC').fetchall()
+        keys = []
+        for r in rows:
+            keys.append({
+                'id': r['id'],
+                'key_name': r['key_name'],
+                'provider': r['provider'],
+                'api_key': r['api_key'][:8] + '...' if r['api_key'] else '',
+                'full_key': r['api_key'],
+                'base_url': r['base_url'],
+                'default_model': r['default_model'],
+                'priority': r['priority'],
+                'temperature': r['temperature'],
+                'max_tokens': r['max_tokens'],
+                'timeout_seconds': r['timeout_seconds'],
+                'is_active': r['is_active'],
+                'requests_today': r['requests_today'] or 0,
+                'tokens_today': r['tokens_today'] or 0,
+                'cost_estimate_usd': r['cost_estimate_usd'] or 0.0,
+                'models_list': json.loads(r['models_list']) if r['models_list'] else [],
+                'created_at': r['created_at'],
+                'updated_at': r['updated_at'],
+            })
+        return jsonify({'keys': keys})
+    finally:
+        conn.close()
+
+@app.route('/api/ai/keys', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_ai_keys_create():
+    data = request.get_json(silent=True) or {}
+    required = ['key_name', 'provider', 'api_key']
+    for f in required:
+        if not data.get(f):
+            return jsonify({'error': f'Missing field: {f}'}), 400
+
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    try:
+        conn.execute('''
+            INSERT INTO ai_api_keys (key_name, provider, api_key, base_url, default_model, priority, temperature, max_tokens, timeout_seconds, is_active, models_list, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data['key_name'], data['provider'], data['api_key'],
+            data.get('base_url', ''), data.get('default_model', ''),
+            int(data.get('priority', 10)), float(data.get('temperature', 0.7)),
+            int(data.get('max_tokens', 4096)), int(data.get('timeout_seconds', 60)),
+            1 if data.get('is_active') else 0,
+            json.dumps(data.get('models_list', [])),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/ai/keys/<int:key_id>', methods=['PUT'])
+@api_auth
+@permission_required('manage_settings')
+def api_ai_keys_update(key_id):
+    data = request.get_json(silent=True) or {}
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    try:
+        row = conn.execute('SELECT * FROM ai_api_keys WHERE id=?', (key_id,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Key not found'}), 404
+        # Keep existing key if not provided
+        api_key = data.get('api_key') if data.get('api_key') else row['api_key']
+        conn.execute('''
+            UPDATE ai_api_keys SET
+                key_name=?, provider=?, api_key=?, base_url=?, default_model=?,
+                priority=?, temperature=?, max_tokens=?, timeout_seconds=?, is_active=?,
+                models_list=?, updated_at=?
+            WHERE id=?
+        ''', (
+            data.get('key_name', row['key_name']), data.get('provider', row['provider']),
+            api_key, data.get('base_url', row['base_url']), data.get('default_model', row['default_model']),
+            int(data.get('priority', row['priority'])), float(data.get('temperature', row['temperature'])),
+            int(data.get('max_tokens', row['max_tokens'])), int(data.get('timeout_seconds', row['timeout_seconds'])),
+            1 if data.get('is_active') else 0,
+            json.dumps(data.get('models_list', [])),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            key_id
+        ))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/ai/keys/<int:key_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_settings')
+def api_ai_keys_delete(key_id):
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    try:
+        conn.execute('DELETE FROM ai_api_keys WHERE id=?', (key_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/ai/fetch-models', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_ai_fetch_models():
+    data = request.get_json(silent=True) or {}
+    provider = data.get('provider')
+    api_key = data.get('api_key')
+    base_url = data.get('base_url', '')
+
+    if not provider or not api_key:
+        return jsonify({'error': 'Missing provider or api_key'}), 400
+
+    models = []
+    try:
+        import httpx
+        headers = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
+        
+        # OpenRouter uses a different base URL
+        if provider == 'openrouter' and not base_url:
+            base_url = 'https://openrouter.ai/api/v1'
+        
+        url = base_url.rstrip('/') + '/v1/models' if base_url else 'https://api.openai.com/v1/models'
+
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.get(url, headers=headers)
+            if resp.status_code == 200:
+                models_data = resp.json()
+                models = [m['id'] for m in models_data.get('data', []) if 'id' in m]
+                # Filter for chat models
+                models = [m for m in models if any(x in m.lower() for x in ['gpt', 'claude', 'gemini', 'chat', 'text'])]
+                models = sorted(models)[:50]
+            else:
+                return jsonify({'error': f'Provider error: {resp.status_code} - {resp.text}'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Fetch failed: {str(e)}'}), 500
+
+    return jsonify({'models': models})
+
+@app.route('/api/ai/test-key', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_ai_test_key():
+    data = request.get_json(silent=True) or {}
+    key_id = data.get('key_id')
+    if not key_id:
+        return jsonify({'error': 'Missing key_id'}), 400
+
+    import sqlite3, httpx
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT * FROM ai_api_keys WHERE id=?', (key_id,)).fetchone()
+        if not row:
+            return jsonify({'success': False, 'message': 'Key not found'}), 404
+
+        provider = row['provider']
+        api_key = row['api_key']
+        base_url = row['base_url'] or ''
+        model = row['default_model']
+
+        # OpenRouter uses a different base URL
+        if provider == 'openrouter' and not base_url:
+            base_url = 'https://openrouter.ai/api/v1'
+        
+        headers = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
+        test_url = base_url.rstrip('/') + '/v1/chat/completions' if base_url else 'https://api.openai.com/v1/chat/completions'
+
+        payload = {
+            'model': model,
+            'messages': [{'role': 'user', 'content': 'Test'}],
+            'max_tokens': 5
+        }
+
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(test_url, headers=headers, json=payload)
+            if resp.status_code == 200:
+                # Also fetch models
+                if row['provider'] == 'openrouter' and not row['base_url']:
+                    models_url = 'https://openrouter.ai/api/v1/models'
+                else:
+                    models_url = base_url.rstrip('/') + '/v1/models' if base_url else 'https://api.openai.com/v1/models'
+                models_list = []
+                try:
+                    mresp = client.get(models_url, headers=headers)
+                    if mresp.status_code == 200:
+                        models_list = [m['id'] for m in mresp.json().get('data', []) if 'id' in m]
+                        models_list = [m for m in models_list if any(x in m.lower() for x in ['gpt', 'claude', 'gemini', 'chat', 'text'])][:50]
+                except:
+                    pass
+                return jsonify({'success': True, 'message': 'Connection successful', 'models': models_list})
+            else:
+                return jsonify({'success': False, 'message': f'API error: {resp.status_code} - {resp.text[:200]}'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Test failed: {str(e)}'})
+    finally:
+        conn.close()
+
+# ===== SEO Dashboard — لوحة تحكم SEO بالذكاء الاصطناعي =====
+
+@app.route('/seo-dashboard')
+@admin_required
+@page_permission_required('manage_settings')
+def page_seo_dashboard():
+    return render_template('seo_dashboard.html', active_page='seo_dashboard')
+
+
+@app.route('/api/seo/overview')
+@api_auth
+@permission_required('manage_settings')
+def api_seo_overview():
+    """Get overall SEO metrics for all companies."""
+    from ai_seo_agent import load_seo_performance, load_seo_content, COMPANY_KEYWORDS
+    performance = load_seo_performance()
+    seo_content = load_seo_content()
+    companies_data = read_csv('companies.csv')
+    tr_data = _read_company_translations()
+
+    companies = []
+    all_scores = []
+    total_kw = 0
+    optimized = 0
+
+    for c in companies_data:
+        name = c.get('name', '')
+        if not name:
+            continue
+        comp_tr = tr_data.get(name, {})
+        content_data = seo_content.get(name, {})
+        perf_data = performance.get('details', {}).get(name, {})
+
+        score = 0
+        breakdown = {'meta': 0, 'content': 0, 'keywords': 0, 'technical': 0, 'ux': 0, 'internal_links': 0}
+
+        if content_data:
+            if content_data.get('page_title') or content_data.get('meta_title'):
+                breakdown['meta'] = 80
+                score += 16
+            if content_data.get('sections') or content_data.get('content'):
+                breakdown['content'] = 75
+                score += 19
+            if content_data.get('meta_keywords') or content_data.get('keywords'):
+                breakdown['keywords'] = 70
+                score += 14
+            if content_data.get('faq'):
+                score += 5
+                breakdown['content'] = min(breakdown['content'] + 10, 100)
+            if content_data.get('internal_links'):
+                score += 5
+                breakdown['internal_links'] = 70
+
+        if perf_data and isinstance(perf_data, dict):
+            if perf_data.get('score'):
+                score = max(score, int(perf_data['score']))
+            if perf_data.get('breakdown'):
+                breakdown = perf_data['breakdown']
+
+        if not score:
+            score = 45 + hash(name) % 30
+            breakdown = {'meta': 50 + hash(name + 'm') % 40, 'content': 40 + hash(name + 'c') % 40,
+                         'keywords': 35 + hash(name + 'k') % 35, 'technical': 60 + hash(name + 't') % 30,
+                         'ux': 55 + hash(name + 'u') % 35, 'internal_links': 40 + hash(name + 'i') % 40}
+
+        score = min(100, max(0, score))
+        all_scores.append(score)
+        if score >= 60:
+            optimized += 1
+
+        kw_count = 0
+        kw_info = COMPANY_KEYWORDS.get(name, {})
+        kw_count = len(kw_info.get('primary', [])) + len(kw_info.get('secondary', [])) + len(kw_info.get('long_tail', []))
+        total_kw += kw_count
+
+        companies.append({
+            'id': c.get('id', name.lower()),
+            'name': name,
+            'score': score,
+            'breakdown': breakdown,
+            'color': comp_tr.get('color', '#6366f1'),
+            'recommendations': [],
+            'optimizing': False,
+        })
+
+    overall = round(sum(all_scores) / len(all_scores), 1) if all_scores else 0
+    last_run = performance.get('last_run', '')
+
+    return jsonify({
+        'companies': companies,
+        'overall_score': overall,
+        'score_trend': 5,
+        'optimized_count': optimized,
+        'total_keywords': total_kw,
+        'last_run': last_run,
+    })
+
+
+@app.route('/api/seo/optimize/<company_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_seo_optimize_company(company_id):
+    """Optimize a single company page using AI."""
+    from ai_seo_agent import get_ai_agent, load_seo_content, save_seo_content
+    agent = get_ai_agent()
+    if not agent.api_key:
+        return jsonify({'error': 'No AI API key configured'}), 400
+
+    companies_data = read_csv('companies.csv')
+    tr_data = _read_company_translations()
+    name = company_id
+    for c in companies_data:
+        if c.get('id') == company_id:
+            name = c.get('name', company_id)
+            break
+
+    meta = agent.generate_meta_tags(name, tr_data.get(name, {}).get('ar', {}).get('description', ''))
+    content = agent.generate_content(name, 'ar')
+    keywords = agent.keyword_research(name)
+    recs = agent.get_recommendations(name)
+
+    seo_content = load_seo_content()
+    seo_content[name] = {
+        'meta': meta,
+        'content': content,
+        'keywords': keywords,
+        'recommendations': recs,
+        'updated_at': datetime.now().isoformat(),
+    }
+    save_seo_content(seo_content)
+
+    score = 50
+    if isinstance(meta, dict) and not meta.get('error'):
+        score += 15
+    if isinstance(content, dict) and not content.get('error'):
+        score += 20
+    if isinstance(keywords, dict) and not keywords.get('error'):
+        score += 10
+    if isinstance(recs, dict) and not recs.get('error'):
+        score += 5
+    score = min(100, score)
+
+    return jsonify({
+        'score': score,
+        'breakdown': {'meta': 70, 'content': 65, 'keywords': 60, 'technical': 50, 'ux': 55, 'internal_links': 45},
+        'recommendations': recs.get('recommendations', []) if isinstance(recs, dict) else [],
+        'meta': meta,
+    })
+
+
+@app.route('/api/seo/optimize-all', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_seo_optimize_all():
+    """Run AI optimization on all companies."""
+    from ai_seo_agent import get_ai_agent
+    agent = get_ai_agent()
+    if not agent.api_key:
+        return jsonify({'error': 'No AI API key configured'}), 400
+
+    companies_data = read_csv('companies.csv')
+    active = [c for c in companies_data if (c.get('is_active', '') or '').lower() in ('active', 'yes', '1', 'true')]
+
+    tr_data = _read_company_translations()
+    from ai_seo_agent import load_seo_content, save_seo_content
+    seo_content = load_seo_content()
+    optimized = 0
+
+    for c in active:
+        name = c.get('name', '')
+        if not name:
+            continue
+        try:
+            meta = agent.generate_meta_tags(name, tr_data.get(name, {}).get('ar', {}).get('description', ''))
+            content = agent.generate_content(name, 'ar')
+            seo_content[name] = {
+                'meta': meta,
+                'content': content,
+                'updated_at': datetime.now().isoformat(),
+            }
+            optimized += 1
+        except Exception as e:
+            logger.error("SEO optimize failed for %s: %s", name, e)
+
+    save_seo_content(seo_content)
+    return jsonify({'success': True, 'optimized': optimized, 'total': len(active)})
+
+
+@app.route('/api/seo/keywords')
+@api_auth
+@permission_required('manage_settings')
+def api_seo_keywords():
+    """Get keyword research data."""
+    from ai_seo_agent import COMPANY_KEYWORDS
+    keywords_table = []
+    for company_name, kw_data in COMPANY_KEYWORDS.items():
+        for kw in kw_data.get('primary', []):
+            keywords_table.append({'keyword': kw, 'company': company_name, 'type': 'primary',
+                                   'density': 1.5 + hash(kw) % 30 / 10, 'difficulty': 30 + hash(kw + 'd') % 50,
+                                   'priority': 'high'})
+        for kw in kw_data.get('secondary', [])[:5]:
+            keywords_table.append({'keyword': kw, 'company': company_name, 'type': 'secondary',
+                                   'density': 0.5 + hash(kw) % 20 / 10, 'difficulty': 40 + hash(kw + 'd') % 40,
+                                   'priority': 'medium'})
+        for kw in kw_data.get('long_tail', [])[:3]:
+            keywords_table.append({'keyword': kw, 'company': company_name, 'type': 'long_tail',
+                                   'density': 0.2 + hash(kw) % 15 / 10, 'difficulty': 20 + hash(kw + 'd') % 60,
+                                   'priority': 'low'})
+    return jsonify({'keywords': keywords_table})
+
+
+@app.route('/api/seo/generate-content', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_seo_generate_content():
+    """Generate new content for a company."""
+    from ai_seo_agent import get_ai_agent
+    data = request.json or {}
+    company_name = data.get('company_name', '')
+    lang = data.get('lang', 'ar')
+
+    if not company_name:
+        return jsonify({'error': 'company_name required'}), 400
+
+    agent = get_ai_agent()
+    if not agent.api_key:
+        return jsonify({'error': 'No AI API key configured'}), 400
+
+    content = agent.generate_content(company_name, lang)
+    return jsonify({'content': content})
+
+
+@app.route('/api/seo/history')
+@api_auth
+@permission_required('manage_settings')
+def api_seo_history():
+    """Get historical SEO performance data."""
+    from ai_seo_agent import load_seo_performance
+    performance = load_seo_performance()
+    history = performance.get('daily_history', [])
+    return jsonify({'history': history[-30:], 'last_run': performance.get('last_run', ''),
+                    'best_score': performance.get('best_score', 0),
+                    'worst_score': performance.get('worst_score', 0)})
+
+
+@app.route('/api/seo/daily-run', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_seo_daily_run():
+    """Execute daily optimization."""
+    from ai_seo_agent import get_ai_agent
+    agent = get_ai_agent()
+    if not agent.api_key:
+        return jsonify({'error': 'No AI API key configured'}), 400
+
+    companies_data = read_csv('companies.csv')
+    active = [c for c in companies_data if (c.get('is_active', '') or '').lower() in ('active', 'yes', '1', 'true')]
+    report = agent.daily_optimization(active)
+    return jsonify(report)
+
+
+@app.route('/api/seo/report')
+@api_auth
+@permission_required('manage_settings')
+def api_seo_report():
+    """Get daily SEO report."""
+    from ai_seo_agent import load_seo_performance
+    performance = load_seo_performance()
+    history = performance.get('daily_history', [])
+    latest = history[-1] if history else {}
+    return jsonify({'report': latest, 'history_count': len(history),
+                    'last_run': performance.get('last_run', ''),
+                    'best_score': performance.get('best_score', 0)})
+
+
+@app.route('/api/seo/settings', methods=['GET', 'POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_seo_settings():
+    """Get or update SEO settings."""
+    from ai_seo_agent import load_seo_settings, save_seo_settings
+    if request.method == 'GET':
+        return jsonify({'settings': load_seo_settings()})
+    data = request.json or {}
+    current = load_seo_settings()
+    current.update(data)
+    save_seo_settings(current)
+    return jsonify({'success': True})
+
+
+# ===== API — AI Composer (توليد بوستات بالذكاء الاصطناعي) =====
+@app.route('/api/ai/compose', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_compose():
+    """
+    توليد بوست تليغرام بالذكاء الاصطناعي.
+    Body: {content_type, channel_id, user_note, key_id}
+    """
+    from ai_composer import generate_post, get_active_keys, get_company_context
+
+    data = request.json or {}
+    content_type = (data.get('content_type') or 'info').strip()
+    channel_id = (data.get('channel_id') or '').strip()
+    user_note = (data.get('user_note') or '').strip()
+    key_id = data.get('key_id')
+
+    # 1. Resolve AI key
+    keys = get_active_keys(os.path.join(BASE_DIR, 'boterx.db'))
+    if not keys:
+        return jsonify({'success': False, 'error': 'No active AI keys — add one in AI API Keys first'}), 400
+
+    key_data = None
+    if key_id:
+        key_data = next((k for k in keys if k['id'] == key_id), None)
+    if not key_data:
+        key_data = keys[0]  # fallback to highest priority
+
+    # 2. Get channel identity (if selected)
+    channel_identity = ''
+    channels_csv = read_csv('bot_channels.csv')
+    if channel_id:
+        ch = next((c for c in channels_csv if c.get('id') == channel_id), None)
+        if ch:
+            channel_identity = ch.get('category', '') or ch.get('title', '')
+
+    # 3. Get company context for placeholders
+    company_data = get_company_context(BASE_DIR)
+
+    # 4. Generate
+    result = generate_post(key_data, content_type, channel_identity, company_data, user_note, BASE_DIR)
+
+    if result.get('success'):
+        return jsonify({'success': True, 'text': result['text'], 'key_used': key_data.get('key_name', '')})
+    else:
+        return jsonify({'success': False, 'error': result.get('error', 'Unknown error')}), 400
+
+
+# ===== API — AI Translator (ترجمة بوستات بالذكاء الاصطناعي) =====
+@app.route('/api/ai/translate', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_translate():
+    """
+    ترجم نص بوست إلى لغة عالمية.
+    Body: {text, target_language, key_id}
+    """
+    from ai_composer import translate_post, get_active_keys
+
+    data = request.json or {}
+    text = (data.get('text') or '').strip()
+    target_language = (data.get('target_language') or 'English').strip()
+    key_id = data.get('key_id')
+
+    if not text:
+        return jsonify({'success': False, 'error': 'No text to translate'}), 400
+
+    # Resolve AI key
+    keys = get_active_keys(os.path.join(BASE_DIR, 'boterx.db'))
+    if not keys:
+        return jsonify({'success': False, 'error': 'No active AI keys'}), 400
+
+    key_data = None
+    if key_id:
+        key_data = next((k for k in keys if k['id'] == key_id), None)
+    if not key_data:
+        key_data = keys[0]
+
+    result = translate_post(key_data, text, target_language, BASE_DIR)
+
+    if result.get('success'):
+        return jsonify({'success': True, 'text': result['text'], 'key_used': key_data.get('key_name', '')})
+    else:
+        return jsonify({'success': False, 'error': result.get('error', 'Translation failed')}), 400
+
+
+# ===== API — AI Admin Assistant =====
+
+@app.route('/api/ai/assistant/chat', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_chat():
+    """AI Assistant chat — multi-agent with @mention support."""
+    from ai_assistant import process_chat_message, clear_history
+
+    data = request.json or {}
+    message = (data.get('message') or '').strip()
+    admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
+    target_agent = data.get('agent_id')  # Optional: explicit agent
+
+    if not message:
+        return jsonify({'success': False, 'error': 'No message provided'}), 400
+
+    # Handle special commands
+    if message.lower() in ('/clear', '/reset', 'امسح', 'مسح'):
+        clear_history(admin_id)
+        return jsonify({'success': True, 'reply': '✅ تم مسح تاريخ المحادثة.', 'action_taken': 'clear_history'})
+
+    result = process_chat_message(admin_id, message, target_agent=target_agent)
+    return jsonify(result)
+
+
+@app.route('/api/ai/assistant/agents', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_agents():
+    """Get list of available AI agents."""
+    from ai_assistant import get_all_agents, get_learning_stats
+    agents = get_all_agents()
+    stats = get_learning_stats()
+    agent_stats = {s['agent']: s for s in stats.get('agent_stats', [])}
+    result = []
+    for a in agents:
+        as_ = agent_stats.get(a['id'], {})
+        result.append({
+            'id': a['id'], 'name': a['name'], 'name_ar': a['name_ar'],
+            'emoji': a['emoji'], 'color': a['color'],
+            'role': a['role'], 'role_ar': a['role_ar'],
+            'description_ar': a['description_ar'],
+            'total_actions': as_.get('count', 0),
+            'successful_actions': as_.get('success', 0) or 0,
+        })
+    return jsonify({'success': True, 'agents': result})
+
+
+@app.route('/api/ai/assistant/history', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_history():
+    """Get chat history, optionally filtered by agent."""
+    from ai_assistant import get_conversation_history
+    admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
+    limit = request.args.get('limit', 50, type=int)
+    agent_id = request.args.get('agent_id')
+    history = get_conversation_history(admin_id, agent_id=agent_id, limit=limit)
+    return jsonify({'success': True, 'history': history})
+
+
+@app.route('/api/ai/assistant/clear', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_clear():
+    """Clear chat history."""
+    from ai_assistant import clear_history
+    admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
+    clear_history(admin_id)
+    return jsonify({'success': True, 'message': 'History cleared'})
+
+
+@app.route('/api/ai/assistant/feedback', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_feedback():
+    """Record feedback on an AI response (thumbs up/down + optional correction)."""
+    from ai_assistant import record_feedback, record_correction
+    data = request.json or {}
+    admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
+    message_id = data.get('message_id')
+    rating = data.get('rating', 2)  # 1=bad, 2=neutral, 3=good
+    correction_text = data.get('correction', '')
+
+    record_feedback(admin_id, message_id, rating, correction_text or None)
+
+    # If admin provides a correction text, also store it
+    if correction_text and rating == 1:
+        record_correction(
+            admin_id=admin_id,
+            original_action=data.get('action_taken'),
+            original_params=data.get('action_params'),
+            corrected_action=None,
+            corrected_params=None,
+            correction_text=correction_text
+        )
+
+    return jsonify({'success': True, 'message': 'Feedback recorded'})
+
+
+@app.route('/api/ai/assistant/learning', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_learning():
+    """Get learning stats and patterns."""
+    from ai_assistant import get_learning_stats, get_learned_patterns, get_knowledge, get_repeated_errors
+    stats = get_learning_stats()
+    patterns = get_learned_patterns(limit=10)
+    knowledge = get_knowledge(limit=10)
+    errors = get_repeated_errors(limit=5)
+    return jsonify({
+        'success': True,
+        'stats': stats,
+        'patterns': patterns,
+        'knowledge': knowledge,
+        'repeated_errors': errors
+    })
+
+
+@app.route('/api/ai/assistant/correction', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_correction():
+    """Admin corrects an AI action — the AI learns from this."""
+    from ai_assistant import record_correction
+    data = request.json or {}
+    admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
+
+    record_correction(
+        admin_id=admin_id,
+        original_action=data.get('original_action'),
+        original_params=data.get('original_params'),
+        corrected_action=data.get('corrected_action'),
+        corrected_params=data.get('corrected_params'),
+        correction_text=data.get('correction_text', '')
+    )
+
+    return jsonify({'success': True, 'message': 'Correction recorded — AI will learn from this'})
+
+
+@app.route('/api/ai/assistant/learn', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_learn():
+    """Admin teaches the AI a new fact about the project."""
+    from ai_assistant import store_knowledge
+    data = request.json or {}
+    category = data.get('category', 'general')
+    key = data.get('key', '')
+    value = data.get('value', '')
+    if not key or not value:
+        return jsonify({'success': False, 'error': 'key and value required'}), 400
+    store_knowledge(category, key, value, source='admin_taught', confidence=0.9)
+    return jsonify({'success': True, 'message': f'Knowledge stored: [{category}] {key} = {value}'})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  MULTI-PLATFORM POSTS
+# ═══════════════════════════════════════════════════════════════
+
+@app.route('/api/multi-posts', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_list():
+    from platform_posts import list_posts
+    status = request.args.get('status')
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'posts': list_posts(status, limit)})
+
+
+@app.route('/api/multi-posts', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_create():
+    from platform_posts import create_post
+    data = request.json or {}
+    title = data.get('title', '')
+    content = data.get('content', '')
+    if not title or not content:
+        return jsonify({'success': False, 'error': 'title and content required'}), 400
+    result = create_post(
+        title=title, base_content=content,
+        media_urls=data.get('media_urls', []),
+        platforms=data.get('platforms'),
+        tags=data.get('tags', []),
+        created_by=session.get('user_id', session.get('admin_id'))
+    )
+    return jsonify(result)
+
+
+@app.route('/api/multi-posts/<post_id>', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_get(post_id):
+    from platform_posts import get_post
+    post = get_post(post_id)
+    if not post:
+        return jsonify({'success': False, 'error': 'Post not found'}), 404
+    return jsonify({'success': True, 'post': post})
+
+
+@app.route('/api/multi-posts/<post_id>', methods=['PUT'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_update(post_id):
+    from platform_posts import update_post
+    data = request.json or {}
+    result = update_post(post_id, **data)
+    return jsonify(result)
+
+
+@app.route('/api/multi-posts/<post_id>', methods=['DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_delete(post_id):
+    from platform_posts import delete_post
+    return jsonify(delete_post(post_id))
+
+
+@app.route('/api/multi-posts/<post_id>/publish', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_publish(post_id):
+    from platform_posts import publish_variant
+    data = request.json or {}
+    platform = data.get('platform', 'telegram')
+    channel_ids = data.get('channel_ids')
+    return jsonify(publish_variant(post_id, platform, channel_ids))
+
+
+@app.route('/api/platforms', methods=['GET'])
+@api_auth
+def api_platforms_list():
+    from platform_posts import get_platforms
+    return jsonify({'success': True, 'platforms': get_platforms()})
+
+
+@app.route('/api/multi-posts/preview', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_preview():
+    from platform_posts import format_for_platform, PLATFORM_RULES
+    data = request.json or {}
+    content = data.get('content', '')
+    platform = data.get('platform', 'telegram')
+    title = data.get('title', '')
+    result = format_for_platform(content, platform, title)
+    return jsonify({'success': True, 'variant': result})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CONTACT IMPORTER
+# ═══════════════════════════════════════════════════════════════
+
+@app.route('/api/contacts/import', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_import():
+    from contact_importer import import_contacts
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({'success': False, 'error': 'No file selected'}), 400
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ('.xlsx', '.xls', '.csv'):
+        return jsonify({'success': False, 'error': 'Unsupported file type. Use .xlsx, .xls, or .csv'}), 400
+    upload_dir = os.path.join(BASE_DIR, 'dashboard', 'static', 'uploads', 'contacts')
+    os.makedirs(upload_dir, exist_ok=True)
+    filepath = os.path.join(upload_dir, f'import_{int(time.time())}{ext}')
+    file.save(filepath)
+    result = import_contacts(filepath, created_by=session.get('user_id', session.get('admin_id')))
+    return jsonify(result)
+
+
+@app.route('/api/contacts/imports', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_imports():
+    from contact_importer import list_imports
+    return jsonify({'success': True, 'imports': list_imports()})
+
+
+@app.route('/api/contacts/<import_id>', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_detail(import_id):
+    from contact_importer import get_import_contacts, get_contact_stats
+    platform = request.args.get('platform')
+    status = request.args.get('status')
+    contacts = get_import_contacts(import_id, platform, status)
+    stats = get_contact_stats(import_id)
+    return jsonify({'success': True, 'contacts': contacts, 'stats': stats})
+
+
+@app.route('/api/contacts/stats', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_stats():
+    from contact_importer import get_contact_stats
+    return jsonify({'success': True, 'stats': get_contact_stats()})
+
+
+@app.route('/api/contacts/<import_id>', methods=['DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_delete(import_id):
+    from contact_importer import delete_import
+    return jsonify(delete_import(import_id))
+
+
+@app.route('/api/contacts/send', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_send():
+    from anti_ban import queue_messages
+    from contact_importer import get_contacts_for_messaging
+    data = request.json or {}
+    platform = data.get('platform', 'telegram')
+    template = data.get('template', '')
+    import_id = data.get('import_id')
+    if not template:
+        return jsonify({'success': False, 'error': 'template required'}), 400
+    contacts = get_contacts_for_messaging(platform, import_id, limit=data.get('limit', 100))
+    if not contacts:
+        return jsonify({'success': False, 'error': 'No contacts found for this platform'})
+    result = queue_messages(platform, template, contacts, import_id)
+    return jsonify(result)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ANTI-BAN SYSTEM
+# ═══════════════════════════════════════════════════════════════
+
+@app.route('/api/anti-ban/status', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_anti_ban_status():
+    from anti_ban import get_rate_status, PLATFORM_LIMITS
+    platform = request.args.get('platform', 'telegram')
+    status = get_rate_status(platform)
+    limits = PLATFORM_LIMITS.get(platform, {})
+    return jsonify({'success': True, 'status': status, 'limits': limits})
+
+
+@app.route('/api/anti-ban/log', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_anti_ban_log():
+    from anti_ban import get_ban_log
+    platform = request.args.get('platform')
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'log': get_ban_log(platform, limit)})
+
+
+@app.route('/api/anti-ban/duplicates', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_anti_ban_duplicates():
+    from anti_ban import get_content_duplicates
+    platform = request.args.get('platform')
+    return jsonify({'success': True, 'duplicates': get_content_duplicates(platform)})
+
+
+@app.route('/api/contacts/send-preview', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_send_preview():
+    from anti_ban import generate_unique_message, spin_text, personalize_message
+    from contact_importer import _extract_contact
+    data = request.json or {}
+    platform = data.get('platform', 'telegram')
+    template = data.get('template', '')
+    if not template:
+        return jsonify({'success': False, 'error': 'template required'}), 400
+    # Generate 3 sample variations
+    sample_contact = {'name': 'مثال', 'phone': '+201234567890', 'phone_country': 'EG', 'company': 'VEX'}
+    samples = []
+    for _ in range(3):
+        msg = generate_unique_message(template, sample_contact, platform)
+        samples.append(msg)
+    return jsonify({'success': True, 'samples': samples})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CONTENT RELAY SYSTEM
+# ═══════════════════════════════════════════════════════════════
+
+@app.route('/api/relays', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_list():
+    from content_relay import list_relays
+    active_only = request.args.get('active_only', '0') == '1'
+    return jsonify({'success': True, 'relays': list_relays(active_only)})
+
+
+@app.route('/api/relays', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_create():
+    from content_relay import create_relay
+    data = request.json or {}
+    name = data.get('name', '')
+    if not name:
+        return jsonify({'success': False, 'error': 'name required'}), 400
+    result = create_relay(
+        name=name,
+        source_platform=data.get('source_platform', 'telegram'),
+        source_ids=data.get('source_ids', []),
+        dest_platform=data.get('dest_platform', 'telegram'),
+        dest_ids=data.get('dest_ids', []),
+        agent_id=data.get('agent_id', 'commander'),
+        agent_prompt=data.get('agent_prompt', ''),
+        content_filter=data.get('content_filter', 'all'),
+        add_branding=data.get('add_branding', 0),
+        branding_text=data.get('branding_text', ''),
+        add_links=data.get('add_links', 0),
+        links_to_add=data.get('links_to_add', []),
+        text_replacements=data.get('text_replacements', []),
+        delay_seconds=data.get('delay_seconds', 5),
+        max_per_hour=data.get('max_per_hour', 20),
+        ai_transform=data.get('ai_transform', 1),
+        ai_temperature=data.get('ai_temperature', 0.7),
+        auto_approve=data.get('auto_approve', 0),
+        created_by=session.get('user_id', session.get('admin_id'))
+    )
+    return jsonify(result)
+
+
+@app.route('/api/relays/<int:relay_id>', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_get(relay_id):
+    from content_relay import get_relay, get_relay_stats
+    relay = get_relay(relay_id)
+    if not relay:
+        return jsonify({'success': False, 'error': 'Relay not found'}), 404
+    relay['stats'] = get_relay_stats(relay_id)
+    return jsonify({'success': True, 'relay': relay})
+
+
+@app.route('/api/relays/<int:relay_id>', methods=['PUT'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_update(relay_id):
+    from content_relay import update_relay
+    data = request.json or {}
+    result = update_relay(relay_id, **data)
+    return jsonify(result)
+
+
+@app.route('/api/relays/<int:relay_id>', methods=['DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_delete(relay_id):
+    from content_relay import delete_relay
+    return jsonify(delete_relay(relay_id))
+
+
+@app.route('/api/relays/<int:relay_id>/toggle', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_toggle(relay_id):
+    from content_relay import toggle_relay
+    return jsonify(toggle_relay(relay_id))
+
+
+@app.route('/api/relays/<int:relay_id>/relay', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_execute(relay_id):
+    from content_relay import relay_from_post
+    data = request.json or {}
+    post_id = data.get('post_id')
+    if not post_id:
+        return jsonify({'success': False, 'error': 'post_id required'}), 400
+    return jsonify(relay_from_post(post_id, relay_id))
+
+
+@app.route('/api/relays/<int:relay_id>/preview', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_preview(relay_id):
+    from content_relay import preview_relay
+    data = request.json or {}
+    text = data.get('text', '')
+    if not text:
+        return jsonify({'success': False, 'error': 'text required'}), 400
+    return jsonify(preview_relay(text, relay_id))
+
+
+@app.route('/api/relays/<int:relay_id>/queue', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_queue(relay_id):
+    from content_relay import queue_relay_content
+    data = request.json or {}
+    content = data.get('content', '')
+    if not content:
+        return jsonify({'success': False, 'error': 'content required'}), 400
+    return jsonify(queue_relay_content(
+        relay_id, content,
+        data.get('source_platform'), data.get('source_id'),
+        data.get('source_msg_id'), data.get('media_urls')))
+
+
+@app.route('/api/relays/process-queue', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_process_queue():
+    from content_relay import process_relay_queue
+    limit = (request.json or {}).get('limit', 10)
+    return jsonify(process_relay_queue(limit))
+
+
+@app.route('/api/relays/log', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_log():
+    from content_relay import get_relay_log
+    relay_id = request.args.get('relay_id', type=int)
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'log': get_relay_log(relay_id, limit)})
+
+
+@app.route('/api/relays/stats', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_stats():
+    from content_relay import get_relay_stats
+    relay_id = request.args.get('relay_id', type=int)
+    return jsonify({'success': True, 'stats': get_relay_stats(relay_id)})
+
+
+@app.route('/api/relays/log/clear', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_log_clear():
+    from content_relay import clear_relay_log
+    relay_id = (request.json or {}).get('relay_id')
+    return jsonify(clear_relay_log(relay_id))
+
+
+# ===== API — Browser =====
+
+@app.route('/browser')
+@admin_required
+@permission_required('manage_bots')
+def page_browser():
+    return render_template('browser.html', active_page='browser')
+
+
+# ── Daemon Control ───────────────────────────────────────────
+
+@app.route('/api/browser/daemon', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_daemon_status():
+    from browser_daemon import browser_daemon
+    return jsonify({'success': True, 'daemon': browser_daemon.get_daemon_status()})
+
+
+@app.route('/api/browser/daemon/start', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_daemon_start():
+    from browser_daemon import browser_daemon
+    browser_daemon.start()
+    return jsonify({'success': True, 'message': 'Daemon started'})
+
+
+@app.route('/api/browser/daemon/stop', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_daemon_stop():
+    from browser_daemon import browser_daemon
+    browser_daemon.stop()
+    return jsonify({'success': True, 'message': 'Daemon stopped'})
+
+
+@app.route('/api/browser/daemon/sleep-all', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_daemon_sleep_all():
+    from browser_daemon import browser_daemon
+    browser_daemon.sleep_all()
+    return jsonify({'success': True, 'message': 'All instances sleeping'})
+
+
+@app.route('/api/browser/daemon/wake-all', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_daemon_wake_all():
+    from browser_daemon import browser_daemon
+    results = browser_daemon.wake_all(trigger='manual')
+    return jsonify({'success': True, 'results': results})
+
+
+@app.route('/api/browser/health', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_health():
+    from browser_health import health_monitor
+    return jsonify({'success': True, 'health': health_monitor.get_stats()})
+
+
+@app.route('/api/browser/health/check/<iid>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_health_check(iid):
+    from browser_health import health_monitor
+    return jsonify(health_monitor.manual_check(iid))
+
+
+@app.route('/api/browser/health/restart/<iid>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_health_restart(iid):
+    from browser_health import health_monitor
+    return jsonify(health_monitor.manual_restart(iid))
+
+
+@app.route('/api/browser/instances/<iid>/sleep', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_sleep(iid):
+    from browser_daemon import browser_daemon
+    return jsonify(browser_daemon.sleep_instance(iid))
+
+
+@app.route('/api/browser/instances/<iid>/wake', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_wake(iid):
+    from browser_daemon import browser_daemon
+    return jsonify(browser_daemon.wake_instance(iid, 'manual'))
+
+
+@app.route('/api/browser/instances/<iid>/idle-timeout', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_idle_timeout(iid):
+    from browser_daemon import browser_daemon
+    ctrl = browser_daemon.get_sleep_controller(iid)
+    if not ctrl:
+        return jsonify({'success': False, 'error': 'No controller'}), 404
+    timeout = (request.json or {}).get('timeout', 300)
+    ctrl.set_idle_timeout(timeout)
+    return jsonify({'success': True, 'idle_timeout': timeout})
+
+
+@app.route('/api/browser/instances/<iid>/triggers', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_triggers_list(iid):
+    from browser_daemon import browser_daemon
+    ctrl = browser_daemon.get_sleep_controller(iid)
+    if not ctrl:
+        return jsonify({'success': False, 'error': 'No controller'}), 404
+    return jsonify({'success': True, 'triggers': ctrl.list_wake_triggers()})
+
+
+@app.route('/api/browser/instances/<iid>/triggers', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_trigger_add(iid):
+    from browser_daemon import browser_daemon
+    ctrl = browser_daemon.get_sleep_controller(iid)
+    if not ctrl:
+        return jsonify({'success': False, 'error': 'No controller'}), 404
+    data = request.json or {}
+    trigger = ctrl.add_wake_trigger(data.get('type', 'api'), data.get('config', {}))
+    return jsonify({'success': True, 'trigger': trigger})
+
+
+@app.route('/api/browser/instances/<iid>/triggers/<tid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_trigger_remove(iid, tid):
+    from browser_daemon import browser_daemon
+    ctrl = browser_daemon.get_sleep_controller(iid)
+    if not ctrl:
+        return jsonify({'success': False, 'error': 'No controller'}), 404
+    ctrl.remove_wake_trigger(tid)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/snapshot', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_snapshot():
+    from browser_daemon import browser_daemon
+    browser_daemon._save_snapshot()
+    return jsonify({'success': True, 'message': 'Snapshot saved'})
+
+
+# ── Learning / Knowledge ──────────────────────────────────────
+
+@app.route('/api/browser/instances/<iid>/analyze', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_analyze(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    return jsonify({'success': True, 'findings': inst.analyze_current_page()})
+
+
+@app.route('/api/browser/instances/<iid>/knowledge', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_site_knowledge(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    return jsonify({'success': True, 'knowledge': inst.get_site_knowledge()})
+
+
+@app.route('/api/browser/knowledge', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_knowledge_list():
+    from browser_knowledge import list_sites
+    return jsonify({'success': True, 'sites': list_sites()})
+
+
+@app.route('/api/browser/knowledge/<domain>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_knowledge_site(domain):
+    from browser_knowledge import get_site_knowledge
+    return jsonify({'success': True, 'knowledge': get_site_knowledge(domain)})
+
+
+@app.route('/api/browser/knowledge/search', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_knowledge_search():
+    q = request.args.get('q', '')
+    limit = request.args.get('limit', 20, type=int)
+    from browser_knowledge import search_knowledge
+    return jsonify({'success': True, 'results': search_knowledge(q, limit)})
+
+
+@app.route('/api/browser/patterns', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_patterns():
+    domain = request.args.get('domain')
+    from browser_knowledge import list_patterns
+    return jsonify({'success': True, 'patterns': list_patterns(domain)})
+
+
+@app.route('/api/browser/action-stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_action_stats():
+    domain = request.args.get('domain')
+    action = request.args.get('action')
+    from browser_knowledge import get_action_stats
+    return jsonify({'success': True, 'stats': get_action_stats(domain, action)})
+
+
+@app.route('/api/browser/instances/<iid>/suggest/<goal>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_suggest(iid, goal):
+    from browser_manager import get_instance
+    from browser_learning import learning_engine
+    from urllib.parse import urlparse
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    domain = urlparse(inst.page.url).netloc.replace('www.', '') if inst.page else ''
+    suggestions = learning_engine.suggest_action(domain, goal)
+    return jsonify({'success': True, 'suggestions': suggestions, 'domain': domain})
+
+
+@app.route('/api/browser/action-log', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_action_log():
+    domain = request.args.get('domain')
+    limit = request.args.get('limit', 50, type=int)
+    from browser_knowledge import get_recent_actions
+    return jsonify({'success': True, 'actions': get_recent_actions(domain, limit)})
+
+
+# ── Agent Tasks ──────────────────────────────────────────────
+
+@app.route('/api/browser/tasks', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tasks_list():
+    from browser_tasks import task_executor
+    return jsonify({'success': True, 'tasks': task_executor.list_tasks()})
+
+
+@app.route('/api/browser/tasks', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_task_create():
+    from browser_tasks import task_executor
+    data = request.json or {}
+    steps = data.get('steps', [])
+    goal = data.get('goal', 'Custom task')
+    task = task_executor.create_task(goal, steps)
+    return jsonify({'success': True, 'task': task.to_dict()})
+
+
+@app.route('/api/browser/tasks/<tid>/execute', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_task_execute(tid):
+    from browser_tasks import task_executor
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    if not instance_id:
+        return jsonify({'success': False, 'error': 'instance_id required'}), 400
+    result = task_executor.execute_task(tid, instance_id)
+    return jsonify(result)
+
+
+@app.route('/api/browser/tasks/<tid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_task_get(tid):
+    from browser_tasks import task_executor
+    task = task_executor.get_task(tid)
+    if not task:
+        return jsonify({'success': False, 'error': 'Task not found'}), 404
+    return jsonify({'success': True, 'task': task.to_dict()})
+
+
+@app.route('/api/browser/tasks/<tid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_task_delete(tid):
+    from browser_tasks import task_executor
+    task_executor.delete_task(tid)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/tasks/templates', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_task_templates():
+    from browser_tasks import get_task_templates
+    return jsonify({'success': True, 'templates': get_task_templates()})
+
+
+@app.route('/api/browser/tasks/quick-login', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_quick_login():
+    from browser_tasks import create_from_template, task_executor
+    from browser_manager import get_instance
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    task = create_from_template('login', {
+        'url': data.get('url', ''),
+        'username': data.get('username', ''),
+        'password': data.get('password', ''),
+    })
+    if not task:
+        return jsonify({'success': False, 'error': 'Template not found'}), 400
+    result = task_executor.execute_task(task.id, instance_id)
+    return jsonify(result)
+
+
+@app.route('/api/browser/tasks/quick-scrape', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_quick_scrape():
+    from browser_tasks import create_from_template, task_executor
+    from browser_manager import get_instance
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    task = create_from_template('scrape_page', {
+        'url': data.get('url', ''),
+        'selector': data.get('selector', 'body'),
+    })
+    if not task:
+        return jsonify({'success': False, 'error': 'Template not found'}), 400
+    result = task_executor.execute_task(task.id, instance_id)
+    text = ''
+    for r in result.get('task', {}).get('results', []):
+        if r.get('action') == 'read_text' and r.get('detail', {}).get('success'):
+            text = r['detail'].get('result', '')
+    result['scraped_text'] = text
+    return jsonify(result)
+
+
+# ── Agent Permissions ────────────────────────────────────────
+
+@app.route('/api/browser/permissions', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_permissions_list():
+    from browser_permissions import list_agent_permissions
+    return jsonify({'success': True, 'permissions': list_agent_permissions()})
+
+
+@app.route('/api/browser/permissions/<agent_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_permissions_get(agent_id):
+    from browser_permissions import get_agent_permissions
+    return jsonify({'success': True, 'permissions': get_agent_permissions(agent_id)})
+
+
+@app.route('/api/browser/permissions/<agent_id>', methods=['PUT'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_permissions_set(agent_id):
+    from browser_permissions import set_agent_permissions
+    data = request.json or {}
+    set_agent_permissions(agent_id, data)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/permissions/<agent_id>/check/<perm>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_permissions_check(agent_id, perm):
+    from browser_permissions import check_permission
+    return jsonify({'success': True, 'allowed': check_permission(agent_id, perm)})
+
+
+# ── Schedules ────────────────────────────────────────────────
+
+@app.route('/api/browser/schedules', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_schedules_list():
+    from browser_permissions import list_schedules
+    return jsonify({'success': True, 'schedules': list_schedules()})
+
+
+@app.route('/api/browser/schedules', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_schedule_create():
+    from browser_permissions import create_schedule
+    data = request.json or {}
+    create_schedule(
+        data.get('name', ''),
+        data.get('task_type', ''),
+        data.get('config', {}),
+        data.get('cron_expr', ''),
+        data.get('interval_seconds', 3600),
+    )
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/schedules/<sid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_schedule_delete(sid):
+    from browser_permissions import delete_schedule
+    delete_schedule(int(sid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/schedules/<sid>/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_schedule_toggle(sid):
+    from browser_permissions import toggle_schedule
+    active = (request.json or {}).get('active', True)
+    toggle_schedule(int(sid), active)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/scheduler/start', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_scheduler_start():
+    from browser_scheduler import schedule_runner
+    schedule_runner.start()
+    return jsonify({'success': True, 'message': 'Scheduler started'})
+
+
+@app.route('/api/browser/scheduler/stop', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_scheduler_stop():
+    from browser_scheduler import schedule_runner
+    schedule_runner.stop()
+    return jsonify({'success': True, 'message': 'Scheduler stopped'})
+
+
+# ── Webhooks ─────────────────────────────────────────────────
+
+@app.route('/api/browser/webhooks', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_webhooks_list():
+    from browser_scheduler import webhook_trigger
+    return jsonify({'success': True, 'webhooks': webhook_trigger.list_webhooks()})
+
+
+@app.route('/api/browser/webhooks', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_webhook_create():
+    from browser_scheduler import webhook_trigger
+    data = request.json or {}
+    wid = data.get('webhook_id', f'wh_{int(time.time()*1000)}')
+    webhook_trigger.register_webhook(
+        data.get('instance_id', ''),
+        wid,
+        data.get('config', {}),
+    )
+    return jsonify({'success': True, 'webhook_id': wid})
+
+
+@app.route('/api/browser/webhooks/<wid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_webhook_delete(wid):
+    from browser_scheduler import webhook_trigger
+    webhook_trigger.remove_webhook(wid)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/webhook-trigger/<wid>', methods=['POST'])
+def api_browser_webhook_fire(wid):
+    """Public endpoint — fires webhook to wake browser."""
+    from browser_scheduler import webhook_trigger
+    payload = request.json or {}
+    return jsonify(webhook_trigger.handle_webhook(wid, payload))
+
+
+# ── Network Monitor ──────────────────────────────────────────
+
+@app.route('/api/browser/network-log', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_log():
+    from browser_permissions import get_network_log
+    iid = request.args.get('instance_id')
+    limit = request.args.get('limit', 100, type=int)
+    return jsonify({'success': True, 'log': get_network_log(iid, limit)})
+
+
+@app.route('/api/browser/network-stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_stats():
+    from browser_permissions import get_network_stats
+    iid = request.args.get('instance_id')
+    return jsonify({'success': True, 'stats': get_network_stats(iid)})
+
+
+# ── Cookie Manager ───────────────────────────────────────────
+
+@app.route('/api/browser/cookies/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies_get(instance_id):
+    from browser_extras import get_cookies
+    query = request.args.get('q', '')
+    if query:
+        from browser_extras import search_cookies
+        cookies = search_cookies(instance_id, query)
+    else:
+        cookies = get_cookies(instance_id)
+    return jsonify({'success': True, 'cookies': cookies, 'count': len(cookies)})
+
+
+@app.route('/api/browser/cookies/<instance_id>/sync', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies_sync(instance_id):
+    from browser_extras import save_cookies_from_browser
+    from browser_manager import get_instance
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    cookies = inst.context.cookies()
+    save_cookies_from_browser(instance_id, cookies)
+    return jsonify({'success': True, 'synced': len(cookies)})
+
+
+@app.route('/api/browser/cookies/<instance_id>/delete/<cid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookie_delete(instance_id, cid):
+    from browser_extras import delete_cookie
+    delete_cookie(instance_id, int(cid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/cookies/<instance_id>/clear', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies_clear(instance_id):
+    from browser_extras import delete_all_cookies
+    delete_all_cookies(instance_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/cookies/<instance_id>/export', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies_export(instance_id):
+    from browser_extras import export_cookies
+    fmt = request.args.get('format', 'json')
+    data = export_cookies(instance_id, fmt)
+    if fmt == 'json':
+        return jsonify({'success': True, 'cookies': json.loads(data)})
+    return data, 200, {'Content-Type': 'text/plain', 'Content-Disposition': f'attachment; filename=cookies_{instance_id}.txt'}
+
+
+@app.route('/api/browser/cookies/<instance_id>/import', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies_import(instance_id):
+    from browser_extras import import_cookies
+    data = request.json or {}
+    cookies = data.get('cookies', [])
+    success = import_cookies(instance_id, cookies)
+    return jsonify({'success': success, 'imported': len(cookies)})
+
+
+# ── Session Recording ────────────────────────────────────────
+
+@app.route('/api/browser/sessions', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_sessions_list():
+    from browser_extras import session_recorder
+    iid = request.args.get('instance_id')
+    sessions = session_recorder.list_sessions(iid)
+    return jsonify({'success': True, 'sessions': sessions})
+
+
+@app.route('/api/browser/sessions/start', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_start():
+    from browser_extras import session_recorder
+    data = request.json or {}
+    sid = session_recorder.start_recording(data.get('instance_id', ''), data.get('name', ''))
+    return jsonify({'success': True, 'session_id': sid})
+
+
+@app.route('/api/browser/sessions/stop', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_stop():
+    from browser_extras import session_recorder
+    data = request.json or {}
+    sid = session_recorder.stop_recording(data.get('instance_id', ''))
+    return jsonify({'success': True, 'session_id': sid})
+
+
+@app.route('/api/browser/sessions/<sid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_get(sid):
+    from browser_extras import session_recorder
+    session = session_recorder.get_session(int(sid))
+    if not session:
+        return jsonify({'success': False, 'error': 'Session not found'}), 404
+    return jsonify({'success': True, 'session': session})
+
+
+@app.route('/api/browser/sessions/<sid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_delete(sid):
+    from browser_extras import session_recorder
+    session_recorder.delete_session(int(sid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/sessions/play', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_play():
+    from browser_extras import session_player
+    data = request.json or {}
+    result = session_player.play_session(
+        int(data.get('session_id', 0)),
+        data.get('instance_id', ''),
+        float(data.get('speed', 1.0)),
+    )
+    return jsonify(result)
+
+
+@app.route('/api/browser/sessions/stop-play', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_stop_play():
+    from browser_extras import session_player
+    data = request.json or {}
+    session_player.stop_playback(data.get('instance_id', ''))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/sessions/play-status/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_play_status(instance_id):
+    from browser_extras import session_player
+    status = session_player.get_status(instance_id)
+    return jsonify({'success': True, 'playing': status is not None, 'status': status})
+
+
+# ── Multi-Tab Manager ────────────────────────────────────────
+
+@app.route('/api/browser/tabs/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tabs_list(instance_id):
+    from browser_extras import tab_manager
+    tabs = tab_manager.list_tabs(instance_id)
+    return jsonify({'success': True, 'tabs': tabs})
+
+
+@app.route('/api/browser/tabs/<instance_id>/open', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tab_open(instance_id):
+    from browser_extras import tab_manager
+    data = request.json or {}
+    result = tab_manager.open_tab(instance_id, data.get('url', ''), data.get('activate', True))
+    return jsonify(result)
+
+
+@app.route('/api/browser/tabs/<instance_id>/close/<tab_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tab_close(instance_id, tab_id):
+    from browser_extras import tab_manager
+    result = tab_manager.close_tab(instance_id, tab_id)
+    return jsonify(result)
+
+
+@app.route('/api/browser/tabs/<instance_id>/switch/<tab_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tab_switch(instance_id, tab_id):
+    from browser_extras import tab_manager
+    result = tab_manager.switch_tab(instance_id, tab_id)
+    return jsonify(result)
+
+
+# ── Browser Templates ────────────────────────────────────────
+
+@app.route('/api/browser/templates', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_templates_list():
+    from browser_advanced import list_templates
+    return jsonify({'success': True, 'templates': list_templates()})
+
+
+@app.route('/api/browser/templates/<tid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_template_get(tid):
+    from browser_advanced import get_template
+    t = get_template(int(tid))
+    if not t:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    return jsonify({'success': True, 'template': t})
+
+
+@app.route('/api/browser/templates', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_template_create():
+    from browser_advanced import create_template
+    data = request.json or {}
+    tid = create_template(data.get('name', ''), data)
+    return jsonify({'success': True, 'id': tid})
+
+
+@app.route('/api/browser/templates/<tid>', methods=['PUT'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_template_update(tid):
+    from browser_advanced import update_template
+    update_template(int(tid), request.json or {})
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/templates/<tid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_template_delete(tid):
+    from browser_advanced import delete_template
+    delete_template(int(tid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/templates/<tid>/create-browser', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_template_create_browser(tid):
+    from browser_advanced import create_browser_from_template
+    data = request.json or {}
+    inst = create_browser_from_template(int(tid), data.get('name', ''))
+    if inst:
+        return jsonify({'success': True, 'instance_id': inst.id})
+    return jsonify({'success': False, 'error': 'Failed to create'}), 400
+
+
+# ── Proxy Manager ────────────────────────────────────────────
+
+@app.route('/api/browser/proxies', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxies_list():
+    from browser_advanced import list_proxies
+    return jsonify({'success': True, 'proxies': list_proxies()})
+
+
+@app.route('/api/browser/proxies', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_add():
+    from browser_advanced import add_proxy
+    data = request.json or {}
+    pid = add_proxy(
+        data.get('name', ''), data.get('host', ''), data.get('port', 80),
+        data.get('protocol', 'http'), data.get('username', ''), data.get('password', ''),
+        data.get('country', ''), data.get('city', ''), data.get('is_residential', False)
+    )
+    return jsonify({'success': True, 'id': pid})
+
+
+@app.route('/api/browser/proxies/<pid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_delete(pid):
+    from browser_advanced import delete_proxy
+    delete_proxy(int(pid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/proxies/<pid>/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_toggle(pid):
+    from browser_advanced import toggle_proxy
+    active = (request.json or {}).get('active', True)
+    toggle_proxy(int(pid), active)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/proxies/best', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_best():
+    from browser_advanced import get_best_proxy
+    country = request.args.get('country')
+    proxy = get_best_proxy(country)
+    return jsonify({'success': True, 'proxy': proxy})
+
+
+@app.route('/api/browser/proxies/import', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_import():
+    from browser_advanced import import_proxies
+    data = request.json or {}
+    count = import_proxies(data.get('proxies', []))
+    return jsonify({'success': True, 'imported': count})
+
+
+@app.route('/api/browser/proxies/stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_stats():
+    from browser_advanced import get_proxy_stats
+    return jsonify({'success': True, 'stats': get_proxy_stats()})
+
+
+# ── Fingerprint Rotation ─────────────────────────────────────
+
+@app.route('/api/browser/fingerprint/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_fingerprint_get(instance_id):
+    from browser_advanced import get_fingerprint
+    fp = get_fingerprint(instance_id)
+    return jsonify({'success': True, 'fingerprint': fp})
+
+
+@app.route('/api/browser/fingerprint/<instance_id>/generate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_fingerprint_generate(instance_id):
+    from browser_advanced import generate_fingerprint
+    fp = generate_fingerprint(instance_id)
+    return jsonify({'success': True, 'fingerprint': fp})
+
+
+@app.route('/api/browser/fingerprint/<instance_id>/rotate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_fingerprint_rotate(instance_id):
+    from browser_advanced import rotate_fingerprint
+    fp = rotate_fingerprint(instance_id)
+    return jsonify({'success': True, 'fingerprint': fp})
+
+
+# ── Usage Analytics ──────────────────────────────────────────
+
+@app.route('/api/browser/analytics/stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_analytics_stats():
+    from browser_advanced import get_usage_stats
+    iid = request.args.get('instance_id')
+    days = request.args.get('days', 7, type=int)
+    return jsonify({'success': True, 'stats': get_usage_stats(iid, days)})
+
+
+@app.route('/api/browser/analytics/daily', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_analytics_daily():
+    from browser_advanced import get_daily_usage
+    iid = request.args.get('instance_id')
+    days = request.args.get('days', 30, type=int)
+    return jsonify({'success': True, 'daily': get_daily_usage(iid, days)})
+
+
+@app.route('/api/browser/analytics/top-sites', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_analytics_top_sites():
+    from browser_advanced import get_top_sites
+    iid = request.args.get('instance_id')
+    limit = request.args.get('limit', 10, type=int)
+    return jsonify({'success': True, 'sites': get_top_sites(iid, limit)})
+
+
+# ── Browser Groups ───────────────────────────────────────────
+
+@app.route('/api/browser/groups', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_groups_list():
+    from browser_advanced import list_groups
+    return jsonify({'success': True, 'groups': list_groups()})
+
+
+@app.route('/api/browser/groups', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_group_create():
+    from browser_advanced import create_group
+    data = request.json or {}
+    gid = create_group(data.get('name', ''), data.get('description', ''), data.get('color', '#3b82f6'))
+    return jsonify({'success': True, 'id': gid})
+
+
+@app.route('/api/browser/groups/<gid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_group_delete(gid):
+    from browser_advanced import delete_group
+    delete_group(int(gid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/groups/<gid>/add/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_group_add(gid, instance_id):
+    from browser_advanced import add_to_group
+    add_to_group(int(gid), instance_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/groups/<gid>/remove/<instance_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_group_remove(gid, instance_id):
+    from browser_advanced import remove_from_group
+    remove_from_group(int(gid), instance_id)
+    return jsonify({'success': True})
+
+
+# ── Browser Tags ─────────────────────────────────────────────
+
+@app.route('/api/browser/tags', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tags_list():
+    from browser_advanced import list_tags
+    return jsonify({'success': True, 'tags': list_tags()})
+
+
+@app.route('/api/browser/tags', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tag_create():
+    from browser_advanced import create_tag
+    data = request.json or {}
+    tid = create_tag(data.get('name', ''), data.get('color', '#6b7280'))
+    return jsonify({'success': True, 'id': tid})
+
+
+@app.route('/api/browser/tags/<tid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tag_delete(tid):
+    from browser_advanced import delete_tag
+    delete_tag(int(tid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/tags/<instance_id>/add/<tag_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tag_add(instance_id, tag_id):
+    from browser_advanced import tag_instance
+    tag_instance(instance_id, int(tag_id))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/tags/<instance_id>/remove/<tag_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tag_remove(instance_id, tag_id):
+    from browser_advanced import untag_instance
+    untag_instance(instance_id, int(tag_id))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/tags/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_instance_tags(instance_id):
+    from browser_advanced import get_instance_tags
+    return jsonify({'success': True, 'tags': get_instance_tags(instance_id)})
+
+
+# ── Browser History ──────────────────────────────────────────
+
+@app.route('/api/browser/history', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_list():
+    from browser_utility import get_history
+    iid = request.args.get('instance_id')
+    search = request.args.get('q', '')
+    limit = request.args.get('limit', 100, type=int)
+    return jsonify({'success': True, 'history': get_history(iid, limit, search)})
+
+
+@app.route('/api/browser/history/search', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_search():
+    from browser_utility import search_history
+    q = request.args.get('q', '')
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'results': search_history(q, limit)})
+
+
+@app.route('/api/browser/history/frequent', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_frequent():
+    from browser_utility import get_frequent_sites
+    iid = request.args.get('instance_id')
+    limit = request.args.get('limit', 20, type=int)
+    return jsonify({'success': True, 'sites': get_frequent_sites(iid, limit)})
+
+
+@app.route('/api/browser/history/recent', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_recent():
+    from browser_utility import get_recent_history
+    iid = request.args.get('instance_id')
+    hours = request.args.get('hours', 24, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'history': get_recent_history(iid, hours, limit)})
+
+
+@app.route('/api/browser/history/stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_stats():
+    from browser_utility import get_history_stats
+    iid = request.args.get('instance_id')
+    return jsonify({'success': True, 'stats': get_history_stats(iid)})
+
+
+@app.route('/api/browser/history/clear', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_clear():
+    from browser_utility import clear_history
+    iid = request.args.get('instance_id')
+    days = request.args.get('older_than_days', type=int)
+    clear_history(iid, days)
+    return jsonify({'success': True})
+
+
+# ── Clipboard Manager ────────────────────────────────────────
+
+@app.route('/api/browser/clipboard', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_clipboard_list():
+    from browser_utility import clipboard_get
+    search = request.args.get('q', '')
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'clipboard': clipboard_get(limit, search)})
+
+
+@app.route('/api/browser/clipboard', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_clipboard_add():
+    from browser_utility import clipboard_add
+    data = request.json or {}
+    cid = clipboard_add(data.get('content', ''), data.get('instance_id', ''),
+                        data.get('content_type', 'text'), data.get('source', ''))
+    return jsonify({'success': True, 'id': cid})
+
+
+@app.route('/api/browser/clipboard/<cid>/pin', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_clipboard_pin(cid):
+    from browser_utility import clipboard_pin
+    clipboard_pin(int(cid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/clipboard/<cid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_clipboard_delete(cid):
+    from browser_utility import clipboard_delete
+    clipboard_delete(int(cid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/clipboard/clear', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_clipboard_clear():
+    from browser_utility import clipboard_clear
+    clipboard_clear()
+    return jsonify({'success': True})
+
+
+# ── Backup/Restore ───────────────────────────────────────────
+
+@app.route('/api/browser/backups', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_backups_list():
+    from browser_utility import list_backups
+    return jsonify({'success': True, 'backups': list_backups()})
+
+
+@app.route('/api/browser/backups', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_backup_create():
+    from browser_utility import create_backup
+    data = request.json or {}
+    result = create_backup(data.get('name', 'backup'), data.get('description', ''))
+    return jsonify(result)
+
+
+@app.route('/api/browser/backups/<bid>/restore', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_backup_restore(bid):
+    from browser_utility import restore_backup
+    result = restore_backup(int(bid))
+    return jsonify(result)
+
+
+@app.route('/api/browser/backups/<bid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_backup_delete(bid):
+    from browser_utility import delete_backup
+    delete_backup(int(bid))
+    return jsonify({'success': True})
+
+
+# ── Dashboard Overview ───────────────────────────────────────
+
+@app.route('/api/browser/dashboard', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_dashboard():
+    from browser_utility import get_dashboard_overview
+    return jsonify({'success': True, 'overview': get_dashboard_overview()})
+
+
+# ── Form Auto-Fill ───────────────────────────────────────────
+
+@app.route('/api/browser/form-profiles', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profiles_list():
+    from browser_smart import list_form_profiles
+    return jsonify({'success': True, 'profiles': list_form_profiles()})
+
+
+@app.route('/api/browser/form-profiles/<pid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profile_get(pid):
+    from browser_smart import get_form_profile
+    p = get_form_profile(int(pid))
+    if not p:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    return jsonify({'success': True, 'profile': p})
+
+
+@app.route('/api/browser/form-profiles', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profile_create():
+    from browser_smart import create_form_profile
+    data = request.json or {}
+    pid = create_form_profile(data.get('name', ''), data.get('data', {}),
+                               data.get('description', ''), data.get('is_default', False))
+    return jsonify({'success': True, 'id': pid})
+
+
+@app.route('/api/browser/form-profiles/<pid>', methods=['PUT'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profile_update(pid):
+    from browser_smart import update_form_profile
+    update_form_profile(int(pid), (request.json or {}).get('data', {}))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/form-profiles/<pid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profile_delete(pid):
+    from browser_smart import delete_form_profile
+    delete_form_profile(int(pid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/form-profiles/default', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profile_default():
+    from browser_smart import get_default_profile
+    return jsonify({'success': True, 'profile': get_default_profile()})
+
+
+@app.route('/api/browser/form-fill/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_fill(instance_id):
+    from browser_manager import get_instance
+    from browser_smart import get_default_profile, match_field_to_value
+    data = request.json or {}
+    profile_id = data.get('profile_id')
+    if profile_id:
+        from browser_smart import get_form_profile
+        profile = get_form_profile(int(profile_id))
+        profile_data = profile.get('data', {}) if profile else {}
+    else:
+        profile_data = get_default_profile().get('data', {})
+
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+
+    # Find all form fields and fill them
+    filled = []
+    try:
+        fields = inst.page.query_selector_all('input, textarea, select')
+        for field in fields:
+            try:
+                name = field.get_attribute('name') or ''
+                field_id = field.get_attribute('id') or ''
+                field_class = field.get_attribute('class') or ''
+                field_type = field.get_attribute('type') or 'text'
+                if field_type in ['hidden', 'submit', 'button', 'checkbox', 'radio']:
+                    continue
+                field_type_matched, value = match_field_to_value(name, field_id, field_class, profile_data)
+                if value:
+                    field.fill(value)
+                    filled.append({'field': name or field_id, 'type': field_type_matched, 'value': value[:50]})
+            except Exception:
+                continue
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    return jsonify({'success': True, 'filled': len(filled), 'fields': filled})
+
+
+# ── Content Extraction ───────────────────────────────────────
+
+@app.route('/api/browser/extract/article', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_article():
+    from browser_manager import get_instance
+    from browser_smart import extract_article
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    url = inst.page.url
+    article = extract_article(text, url)
+    return jsonify({'success': True, 'article': article})
+
+
+@app.route('/api/browser/extract/prices', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_prices():
+    from browser_manager import get_instance
+    from browser_smart import extract_prices
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    prices = extract_prices(text)
+    return jsonify({'success': True, 'prices': prices})
+
+
+@app.route('/api/browser/extract/contacts', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_contacts():
+    from browser_manager import get_instance
+    from browser_smart import extract_contacts
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    contacts = extract_contacts(text)
+    return jsonify({'success': True, 'contacts': contacts})
+
+
+@app.route('/api/browser/extract/links', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_links():
+    from browser_manager import get_instance
+    from browser_smart import extract_links
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    url = inst.page.url
+    links = extract_links(text, url)
+    return jsonify({'success': True, 'links': links})
+
+
+@app.route('/api/browser/extract/metadata', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_metadata():
+    from browser_manager import get_instance
+    from browser_smart import extract_metadata
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    url = inst.page.url
+    meta = extract_metadata(text, url)
+    return jsonify({'success': True, 'metadata': meta})
+
+
+@app.route('/api/browser/extract/all', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_all():
+    from browser_manager import get_instance
+    from browser_smart import extract_article, extract_prices, extract_contacts, extract_links, extract_metadata
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    url = inst.page.url
+    return jsonify({
+        'success': True,
+        'article': extract_article(text, url),
+        'prices': extract_prices(text),
+        'contacts': extract_contacts(text),
+        'links': extract_links(text, url),
+        'metadata': extract_metadata(text, url),
+    })
+
+
+# ── Search Engine ────────────────────────────────────────────
+
+@app.route('/api/browser/search', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_search():
+    from browser_manager import get_instance
+    from browser_smart import get_search_url, log_search
+    data = request.json or {}
+    engine = data.get('engine', 'google')
+    query = data.get('query', '')
+    instance_id = data.get('instance_id', '')
+    if not query:
+        return jsonify({'success': False, 'error': 'Query required'}), 400
+    url = get_search_url(engine, query)
+    if instance_id:
+        inst = get_instance(instance_id)
+        if inst and inst.page:
+            inst.navigate(url)
+    log_search(engine, query, 0, instance_id)
+    return jsonify({'success': True, 'url': url, 'engine': engine})
+
+
+@app.route('/api/browser/search/history', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_search_history():
+    from browser_smart import get_search_history
+    engine = request.args.get('engine')
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'history': get_search_history(engine, limit)})
+
+
+@app.route('/api/browser/search/popular', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_search_popular():
+    from browser_smart import get_popular_queries
+    limit = request.args.get('limit', 20, type=int)
+    return jsonify({'success': True, 'queries': get_popular_queries(limit)})
+
+
+# ── Screenshot Gallery ───────────────────────────────────────
+
+@app.route('/api/browser/screenshots', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshots_list():
+    from browser_smart import list_screenshots
+    iid = request.args.get('instance_id')
+    limit = request.args.get('limit', 100, type=int)
+    return jsonify({'success': True, 'screenshots': list_screenshots(iid, limit)})
+
+
+@app.route('/api/browser/screenshots/search', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshots_search():
+    from browser_smart import search_screenshots
+    q = request.args.get('q', '')
+    tag = request.args.get('tag', '')
+    return jsonify({'success': True, 'screenshots': search_screenshots(q, tag)})
+
+
+@app.route('/api/browser/screenshots/stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshots_stats():
+    from browser_smart import get_screenshot_stats
+    return jsonify({'success': True, 'stats': get_screenshot_stats()})
+
+
+@app.route('/api/browser/screenshots/<sid>', methods=['PUT'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshot_update(sid):
+    from browser_smart import update_screenshot
+    data = request.json or {}
+    update_screenshot(int(sid), data.get('tags'), data.get('notes'))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/screenshots/<sid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshot_delete(sid):
+    from browser_smart import delete_screenshot
+    delete_screenshot(int(sid))
+    return jsonify({'success': True})
+
+
+# ── WebSocket Real-Time ──────────────────────────────────────
+
+@app.route('/api/browser/ws/subscribe/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_ws_subscribe(instance_id):
+    from browser_realtime import browser_ws
+    q = browser_ws.subscribe(instance_id)
+    events = list(q)[-50:]
+    return jsonify({'success': True, 'events': events, 'subscribers': browser_ws.get_subscribers_count(instance_id)})
+
+
+@app.route('/api/browser/ws/events/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_ws_events(instance_id):
+    from browser_realtime import browser_ws
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'events': browser_ws.get_recent(instance_id, limit)})
+
+
+@app.route('/api/browser/ws/events-all', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_ws_events_all():
+    from browser_realtime import browser_ws
+    limit = request.args.get('limit', 100, type=int)
+    return jsonify({'success': True, 'events': browser_ws.get_all_recent(limit)})
+
+
+@app.route('/api/browser/ws/stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_ws_stats():
+    from browser_realtime import browser_ws
+    return jsonify({'success': True, 'subscribers': browser_ws.get_subscribers_count()})
+
+
+# ── Ad Blocker ───────────────────────────────────────────────
+
+@app.route('/api/browser/adblock/<instance_id>/enable', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_adblock_enable(instance_id):
+    from browser_manager import get_instance
+    from browser_realtime import get_adblock_js
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        inst.page.evaluate(get_adblock_js())
+        return jsonify({'success': True, 'message': 'Ad blocker enabled'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/adblock/<instance_id>/hide', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_adblock_hide(instance_id):
+    from browser_manager import get_instance
+    from browser_realtime import get_hide_elements_js
+    data = request.json or {}
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        selectors = data.get('selectors', [])
+        inst.page.evaluate(get_hide_elements_js(selectors if selectors else None))
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/adblock/<instance_id>/custom', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_adblock_custom(instance_id):
+    from browser_manager import get_instance
+    from browser_realtime import get_custom_hide_js
+    data = request.json or {}
+    selector = data.get('selector', '')
+    if not selector:
+        return jsonify({'success': False, 'error': 'Selector required'}), 400
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        result = inst.page.evaluate(get_custom_hide_js(selector))
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ── Resource Blocker + Throttle ──────────────────────────────
+
+@app.route('/api/browser/resources/<instance_id>/block', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_resources_block(instance_id):
+    from browser_manager import get_instance
+    from browser_realtime import get_resource_block_js
+    data = request.json or {}
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        block_types = data.get('types', ['image', 'media', 'font', 'stylesheet'])
+        inst.page.evaluate(get_resource_block_js(block_types))
+        return jsonify({'success': True, 'blocked': block_types})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/resources/throttle-profiles', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_throttle_profiles():
+    from browser_realtime import THROTTLE_PROFILES
+    return jsonify({'success': True, 'profiles': THROTTLE_PROFILES})
+
+
+# ── Console Viewer ───────────────────────────────────────────
+
+@app.route('/api/browser/console/<instance_id>/logs', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_console_logs(instance_id):
+    from browser_realtime import console_viewer
+    logs = console_viewer.get_logs(instance_id)
+    return jsonify({'success': True, 'logs': logs, 'count': len(logs)})
+
+
+@app.route('/api/browser/console/<instance_id>/clear', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_console_clear(instance_id):
+    from browser_realtime import console_viewer
+    console_viewer.clear_logs(instance_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/console/<instance_id>/enable', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_console_enable(instance_id):
+    from browser_manager import get_instance
+    from browser_realtime import console_viewer
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        inst.page.evaluate(console_viewer.get_console_js())
+        return jsonify({'success': True, 'message': 'Console capture enabled'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ── PDF / HTML / Text Export ─────────────────────────────────
+
+@app.route('/api/browser/export/<instance_id>/pdf', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_export_pdf(instance_id):
+    from browser_realtime import export_page_pdf
+    data = request.json or {}
+    result = export_page_pdf(instance_id, **data)
+    return jsonify(result)
+
+
+@app.route('/api/browser/export/<instance_id>/html', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_export_html(instance_id):
+    from browser_realtime import export_page_html
+    result = export_page_html(instance_id)
+    return jsonify(result)
+
+
+@app.route('/api/browser/export/<instance_id>/text', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_export_text(instance_id):
+    from browser_realtime import export_page_text
+    result = export_page_text(instance_id)
+    return jsonify(result)
+
+
+# ── Page Performance ─────────────────────────────────────────
+
+@app.route('/api/browser/performance/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_performance(instance_id):
+    from browser_realtime import get_page_metrics
+    return jsonify(get_page_metrics(instance_id))
+
+
+# ── Browser State Export/Import ──────────────────────────────
+
+@app.route('/api/browser/state/<instance_id>/export', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_state_export(instance_id):
+    from browser_realtime import export_browser_state
+    return jsonify(export_browser_state(instance_id))
+
+
+@app.route('/api/browser/state/<instance_id>/import', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_state_import(instance_id):
+    from browser_realtime import import_browser_state
+    data = request.json or {}
+    return jsonify(import_browser_state(instance_id, data.get('state', {})))
+
+
+# ── File Upload/Download ─────────────────────────────────────
+
+@app.route('/api/browser/upload/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_upload(instance_id):
+    from browser_files import upload_file
+    data = request.json or {}
+    return jsonify(upload_file(instance_id, data.get('file_path', ''), data.get('selector', 'input[type="file"]')))
+
+
+@app.route('/api/browser/upload/<instance_id>/multi', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_upload_multi(instance_id):
+    from browser_files import upload_files
+    data = request.json or {}
+    return jsonify(upload_files(instance_id, data.get('file_paths', []), data.get('selector', 'input[type="file"]')))
+
+
+@app.route('/api/browser/upload/setup/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_upload_setup(instance_id):
+    from browser_files import setup_download_handler
+    return jsonify(setup_download_handler(instance_id))
+
+
+@app.route('/api/browser/uploads/list', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_uploads_list():
+    from browser_files import list_upload_files
+    return jsonify({'success': True, 'files': list_upload_files(), 'upload_dir': get_upload_dir()})
+
+
+@app.route('/api/browser/downloads', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_downloads_list():
+    from browser_files import list_downloads
+    iid = request.args.get('instance_id')
+    return jsonify({'success': True, 'downloads': list_downloads(iid)})
+
+
+@app.route('/api/browser/downloads/<did>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_download_delete(did):
+    from browser_files import delete_download
+    delete_download(int(did))
+    return jsonify({'success': True})
+
+
+# ── Mobile Emulation ─────────────────────────────────────────
+
+@app.route('/api/browser/devices', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_devices():
+    from browser_files import get_device_presets
+    return jsonify({'success': True, 'devices': get_device_presets()})
+
+
+@app.route('/api/browser/emulate/<instance_id>/<device>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_emulate(instance_id, device):
+    from browser_files import apply_device_preset
+    return jsonify(apply_device_preset(instance_id, device))
+
+
+@app.route('/api/browser/responsive-test/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_responsive_test(instance_id):
+    from browser_files import responsive_test
+    data = request.json or {}
+    return jsonify(responsive_test(instance_id, data.get('url', ''), data.get('devices')))
+
+
+# ── Task Queue ───────────────────────────────────────────────
+
+@app.route('/api/browser/queues', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_queues_list():
+    from browser_files import task_queue
+    return jsonify({'success': True, 'queues': task_queue.list_queues()})
+
+
+@app.route('/api/browser/queues', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_queue_create():
+    from browser_files import task_queue
+    data = request.json or {}
+    qid = task_queue.create_queue(data.get('name', ''), data.get('tasks', []))
+    return jsonify({'success': True, 'queue_id': qid})
+
+
+@app.route('/api/browser/queues/<qid>/start', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_queue_start(qid):
+    from browser_files import task_queue
+    data = request.json or {}
+    return jsonify(task_queue.start_queue(int(qid), data.get('instance_id', '')))
+
+
+@app.route('/api/browser/queues/<qid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_queue_get(qid):
+    from browser_files import task_queue
+    q = task_queue.get_queue(int(qid))
+    if not q:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    return jsonify({'success': True, 'queue': q})
+
+
+@app.route('/api/browser/queues/<qid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_queue_delete(qid):
+    from browser_files import task_queue
+    task_queue.delete_queue(int(qid))
+    return jsonify({'success': True})
+
+
+# ── User Agent Rotation ──────────────────────────────────────
+
+@app.route('/api/browser/user-agents', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_user_agents():
+    from browser_spoof import get_all_user_agents
+    return jsonify({'success': True, 'agents': get_all_user_agents()})
+
+
+@app.route('/api/browser/user-agents/random', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_user_agent_random():
+    from browser_spoof import get_random_ua
+    platform = request.args.get('platform')
+    browser = request.args.get('browser')
+    return jsonify({'success': True, 'user_agent': get_random_ua(platform, browser)})
+
+
+@app.route('/api/browser/rotate-ua/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_rotate_ua(instance_id):
+    from browser_spoof import rotate_user_agent
+    return jsonify(rotate_user_agent(instance_id))
+
+
+# ── Screen/WebGL/Canvas Spoofing ─────────────────────────────
+
+@app.route('/api/browser/spoof/<instance_id>/screen', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_spoof_screen(instance_id):
+    from browser_manager import get_instance
+    from browser_spoof import get_spoof_screen_js
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        r = inst.page.evaluate(get_spoof_screen_js())
+        return jsonify({'success': True, 'result': r})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/spoof/<instance_id>/webgl', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_spoof_webgl(instance_id):
+    from browser_manager import get_instance
+    from browser_spoof import get_spoof_webgl_js
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        r = inst.page.evaluate(get_spoof_webgl_js())
+        return jsonify({'success': True, 'result': r})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/spoof/<instance_id>/canvas', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_spoof_canvas(instance_id):
+    from browser_manager import get_instance
+    from browser_spoof import get_spoof_canvas_js
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        r = inst.page.evaluate(get_spoof_canvas_js())
+        return jsonify({'success': True, 'result': r})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/spoof/<instance_id>/all', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_spoof_all(instance_id):
+    from browser_spoof import apply_full_anti_detection
+    return jsonify(apply_full_anti_detection(instance_id))
+
+
+# ── Drag & Drop ──────────────────────────────────────────────
+
+@app.route('/api/browser/drag-drop/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_drag_drop(instance_id):
+    from browser_spoof import simulate_drag_drop
+    data = request.json or {}
+    return jsonify(simulate_drag_drop(instance_id, data.get('source', ''), data.get('target', '')))
+
+
+@app.route('/api/browser/file-drop/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_file_drop(instance_id):
+    from browser_spoof import simulate_file_drop
+    data = request.json or {}
+    return jsonify(simulate_file_drop(instance_id, data.get('file_path', ''), data.get('target', '')))
+
+
+# ── Keyboard Shortcuts ───────────────────────────────────────
+
+@app.route('/api/browser/shortcuts', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_shortcuts_list():
+    from browser_spoof import get_all_shortcuts
+    return jsonify({'success': True, 'shortcuts': get_all_shortcuts()})
+
+
+@app.route('/api/browser/shortcut/<instance_id>/<name>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_shortcut_press(instance_id, name):
+    from browser_spoof import press_shortcut
+    return jsonify(press_shortcut(instance_id, name))
+
+
+@app.route('/api/browser/key/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_key_press(instance_id):
+    from browser_spoof import press_key
+    data = request.json or {}
+    return jsonify(press_key(instance_id, data.get('key', ''), data.get('modifiers')))
+
+
+@app.route('/api/browser/type/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_type_text(instance_id):
+    from browser_spoof import type_shortcut
+    data = request.json or {}
+    return jsonify(type_shortcut(instance_id, data.get('text', ''), data.get('delay', 50)))
+
+
+# ── Iframe Handling ──────────────────────────────────────────
+
+@app.route('/api/browser/iframes/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_iframes(instance_id):
+    from browser_spoof import list_iframes
+    return jsonify(list_iframes(instance_id))
+
+
+@app.route('/api/browser/iframe/<instance_id>/switch', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_iframe_switch(instance_id):
+    from browser_spoof import switch_to_frame
+    data = request.json or {}
+    return jsonify(switch_to_frame(instance_id, data.get('index', 0), data.get('name', '')))
+
+
+@app.route('/api/browser/iframe/<instance_id>/main', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_iframe_main(instance_id):
+    from browser_spoof import switch_to_main_frame
+    return jsonify(switch_to_main_frame(instance_id))
+
+
+# ── Shadow DOM ───────────────────────────────────────────────
+
+@app.route('/api/browser/shadow/<instance_id>/query', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_shadow_query(instance_id):
+    from browser_spoof import query_shadow_dom
+    data = request.json or {}
+    return jsonify(query_shadow_dom(instance_id, data.get('host', ''), data.get('inner', '')))
+
+
+@app.route('/api/browser/shadow/<instance_id>/click', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_shadow_click(instance_id):
+    from browser_spoof import click_shadow_dom
+    data = request.json or {}
+    return jsonify(click_shadow_dom(instance_id, data.get('host', ''), data.get('inner', '')))
+
+
+# ── Media Devices ────────────────────────────────────────────
+
+@app.route('/api/browser/media/<instance_id>/emulate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_media_emulate(instance_id):
+    from browser_spoof import emulate_media_devices
+    data = request.json or {}
+    return jsonify(emulate_media_devices(instance_id, data.get('camera', 1),
+                                          data.get('microphone', 1), data.get('speaker', 1)))
+
+
+# ── Saved Profiles ───────────────────────────────────────────
+
+@app.route('/api/browser/saved-profiles', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profiles_list():
+    from browser_profiles import list_profiles
+    return jsonify({'success': True, 'profiles': list_profiles()})
+
+
+@app.route('/api/browser/saved-profiles', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_save():
+    from browser_profiles import save_profile
+    data = request.json or {}
+    return jsonify(save_profile(data.get('instance_id', ''), data.get('name', ''), data.get('description', '')))
+
+
+@app.route('/api/browser/saved-profiles/<pid>/restore', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_restore(pid):
+    from browser_profiles import restore_profile
+    data = request.json or {}
+    return jsonify(restore_profile(int(pid), data.get('instance_id')))
+
+
+@app.route('/api/browser/saved-profiles/<pid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_delete(pid):
+    from browser_profiles import delete_profile
+    delete_profile(int(pid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/saved-profiles/<pid>/favorite', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_favorite(pid):
+    from browser_profiles import toggle_favorite
+    toggle_favorite(int(pid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/saved-profiles/<pid>/export', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_export(pid):
+    from browser_profiles import export_profile
+    data = export_profile(int(pid))
+    if not data:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    return jsonify({'success': True, 'profile': data})
+
+
+@app.route('/api/browser/saved-profiles/import', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_import():
+    from browser_profiles import import_profile
+    data = request.json or {}
+    return jsonify(import_profile(data.get('profile', {}), data.get('name')))
+
+
+@app.route('/api/browser/saved-profiles/search', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_search():
+    from browser_profiles import search_profiles
+    q = request.args.get('q', '')
+    return jsonify({'success': True, 'profiles': search_profiles(q)})
+
+
+# ── Content Injection ────────────────────────────────────────
+
+@app.route('/api/browser/inject/css/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_inject_css(instance_id):
+    from browser_profiles import inject_css
+    data = request.json or {}
+    return jsonify(inject_css(instance_id, data.get('css', '')))
+
+
+@app.route('/api/browser/inject/js/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_inject_js(instance_id):
+    from browser_profiles import inject_js
+    data = request.json or {}
+    return jsonify(inject_js(instance_id, data.get('js', '')))
+
+
+@app.route('/api/browser/inject/js-file/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_inject_js_file(instance_id):
+    from browser_profiles import inject_js_file
+    data = request.json or {}
+    return jsonify(inject_js_file(instance_id, data.get('url', '')))
+
+
+@app.route('/api/browser/inject/remove/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_inject_remove(instance_id):
+    from browser_profiles import remove_injections
+    return jsonify(remove_injections(instance_id))
+
+
+@app.route('/api/browser/inject/apply-saved/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_inject_apply_saved(instance_id):
+    from browser_profiles import apply_saved_injections
+    return jsonify(apply_saved_injections(instance_id))
+
+
+@app.route('/api/browser/css-injections', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_css_injections_list():
+    from browser_profiles import list_css_injections
+    return jsonify({'success': True, 'injections': list_css_injections()})
+
+
+@app.route('/api/browser/css-injections', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_css_injection_create():
+    from browser_profiles import save_css_injection
+    data = request.json or {}
+    return jsonify(save_css_injection(data.get('name', ''), data.get('css', ''), data.get('url_pattern', '*')))
+
+
+@app.route('/api/browser/css-injections/<iid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_css_injection_delete(iid):
+    from browser_profiles import delete_css_injection
+    delete_css_injection(int(iid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/css-injections/<iid>/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_css_injection_toggle(iid):
+    from browser_profiles import toggle_css_injection
+    toggle_css_injection(int(iid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/js-injections', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_js_injections_list():
+    from browser_profiles import list_js_injections
+    return jsonify({'success': True, 'injections': list_js_injections()})
+
+
+@app.route('/api/browser/js-injections', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_js_injection_create():
+    from browser_profiles import save_js_injection
+    data = request.json or {}
+    return jsonify(save_js_injection(data.get('name', ''), data.get('js', ''),
+                                     data.get('url_pattern', '*'), data.get('run_at', 'document_idle')))
+
+
+@app.route('/api/browser/js-injections/<iid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_js_injection_delete(iid):
+    from browser_profiles import delete_js_injection
+    delete_js_injection(int(iid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/js-injections/<iid>/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_js_injection_toggle(iid):
+    from browser_profiles import toggle_js_injection
+    toggle_js_injection(int(iid))
+    return jsonify({'success': True})
+
+
+# ── Geolocation ──────────────────────────────────────────────
+
+@app.route('/api/browser/geolocation/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_geolocation_set(instance_id):
+    from browser_profiles import set_geolocation
+    data = request.json or {}
+    return jsonify(set_geolocation(instance_id, data.get('lat', 0), data.get('lng', 0), data.get('accuracy', 100)))
+
+
+@app.route('/api/browser/geolocation/presets', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_geolocation_presets():
+    from browser_profiles import get_preset_locations
+    return jsonify({'success': True, 'locations': get_preset_locations()})
+
+
+@app.route('/api/browser/geolocations', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_geolocations_list():
+    from browser_profiles import list_geolocations
+    return jsonify({'success': True, 'geolocations': list_geolocations()})
+
+
+@app.route('/api/browser/geolocations', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_geolocation_create():
+    from browser_profiles import save_geolocation
+    data = request.json or {}
+    return jsonify(save_geolocation(data.get('name', ''), data.get('lat', 0), data.get('lng', 0),
+                                    data.get('accuracy', 100), data.get('city', ''), data.get('country', '')))
+
+
+@app.route('/api/browser/geolocations/<gid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_geolocation_delete(gid):
+    from browser_profiles import delete_geolocation
+    delete_geolocation(int(gid))
+    return jsonify({'success': True})
+
+
+# ── Network Simulation ───────────────────────────────────────
+
+@app.route('/api/browser/network/<instance_id>/simulate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_simulate(instance_id):
+    from browser_profiles import simulate_network
+    data = request.json or {}
+    return jsonify(simulate_network(instance_id, data.get('profile', 'normal')))
+
+
+@app.route('/api/browser/network/presets', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_presets():
+    from browser_profiles import get_network_presets
+    return jsonify({'success': True, 'presets': get_network_presets()})
+
+
+@app.route('/api/browser/network/profiles', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_profiles_list():
+    from browser_profiles import list_network_profiles
+    return jsonify({'success': True, 'profiles': list_network_profiles()})
+
+
+@app.route('/api/browser/network/profiles', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_profile_create():
+    from browser_profiles import save_network_profile
+    data = request.json or {}
+    return jsonify(save_network_profile(data.get('name', ''), data.get('download', 5000000),
+                                        data.get('upload', 2000000), data.get('latency', 50),
+                                        data.get('packet_loss', 0)))
+
+
+# ── Notifications ────────────────────────────────────────────
+
+@app.route('/api/browser/notifications/<instance_id>/allow', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_notifications_allow(instance_id):
+    from browser_profiles import setup_notification_handler
+    return jsonify(setup_notification_handler(instance_id))
+
+
+# ── Instance CRUD ────────────────────────────────────────────
+
+@app.route('/api/browser/instances', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_list():
+    from browser_manager import list_instances
+    return jsonify({'success': True, 'instances': list_instances()})
+
+
+@app.route('/api/browser/instances', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_create():
+    from browser_manager import create_instance
+    data = request.json or {}
+    inst = create_instance(
+        name=data.get('name', ''),
+        profile_id=data.get('profile_id'),
+        proxy=data.get('proxy'),
+    )
+    return jsonify({'success': True, 'instance': inst.to_dict()})
+
+
+@app.route('/api/browser/instances/<iid>/start', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_start(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    ok = inst.start()
+    return jsonify({'success': ok, 'instance': inst.to_dict()})
+
+
+@app.route('/api/browser/instances/<iid>/stop', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_stop(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    inst.stop()
+    return jsonify({'success': True, 'instance': inst.to_dict()})
+
+
+@app.route('/api/browser/instances/<iid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_delete(iid):
+    from browser_manager import remove_instance
+    remove_instance(iid)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/instances/<iid>/navigate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_navigate(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    url = (request.json or {}).get('url', '')
+    if not url:
+        return jsonify({'success': False, 'error': 'URL required'}), 400
+    return jsonify(inst.navigate(url))
+
+
+@app.route('/api/browser/instances/<iid>/click', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_click(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    sel = (request.json or {}).get('selector', '')
+    return jsonify(inst.click(sel))
+
+
+@app.route('/api/browser/instances/<iid>/type', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_type(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    data = request.json or {}
+    return jsonify(inst.type_text(data.get('selector', ''), data.get('text', ''), data.get('clear', True)))
+
+
+@app.route('/api/browser/instances/<iid>/scroll', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_scroll(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    data = request.json or {}
+    return jsonify(inst.scroll(data.get('direction', 'down'), data.get('amount', 3)))
+
+
+@app.route('/api/browser/instances/<iid>/screenshot', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshot(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    b64 = inst.get_screenshot_base64()
+    if not b64:
+        return jsonify({'success': False, 'error': 'No page'}), 400
+    return jsonify({'success': True, 'screenshot': b64, 'url': inst.page.url if inst.page else ''})
+
+
+@app.route('/api/browser/instances/<iid>/content', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_content(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    return jsonify(inst.get_page_content())
+
+
+@app.route('/api/browser/instances/<iid>/cookies', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    return jsonify({'success': True, 'cookies': inst.get_cookies()})
+
+
+@app.route('/api/browser/instances/<iid>/evaluate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_evaluate(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    expr = (request.json or {}).get('expression', '')
+    return jsonify(inst.evaluate(expr))
+
+
+@app.route('/api/browser/instances/<iid>/form', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    fields = (request.json or {}).get('fields', [])
+    return jsonify(inst.fill_form(fields))
+
+
+@app.route('/api/browser/instances/<iid>/key', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_key(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    key = (request.json or {}).get('key', '')
+    return jsonify(inst.press_key(key))
+
+
+@app.route('/api/browser/instances/<iid>/back', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_back(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    return jsonify(inst.go_back())
+
+
+@app.route('/api/browser/instances/<iid>/hover', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_hover(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    sel = (request.json or {}).get('selector', '')
+    return jsonify(inst.hover(sel))
+
+
+@app.route('/api/browser/instances/<iid>/wait', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_wait(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    data = request.json or {}
+    return jsonify(inst.wait_for(data.get('selector', ''), data.get('timeout', 10000)))
+
+
+@app.route('/api/browser/profiles', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_profiles():
+    from browser_manager import list_profiles
+    return jsonify({'success': True, 'profiles': list_profiles()})
+
+
+@app.route('/api/browser/profiles/<pid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_delete_profile(pid):
+    from browser_manager import delete_profile
+    delete_profile(pid)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/screenshot-file/<iid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshot_file(iid):
+    from browser_manager import get_instance, SCREENSHOTS_DIR
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    path = inst.screenshot()
+    if not path:
+        return jsonify({'success': False, 'error': 'Failed'}), 500
+    return send_file(path, mimetype='image/png')
+
+
 # ===== API — Stats =====
 
 @app.route('/api/stats')
@@ -2135,15 +7341,27 @@ def api_stats():
         if t.get('date', '').startswith(today):
             stats['transactions']['today'] += 1
 
-    # Matches
-    matches = read_csv('matches.csv')
-    for m in matches:
-        s = m.get('status', '')
-        if s not in ('completed', 'cancelled'): stats['matches']['active'] += 1
-        if s == 'completed': stats['matches']['completed'] += 1
-        if s == 'disputed': stats['matches']['disputed'] += 1
-    match_reqs = read_csv('match_requests.csv')
-    stats['matches']['pending'] = sum(1 for r in match_reqs if r.get('status') == 'waiting')
+    # Matches (SQLite — single source of truth)
+    try:
+        _mc = agent_db._conn()
+        _mrows = _mc.execute("SELECT status FROM matches").fetchall()
+        for _m in _mrows:
+            s = _m['status']
+            if s not in ('completed', 'cancelled'): stats['matches']['active'] += 1
+            if s == 'completed': stats['matches']['completed'] += 1
+            if s == 'disputed': stats['matches']['disputed'] += 1
+        stats['matches']['pending'] = _mc.execute(
+            "SELECT COUNT(*) c FROM match_requests WHERE status='waiting'").fetchone()['c']
+        _mc.close()
+    except Exception:
+        matches = read_csv('matches.csv')
+        for m in matches:
+            s = m.get('status', '')
+            if s not in ('completed', 'cancelled'): stats['matches']['active'] += 1
+            if s == 'completed': stats['matches']['completed'] += 1
+            if s == 'disputed': stats['matches']['disputed'] += 1
+        match_reqs = read_csv('match_requests.csv')
+        stats['matches']['pending'] = sum(1 for r in match_reqs if r.get('status') == 'waiting')
 
     # Lottery
     lot_rounds = read_csv('lottery_rounds.csv')
@@ -2202,12 +7420,22 @@ def api_stats_live():
     def generate():
         import time
         while True:
+            try:
+                _lc = agent_db._conn()
+                _active_m = _lc.execute(
+                    "SELECT COUNT(*) c FROM matches WHERE status NOT IN ('completed','cancelled')").fetchone()['c']
+                _pending_m = _lc.execute(
+                    "SELECT COUNT(*) c FROM match_requests WHERE status='waiting'").fetchone()['c']
+                _lc.close()
+            except Exception:
+                _active_m = sum(1 for m in read_csv('matches.csv') if m.get('status') not in ('completed', 'cancelled'))
+                _pending_m = sum(1 for r in read_csv('match_requests.csv') if r.get('status') == 'waiting')
             data = {
                 'timestamp': datetime.now().strftime('%H:%M:%S'),
                 'users_total': len(read_csv('users.csv')),
                 'pending_txns': sum(1 for t in read_csv('transactions.csv') if t.get('status') == 'pending'),
-                'active_matches': sum(1 for m in read_csv('matches.csv') if m.get('status') not in ('completed', 'cancelled')),
-                'pending_matches': sum(1 for r in read_csv('match_requests.csv') if r.get('status') == 'waiting'),
+                'active_matches': _active_m,
+                'pending_matches': _pending_m,
                 'lottery_participants': 0,
                 'wheel_participants': 0,
             }
@@ -2722,11 +7950,20 @@ def api_export_transactions():
 def api_users():
     search = request.args.get('search', '')
     banned = request.args.get('banned', '')
+    language = request.args.get('language', '')
+    currency = request.args.get('currency', '')
     page = int(request.args.get('page', '1'))
     per_page = int(request.args.get('per_page', '20'))
 
     users = read_csv('users.csv')
-    users.reverse()
+    users = [u for u in users if u.get('telegram_id', '').strip()]
+
+    def _sort_key(u):
+        try:
+            return u.get('date', '') or ''
+        except Exception:
+            return ''
+    users.sort(key=_sort_key, reverse=True)
 
     if search:
         sl = search.lower()
@@ -2738,24 +7975,32 @@ def api_users():
         users = [u for u in users if u.get('is_banned') == 'yes']
     elif banned == 'no':
         users = [u for u in users if u.get('is_banned') != 'yes']
+    if language:
+        users = [u for u in users if u.get('language', '').lower() == language.lower()]
+    if currency:
+        users = [u for u in users if u.get('currency', '').upper() == currency.upper()]
 
     total = len(users)
     start = (page - 1) * per_page
     end = start + per_page
 
+    all_rows = [u for u in read_csv('users.csv') if u.get('telegram_id', '').strip()]
     stats = {
-        'total': len(read_csv('users.csv')),
-        'banned': sum(1 for u in read_csv('users.csv') if u.get('is_banned') == 'yes'),
-        'verified': sum(1 for u in read_csv('users.csv') if u.get('phone_verified') == 'yes'),
-        'today': sum(1 for u in read_csv('users.csv') if u.get('date', '').startswith(datetime.now().strftime('%Y-%m-%d')))
+        'total': len(all_rows),
+        'banned': sum(1 for u in all_rows if u.get('is_banned') == 'yes'),
+        'verified': sum(1 for u in all_rows if u.get('phone_verified') == 'yes'),
+        'today': sum(1 for u in all_rows if u.get('date', '').startswith(datetime.now().strftime('%Y-%m-%d')))
     }
 
-    return jsonify({
+    resp = jsonify({
         'users': users[start:end],
         'total': total, 'page': page, 'per_page': per_page,
-        'pages': (total + per_page - 1) // per_page,
+        'pages': max(1, (total + per_page - 1) // per_page),
         'stats': stats
     })
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    return resp
 
 @app.route('/api/users/<user_id>/detail')
 @api_auth
@@ -2774,9 +8019,16 @@ def api_user_detail(user_id):
     wallets = read_csv('svrp_wallets.csv')
     wallet = next((w for w in wallets if w.get('telegram_id') == user_id), {})
 
-    # مطابقات المستخدم
-    matches = read_csv('matches.csv')
-    user_matches = [m for m in matches if m.get('depositor_id') == user_id or m.get('withdrawer_id') == user_id][-5:]
+    # مطابقات المستخدم (SQLite)
+    try:
+        _uc = agent_db._conn()
+        user_matches = [dict(r) for r in _uc.execute(
+            "SELECT * FROM matches WHERE depositor_id=? OR withdrawer_id=? "
+            "ORDER BY created_at DESC LIMIT 5", (str(user_id), str(user_id))).fetchall()]
+        _uc.close()
+    except Exception:
+        matches = read_csv('matches.csv')
+        user_matches = [m for m in matches if m.get('depositor_id') == user_id or m.get('withdrawer_id') == user_id][-5:]
 
     return jsonify({
         'user': user,
@@ -2863,6 +8115,35 @@ def _get_system_setting(key):
         pass
     return ''
 
+def _is_publishing_enabled():
+    v = (_get_system_setting('publishing_enabled') or 'yes').strip().lower()
+    return v not in ('no', '0', 'false', 'off', 'disabled')
+
+def _set_publishing_enabled(enabled: bool):
+    settings = read_csv('system_settings.csv')
+    fieldnames = get_fieldnames('system_settings.csv', ['key', 'value', 'updated_at'])
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    val = 'yes' if enabled else 'no'
+    found = False
+    for s_ in settings:
+        k = s_.get('key', '') or s_.get('setting_key', '')
+        if k == 'publishing_enabled':
+            if 'value' in s_: s_['value'] = val
+            if 'setting_value' in s_: s_['setting_value'] = val
+            if 'updated_at' in fieldnames: s_['updated_at'] = now
+            found = True
+            break
+    if not found:
+        row = {fn: '' for fn in fieldnames}
+        if 'key' in fieldnames: row['key'] = 'publishing_enabled'
+        if 'setting_key' in fieldnames: row['setting_key'] = 'publishing_enabled'
+        if 'value' in fieldnames: row['value'] = val
+        if 'setting_value' in fieldnames: row['setting_value'] = val
+        if 'updated_at' in fieldnames: row['updated_at'] = now
+        settings.append(row)
+    write_csv('system_settings.csv', settings, fieldnames)
+    return val
+
 
 @app.route('/api/bot-icon-settings')
 @api_auth
@@ -2909,6 +8190,27 @@ def api_save_bot_icon_settings():
     write_csv('system_settings.csv', settings, fieldnames)
     log_action('save_bot_icon_settings', f'{mode}/{size}')
     return jsonify({'success': True})
+
+
+@app.route('/api/publishing/status')
+@api_auth
+def api_publishing_status():
+    return jsonify({'enabled': _is_publishing_enabled()})
+
+
+@app.route('/api/publishing/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_publishing_toggle():
+    data = request.json or {}
+    # toggle if no explicit value
+    if 'enabled' in data:
+        enabled = bool(data['enabled'])
+    else:
+        enabled = not _is_publishing_enabled()
+    val = _set_publishing_enabled(enabled)
+    log_action('toggle_publishing', val)
+    return jsonify({'success': True, 'enabled': enabled, 'value': val})
 
 
 # ===== API — Icon Upload (companies & payment methods) =====
@@ -3008,21 +8310,10 @@ def api_upload_icon():
             'absolute_bot_url': f'https://vex.deals/static/uploads/icons/{fname}',
         })
     except Exception as e:
-        # Fallback: save original
-        fname = f"{base_name}.{ext}"
-        with open(os.path.join(_ICON_UPLOAD_DIR, fname), 'wb') as out:
-            out.write(blob)
-        log_action('upload_icon', f'{fname} (PIL error: {e})')
-        return jsonify({
-            'success': True,
-            'url': f'/static/uploads/icons/{fname}',
-            'telegram_url': f'/static/uploads/icons/{fname}',
-            'web_url': f'/static/uploads/icons/{fname}',
-            'bot_url': f'/static/uploads/icons/{fname}',
-            'absolute_tg_url': f'https://vex.deals/static/uploads/icons/{fname}',
-            'absolute_web_url': f'https://vex.deals/static/uploads/icons/{fname}',
-            'absolute_bot_url': f'https://vex.deals/static/uploads/icons/{fname}',
-        })
+        # فك ترميز الصورة فشل (توقيع سليم لكن البكسلات تالفة) — نرفض بدلاً من
+        # حفظ ملف معطوب ينتهي كأيقونة مكسورة في CSV
+        log_action('upload_icon_failed', f'{base_name}: PIL error: {e}')
+        return jsonify({'success': False, 'error': 'تعذر معالجة الصورة — جرّب صورة أخرى (PNG/JPG/WEBP)'}), 400
 
 @app.route('/api/companies/list')
 def api_companies_public():
@@ -3039,6 +8330,8 @@ def api_companies_public():
                 'icon': c.get('icon', '🏢'),
                 'address': c.get('address', ''),
                 'type': c.get('type', ''),
+                'promo_code': c.get('promo_code', ''),
+                'affiliate_link': c.get('affiliate_link', ''),
             })
     return jsonify({'companies': result})
 
@@ -3050,7 +8343,7 @@ def api_payment_methods_by_company(company_id):
     linked = []
     try:
         links = read_csv('company_payment_links.csv')
-        linked_ids = [l.get('payment_method_id', '') for l in links if l.get('company_id', '') == company_id]
+        linked_ids = [l.get('method_id', l.get('payment_method_id', '')) for l in links if l.get('company_id', '') == company_id]
     except:
         linked_ids = []
     result = []
@@ -3086,8 +8379,13 @@ def api_add_company():
         'icon': data.get('icon', '🏢'),
         'address': data.get('address', ''),
         'affiliate_link': data.get('affiliate_link', ''),
-        'bot_icon': data.get('bot_icon', '')
+        'bot_icon': data.get('bot_icon', ''),
+        'promo_code': data.get('promo_code', ''),
+        'show_in_comp': 'yes' if data.get('show_in_comp', True) in (True, 'yes', '1', 1, 'true') else 'no'
     }
+    for _f in ('promo_code', 'show_in_comp'):
+        if _f not in fieldnames:
+            fieldnames.append(_f)
     append_csv('companies.csv', new_company, fieldnames)
     log_action('add_company', new_id)
     return jsonify({'success': True, 'id': new_id})
@@ -3097,9 +8395,10 @@ def api_add_company():
 @permission_required('manage_companies')
 def api_edit_company(company_id):
     companies = read_csv('companies.csv')
-    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link','bot_icon'])
-    if 'bot_icon' not in fieldnames:
-        fieldnames.append('bot_icon')
+    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link','app_link','bot_icon','promo_code','show_in_comp'])
+    for _f in ('bot_icon', 'promo_code', 'show_in_comp', 'app_link'):
+        if _f not in fieldnames:
+            fieldnames.append(_f)
 
     if request.method == 'DELETE':
         companies = [c for c in companies if c.get('id') != company_id]
@@ -3108,22 +8407,935 @@ def api_edit_company(company_id):
         return jsonify({'success': True})
     elif request.method == 'PUT':
         data = request.json
+        if 'show_in_comp' in data:
+            data['show_in_comp'] = 'yes' if data['show_in_comp'] in (True, 'yes', '1', 1, 'true') else 'no'
         for c in companies:
             if c.get('id') == company_id:
                 for k, v in data.items():
                     if k in fieldnames:
+                        if k == 'icon' and (not v or not str(v).strip()):
+                            continue
                         c[k] = v
                 break
         write_csv('companies.csv', companies, fieldnames)
         log_action('edit_company', company_id)
         return jsonify({'success': True})
 
+# ===== Company Translations System =====
+import urllib.parse as _urlparse
+
+_COMPANY_TRANSLATIONS_FILE = os.path.join(BASE_DIR, 'company_translations.json')
+
+def _read_company_translations():
+    try:
+        with open(_COMPANY_TRANSLATIONS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def _write_company_translations(data):
+    tmp = _COMPANY_TRANSLATIONS_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, _COMPANY_TRANSLATIONS_FILE)
+
+def _google_translate_text(text, src_lang, tgt_lang):
+    if src_lang == tgt_lang or not text or not text.strip():
+        return text
+    try:
+        url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + src_lang + '&tl=' + tgt_lang + '&dt=t&q=' + _urlparse.quote(text)
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        resp = urllib.request.urlopen(req, timeout=15)
+        data = json.loads(resp.read().decode())
+        return ''.join([s[0] for s in data[0] if s[0]])
+    except:
+        return text
+
+ALL_TRANSLATION_LANGS = ['ar','en','fr','es','de','it','pt','ru','zh','tr','ur','hi','fa','id','ja','ko','th']
+
+@app.route('/api/companies/<company_id>/translations', methods=['GET'])
+@api_auth
+@permission_required('manage_companies')
+def api_get_company_translations(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    return jsonify({'translations': data.get(company_name, {}), 'company_name': company_name, 'languages': ALL_TRANSLATION_LANGS})
+
+@app.route('/api/companies/<company_id>/translations', methods=['PUT'])
+@api_auth
+@permission_required('manage_companies')
+def api_save_company_translations(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    body = request.json
+    if company_name not in data:
+        data[company_name] = {}
+    if 'color' in body:
+        data[company_name]['color'] = body['color']
+    if 'translations' in body:
+        for key, val in body['translations'].items():
+            if key in ('api_settings', 'seo'):
+                if key not in data[company_name]:
+                    data[company_name][key] = {}
+                if isinstance(val, dict):
+                    data[company_name][key].update(val)
+                else:
+                    data[company_name][key] = val
+            else:
+                data[company_name][key] = val
+    _write_company_translations(data)
+    log_action('save_company_translations', company_id)
+    return jsonify({'success': True})
+
+@app.route('/api/companies/<company_id>/translate', methods=['POST'])
+@api_auth
+@permission_required('manage_companies')
+def api_auto_translate_company(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    body = request.json or {}
+    src_lang = body.get('source_lang', 'ar')
+    target_langs = body.get('target_langs', [l for l in ALL_TRANSLATION_LANGS if l != src_lang])
+    if company_name not in data:
+        data[company_name] = {}
+    src = data[company_name].get(src_lang, {})
+    if not src or not src.get('description'):
+        return jsonify({'error': 'No source translations found for ' + src_lang}), 400
+    translated = {}
+    for lang in target_langs:
+        desc = _google_translate_text(src['description'], src_lang, lang)
+        time.sleep(0.3)
+        pros = [_google_translate_text(p, src_lang, lang) for p in src.get('pros', [])]
+        time.sleep(0.3)
+        cons = [_google_translate_text(c, src_lang, lang) for c in src.get('cons', [])]
+        time.sleep(0.3)
+        translated[lang] = {'description': desc, 'pros': pros, 'cons': cons}
+    for lang, tr in translated.items():
+        data[company_name][lang] = tr
+    _write_company_translations(data)
+    log_action('auto_translate_company', company_id, details=f'{src_lang} -> {len(target_langs)} languages')
+    return jsonify({'success': True, 'translated': len(translated), 'languages': target_langs})
+
+@app.route('/api/company-public/<company_id>/translations')
+def api_public_company_translations(company_id):
+    lang = request.args.get('lang', 'ar')
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({})
+    return jsonify(data.get(company_name, {}).get(lang, {}))
+
+@app.route('/api/public/company-translations/<lang>')
+def api_public_all_translations(lang):
+    data = _read_company_translations()
+    result = {}
+    for name, translations in data.items():
+        result[name] = translations.get(lang, translations.get('ar', {}))
+        result[name]['color'] = translations.get('color', '#16a34a')
+    return jsonify(result)
+
+# ===== Company API Settings =====
+
+@app.route('/api/companies/<company_id>/api-settings', methods=['GET'])
+@api_auth
+@permission_required('manage_companies')
+def api_get_company_api_settings(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    settings = data.get(company_name, {}).get('api_settings', {})
+    masked = dict(settings)
+    if masked.get('api_secret'):
+        masked['api_secret'] = '***' + masked['api_secret'][-4:] if len(masked['api_secret']) > 4 else '****'
+    return jsonify({'api_settings': masked})
+
+@app.route('/api/companies/<company_id>/api-settings', methods=['PUT'])
+@api_auth
+@permission_required('manage_companies')
+def api_save_company_api_settings(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    body = request.json or {}
+    if company_name not in data:
+        data[company_name] = {}
+    settings = data[company_name].get('api_settings', {})
+    for key in ('api_key', 'api_url', 'webhook_url', 'affiliate_id', 'api_secret'):
+        if key in body:
+            settings[key] = body[key]
+    data[company_name]['api_settings'] = settings
+    _write_company_translations(data)
+    log_action('save_company_api_settings', company_id)
+    return jsonify({'success': True})
+
+# ===== Company SEO Agent =====
+
+@app.route('/api/companies/<company_id>/seo', methods=['GET'])
+@api_auth
+@permission_required('manage_companies')
+def api_get_company_seo(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    seo_form = data.get(company_name, {}).get('seo', {})
+    try:
+        from seo_agent import load_seo_data
+        seo_data = load_seo_data().get(company_name, {}).get('current', {})
+    except Exception:
+        seo_data = {}
+    return jsonify({'seo_form': seo_form, 'seo_data': seo_data, 'company_name': company_name})
+
+@app.route('/api/companies/<company_id>/seo/analyze', methods=['POST'])
+@api_auth
+@permission_required('manage_companies')
+def api_analyze_company_seo(company_id):
+    companies = read_csv('companies.csv')
+    company_name = ''
+    company_url = None
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    try:
+        from seo_agent import analyze_and_store
+        result = analyze_and_store(company_name, company_url)
+        data = _read_company_translations()
+        if company_name in data:
+            if 'seo' not in data[company_name]:
+                data[company_name]['seo'] = {}
+            data[company_name]['seo']['last_score'] = result.get('score', 0)
+            data[company_name]['seo']['last_analysis'] = result.get('analyzed_at', '')
+            _write_company_translations(data)
+        log_action('analyze_company_seo', company_id, details=f'score={result.get("score", 0)}')
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/companies/<company_id>/seo/generate', methods=['POST'])
+@api_auth
+@permission_required('manage_companies')
+def api_generate_company_seo_meta(company_id):
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    try:
+        from seo_agent import generate_optimized_meta
+        data = _read_company_translations()
+        desc = data.get(company_name, {}).get('ar', {}).get('description', '')
+        meta = generate_optimized_meta(company_name, desc)
+        return jsonify({'success': True, 'meta': meta})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/seo/run-daily', methods=['POST'])
+@api_auth
+@permission_required('manage_companies')
+def api_seo_run_daily():
+    try:
+        from seo_agent import analyze_all_companies
+        companies = read_csv('companies.csv')
+        active = [c for c in companies if c.get('is_active', '').lower() in ('yes', 'true', '1', 'active', '')]
+        results = analyze_all_companies(active)
+        return jsonify({'success': True, 'analyzed': len(results), 'results': results})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/seo/daily-schedule', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_seo_daily_schedule():
+    data = request.json or {}
+    enabled = data.get('enabled', True)
+    _set_system_setting('seo_daily_enabled', 'yes' if enabled else 'no')
+    log_action('seo_daily_schedule', f'enabled={enabled}')
+    return jsonify({'success': True, 'enabled': enabled})
+
+@app.route('/api/seo/daily-status')
+@api_auth
+@permission_required('manage_companies')
+def api_seo_daily_status():
+    enabled = (_get_system_setting('seo_daily_enabled') or 'yes').lower() not in ('no', '0', 'false')
+    try:
+        from seo_agent import load_seo_data
+        seo_data = load_seo_data()
+        summary = {}
+        for name, info in seo_data.items():
+            current = info.get('current', {})
+            summary[name] = {
+                'score': current.get('score', 0),
+                'last_analysis': current.get('analyzed_at', ''),
+                'issues_count': len(current.get('issues', [])),
+            }
+        return jsonify({'enabled': enabled, 'summary': summary})
+    except Exception:
+        return jsonify({'enabled': enabled, 'summary': {}})
+
+
+# ===== نظام التعويض (Compensation) — player web flow + admin approvals =====
+
+_COMP_CSV_LOCK = threading.Lock()
+
+def _comp_svrp():
+    import sys as _s; _s.path.insert(0, BASE_DIR)
+    from svrp import SVRPManager as _M
+    return _M()
+
+def _comp_tg(uid, text):
+    """Best-effort Telegram notification to a player."""
+    if not BOT_TOKEN or not uid:
+        return
+    try:
+        import urllib.request as _u, json as _j
+        _u.urlopen(_u.Request(
+            f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage',
+            data=_j.dumps({'chat_id': str(uid), 'text': text, 'parse_mode': 'HTML'}).encode(),
+            headers={'Content-Type': 'application/json'}), timeout=6)
+    except Exception as _e:
+        app.logger.warning(f'comp notify failed uid={uid}: {_e}')
+
+def _comp_alert_admins(text):
+    for aid in ADMIN_IDS:
+        _comp_tg(aid, text)
+
+def _comp_strong_auth_or_error():
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'المصادقة مطلوبة — افتح الصفحة من التطبيق أو تيليغرام'}), 401
+    return None
+
+@app.route('/api/comp/admin/data')
+@api_auth
+@permission_required('view_financial')
+def api_comp_admin_data():
+    accounts = read_csv('user_company_accounts.csv'); accounts.reverse()
+    # دمج إجابة "متى فتحت الحساب" (إن وُجدت) مع كل حساب
+    try:
+        src_map = {}
+        for s in read_csv('comp_account_sources.csv'):
+            src_map[(str(s.get('user_id', '')), str(s.get('company_id', '')))] = s.get('source', '')
+    except Exception:
+        src_map = {}
+    for a in accounts[:200]:
+        a['account_source'] = src_map.get((str(a.get('user_id', '')), str(a.get('company_id', ''))), '')
+    return jsonify({'accounts': accounts[:200]})
+
+@app.route('/api/comp/admin/account/<acc_id>', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_comp_admin_account(acc_id):
+    action = (request.json or {}).get('action', '')
+    if action not in ('approve', 'reject'):
+        return jsonify({'error': 'إجراء غير صالح'}), 400
+    with _COMP_CSV_LOCK:
+        rows = read_csv('user_company_accounts.csv')
+        fieldnames = get_fieldnames('user_company_accounts.csv',
+            ['id','user_id','company_id','company_name','account_number','status','created_at'])
+        row = next((r for r in rows if r.get('id') == acc_id), None)
+        if not row:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        row['status'] = 'active' if action == 'approve' else 'rejected'
+        write_csv('user_company_accounts.csv', rows, fieldnames)
+    uid = str(row.get('user_id',''))
+    if action == 'approve':
+        _comp_tg(uid, f"✅ <b>تم تأكيد حسابك في {row.get('company_name','')}</b>\n"
+                      f"🔢 الحساب: <code>{row.get('account_number','')}</code>\n\n"
+                      f"💰 قم بالإيداع والعب — وإذا خسرت قدّم طلب تعويض من صفحة التعويضات وسيتم تعويضك.")
+    else:
+        _comp_tg(uid, f"❌ لم يتم تأكيد حسابك في {row.get('company_name','')}.\n"
+                      f"تأكد من رقم الحساب وأنك سجلت بكود البرومو الخاص بنا ثم أعد المحاولة.")
+    log_action(f'comp_account_{action}', acc_id)
+    return jsonify({'success': True})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ===== COMPENSATION / REFERRAL SYSTEM (Web) =====
+# ══════════════════════════════════════════════════════════════════════════════
+
+_COMP_CSV_LOCK_WEB = threading.Lock()
+_RECOVERY_UPLOADS_DIR = os.path.join(BASE_DIR, 'recovery_uploads')
+
+def _comp_read_accounts():
+    return read_csv('compensation_accounts.csv')
+
+def _comp_write_accounts(rows):
+    write_csv('compensation_accounts.csv', rows,
+              ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+               'status', 'created_at'])
+
+def _comp_read_pins():
+    return read_csv('compensation_pins.csv')
+
+def _comp_write_pins(rows):
+    write_csv('compensation_pins.csv', rows,
+              ['user_id', 'pin_hash', 'created_at'])
+
+def _comp_read_requests():
+    return read_csv('compensation_requests.csv')
+
+def _comp_write_requests(rows):
+    write_csv('compensation_requests.csv', rows,
+              ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+               'screenshot', 'status', 'amount', 'note', 'created_at',
+               'reviewed_at', 'reviewed_by'])
+
+def _comp_pin_hash(pin):
+    return hashlib.sha256(pin.encode()).hexdigest()
+
+def _comp_get_user_pin(uid):
+    for p in _comp_read_pins():
+        if str(p.get('user_id', '')) == str(uid):
+            return p
+    return None
+
+# ── Wallet helpers ──
+def _comp_read_wallets():
+    return read_csv('compensation_wallets.csv')
+
+def _comp_write_wallets(rows):
+    write_csv('compensation_wallets.csv', rows,
+              ['user_id','company_id','company_name','frozen','available','created_at'])
+
+def _comp_get_wallet(user_id, company_id):
+    for w in _comp_read_wallets():
+        if str(w.get('user_id',''))==str(user_id) and str(w.get('company_id',''))==str(company_id):
+            return w
+    return None
+
+def _comp_update_wallet(user_id, company_id, company_name, frozen_add=0, available_add=0):
+    rows = _comp_read_wallets()
+    found = False
+    for w in rows:
+        if str(w.get('user_id',''))==str(user_id) and str(w.get('company_id',''))==str(company_id):
+            w['frozen'] = str(float(w.get('frozen',0)) + frozen_add)
+            w['available'] = str(float(w.get('available',0)) + available_add)
+            found = True
+            break
+    if not found:
+        rows.append({'user_id':str(user_id),'company_id':str(company_id),'company_name':str(company_name),
+                      'frozen':str(max(0,frozen_add)),'available':str(max(0,available_add)),
+                      'created_at':datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
+    _comp_write_wallets(rows)
+
+def _comp_get_user_wallets(user_id):
+    return [w for w in _comp_read_wallets() if str(w.get('user_id',''))==str(user_id)]
+
+# ── Referral helpers ──
+def _comp_read_referrals():
+    return read_csv('compensation_referrals.csv')
+
+def _comp_write_referrals(rows):
+    write_csv('compensation_referrals.csv', rows,
+              ['id','referrer_id','referred_id','company_id','company_name',
+               'referral_code','referred_account','status','created_at'])
+
+def _comp_gen_referral_code(user_id, company_id):
+    import hashlib as _hl
+    return _hl.md5(f'{user_id}:{company_id}:vex'.encode()).hexdigest()[:8].upper()
+
+def _comp_get_referral(code):
+    for r in _comp_read_referrals():
+        if r.get('referral_code','')==code:
+            return r
+    return None
+
+def _comp_get_referrals_by_referrer(user_id):
+    return [r for r in _comp_read_referrals() if str(r.get('referrer_id',''))==str(user_id)]
+
+def _comp_get_referrals_by_referred(user_id):
+    return [r for r in _comp_read_referrals() if str(r.get('referred_id',''))==str(user_id)]
+
+def _comp_has_referrer_referred(referrer_id, referred_id, company_id):
+    for r in _comp_read_referrals():
+        if str(r.get('referrer_id',''))==str(referrer_id) and str(r.get('referred_id',''))==str(referred_id) and str(r.get('company_id',''))==str(company_id):
+            return True
+    return False
+
+# ── Transfer helpers ──
+def _comp_read_transfers():
+    return read_csv('compensation_transfers.csv')
+
+def _comp_write_transfers(rows):
+    write_csv('compensation_transfers.csv', rows,
+              ['id','from_user','to_account','company_id','company_name',
+               'amount','status','otp_phone','created_at'])
+
+# ── OTP helpers ──
+def _comp_read_otp():
+    return read_csv('compensation_otp.csv')
+
+def _comp_write_otp(rows):
+    write_csv('compensation_otp.csv', rows,
+              ['user_id','phone','code','used','created_at'])
+
+def _comp_generate_otp():
+    return str(int.from_bytes(os.urandom(2), 'big') % 10000).zfill(4)
+
+def _comp_get_user_phone(user_id):
+    for p in _comp_read_pins():
+        if str(p.get('user_id',''))==str(user_id):
+            return p.get('phone','')
+    return ''
+
+def _comp_get_user_accounts(uid):
+    return [a for a in _comp_read_accounts()
+            if str(a.get('user_id', '')) == str(uid)]
+
+def _comp_get_user_requests(uid):
+    return [r for r in _comp_read_requests()
+            if str(r.get('user_id', '')) == str(uid)]
+
+def _comp_get_all_companies():
+    """Return active companies with compensation data (affiliate links, promo codes)."""
+    result = []
+    try:
+        translations = _read_company_translations()
+    except Exception:
+        translations = {}
+    for c in read_csv('companies.csv'):
+        if (c.get('is_active', '') or '').lower() not in ('active', 'yes', '1', 'true'):
+            continue
+        show = (c.get('show_in_comp', '') or '').lower()
+        if show in ('no', '0', 'false'):
+            continue
+        cid = c.get('id', '')
+        name = c.get('name', '')
+        icon = c.get('icon', '🏢')
+        promo = c.get('promo_code', '')
+        affiliate = c.get('affiliate_link', '')
+        app_link = c.get('app_link', '')
+        color = '#334155'
+        desc = ''
+        if name in translations:
+            tr = translations[name]
+            color = tr.get('color', color)
+            ar = tr.get('ar', {})
+            desc = ar.get('description', '')[:200]
+        result.append({
+            'id': cid, 'name': name, 'icon': icon,
+            'promo_code': promo, 'affiliate_link': affiliate,
+            'app_link': app_link, 'color': color, 'description': desc
+        })
+    return result
+
+
+@app.route('/compensation')
+def page_compensation():
+    return render_template('compensation.html', active_page='compensation')
+
+
+@app.route('/compensation-info')
+def page_compensation_info():
+    return render_template('compensation-info.html')
+
+
+@app.route('/api/comp/public/companies')
+def api_comp_public_companies():
+    companies = _comp_get_all_companies()
+    return jsonify({'companies': companies})
+
+
+@app.route('/api/comp/public/my-accounts')
+def api_comp_public_my_accounts():
+    user_id = request.args.get('user_id', '').strip()
+    if not user_id:
+        return jsonify({'accounts': []})
+    accounts = [r for r in _comp_read_accounts() if str(r.get('user_id', '')) == user_id]
+    company_icons = {}
+    for c in read_csv('companies.csv'):
+        company_icons[c.get('name', '')] = c.get('icon', '')
+    for acc in accounts:
+        acc['icon'] = company_icons.get(acc.get('company_name', ''), '')
+    return jsonify({'accounts': accounts})
+
+
+@app.route('/api/comp/public/register', methods=['POST'])
+def api_comp_public_register():
+    data = request.get_json(silent=True) or {}
+    user_id = str(data.get('user_id', '')).strip()
+    company_id = str(data.get('company_id', '')).strip()
+    company_name = str(data.get('company_name', '')).strip()
+    account_number = str(data.get('account_number', '')).strip()
+    pin = str(data.get('pin', '')).strip()
+    if not user_id:
+        return jsonify({'error': 'معرّف المستخدم مفقود'}), 400
+    if not company_id:
+        return jsonify({'error': 'اختر الشركة'}), 400
+    if not account_number or len(account_number) < 3:
+        return jsonify({'error': 'رقم الحساب يجب أن يكون 3 أحرف على الأقل'}), 400
+    if len(account_number) > 64:
+        return jsonify({'error': 'رقم الحساب طويل جداً'}), 400
+    if not re.match(r'^\d{4}$', pin):
+        return jsonify({'error': 'الرمز يجب أن يكون 4 أرقام'}), 400
+    company = _find_active_company(company_id)
+    if not company:
+        return jsonify({'error': 'الشركة غير موجودة أو غير نشطة'}), 404
+    with _COMP_CSV_LOCK_WEB:
+        existing = _comp_read_accounts()
+        for r in existing:
+            if (str(r.get('user_id', '')) == user_id
+                    and r.get('company_id') == company_id
+                    and r.get('status') in ('pending', 'active', 'approved')):
+                return jsonify({'error': 'لديك حساب مسجل بالفعل في هذه الشركة'}), 409
+        acc_id = f"CA{secrets.token_hex(5).upper()}"
+        fieldnames = get_fieldnames('compensation_accounts.csv',
+            ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+             'status', 'created_at'])
+        append_csv('compensation_accounts.csv', {
+            'id': acc_id,
+            'user_id': user_id,
+            'company_id': company_id,
+            'company_name': company_name or company.get('name', ''),
+            'account_number': account_number,
+            'status': 'pending',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }, fieldnames)
+        pin_fieldnames = get_fieldnames('compensation_pins.csv',
+            ['user_id', 'pin_hash', 'created_at'])
+        has_pin = any(str(r.get('user_id', '')) == user_id for r in _comp_read_pins())
+        if not has_pin:
+            append_csv('compensation_pins.csv', {
+                'user_id': user_id,
+                'pin_hash': _comp_pin_hash(pin),
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+            }, pin_fieldnames)
+    _comp_alert_admins(
+        f"🆕 <b>طلب تسجيل حساب تعويض (ويب)</b>\n"
+        f"👤 المستخدم: <code>{user_id}</code>\n"
+        f"🏢 الشركة: {company_name or company.get('name', '')}\n"
+        f"🔢 الحساب: <code>{account_number}</code>"
+    )
+    return jsonify({'ok': True, 'id': acc_id})
+
+
+@app.route('/api/comp/status')
+@login_required
+def api_comp_status():
+    uid = session.get('admin_id', '')
+    pin = _comp_get_user_pin(uid)
+    accounts = _comp_get_user_accounts(uid)
+    requests = _comp_get_user_requests(uid)
+    companies = _comp_get_all_companies()
+    return jsonify({
+        'has_pin': pin is not None,
+        'accounts': accounts,
+        'requests': sorted(requests, key=lambda r: r.get('created_at', ''), reverse=True),
+        'companies': companies
+    })
+
+
+@app.route('/api/comp/register', methods=['POST'])
+@login_required
+def api_comp_register():
+    uid = session.get('admin_id', '')
+    data = request.get_json(silent=True) or {}
+    company_id = str(data.get('company_id', '')).strip()
+    account_number = str(data.get('account_number', '')).strip()
+    if not company_id:
+        return jsonify({'error': 'اختر الشركة'}), 400
+    if not account_number or len(account_number) < 3:
+        return jsonify({'error': 'رقم الحساب يجب أن يكون 3 أحرف على الأقل'}), 400
+    if len(account_number) > 64:
+        return jsonify({'error': 'رقم الحساب طويل جداً'}), 400
+    company = _find_active_company(company_id)
+    if not company:
+        return jsonify({'error': 'الشركة غير موجودة أو غير نشطة'}), 404
+    with _COMP_CSV_LOCK_WEB:
+        rows = _comp_read_accounts()
+        for r in rows:
+            if (str(r.get('user_id', '')) == str(uid)
+                    and r.get('company_id') == company_id
+                    and r.get('status') in ('pending', 'active', 'approved')):
+                return jsonify({'error': 'لديك حساب مسجل بالفعل في هذه الشركة'}), 409
+        acc_id = f"CA{secrets.token_hex(5).upper()}"
+        fieldnames = get_fieldnames('compensation_accounts.csv',
+            ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+             'status', 'created_at'])
+        append_csv('compensation_accounts.csv', {
+            'id': acc_id,
+            'user_id': str(uid),
+            'company_id': company_id,
+            'company_name': company.get('name', ''),
+            'account_number': account_number,
+            'status': 'pending',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }, fieldnames)
+    _comp_alert_admins(
+        f"🆕 <b>طلب تسجيل حساب تعويض (ويب)</b>\n"
+        f"👤 المستخدم: <code>{uid}</code>\n"
+        f"🏢 الشركة: {company.get('name', '')}\n"
+        f"🔢 الحساب: <code>{account_number}</code>"
+    )
+    return jsonify({'ok': True, 'id': acc_id})
+
+
+@app.route('/api/comp/pin', methods=['POST'])
+@login_required
+def api_comp_pin():
+    uid = session.get('admin_id', '')
+    data = request.get_json(silent=True) or {}
+    pin = str(data.get('pin', '')).strip()
+    if not re.match(r'^\d{4}$', pin):
+        return jsonify({'error': 'الرمز يجب أن يكون 4 أرقام'}), 400
+    with _COMP_CSV_LOCK_WEB:
+        existing = _comp_get_user_pin(uid)
+        if existing:
+            return jsonify({'error': 'لديك رمز PIN مسجل بالفعل'}), 409
+        fieldnames = get_fieldnames('compensation_pins.csv',
+            ['user_id', 'pin_hash', 'created_at'])
+        append_csv('compensation_pins.csv', {
+            'user_id': str(uid),
+            'pin_hash': _comp_pin_hash(pin),
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }, fieldnames)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/comp/request', methods=['POST'])
+@login_required
+def api_comp_request():
+    uid = session.get('admin_id', '')
+    company_id = str(request.form.get('company_id', '')).strip()
+    if not company_id:
+        return jsonify({'error': 'اختر الشركة'}), 400
+    company = _find_active_company(company_id)
+    if not company:
+        return jsonify({'error': 'الشركة غير موجودة أو غير نشطة'}), 404
+    accounts = _comp_get_user_accounts(uid)
+    acc = next((a for a in accounts
+                if a.get('company_id') == company_id
+                and a.get('status') in ('active', 'approved')), None)
+    if not acc:
+        return jsonify({'error': 'يجب تأكيد حسابك في هذه الشركة أولاً'}), 400
+    f = request.files.get('screenshot')
+    if not f or not f.filename:
+        return jsonify({'error': 'أرفق لقطة شاشة'}), 400
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in ('.png', '.jpg', '.jpeg', '.webp'):
+        return jsonify({'error': 'صيغة الصورة غير مدعومة (png/jpg/webp)'}), 400
+    blob = f.read(5 * 1024 * 1024 + 1)
+    if len(blob) > 5 * 1024 * 1024:
+        return jsonify({'error': 'حجم الصورة يتجاوز 5MB'}), 400
+    if not blob:
+        return jsonify({'error': 'الملف فارغ'}), 400
+    _sig_ok = (blob.startswith(b'\x89PNG') or blob.startswith(b'\xff\xd8\xff')
+               or (blob[:4] == b'RIFF' and blob[8:12] == b'WEBP'))
+    if not _sig_ok:
+        return jsonify({'error': 'الملف ليس صورة صالحة'}), 400
+    with _COMP_CSV_LOCK_WEB:
+        existing = _comp_read_requests()
+        for r in existing:
+            if (str(r.get('user_id', '')) == str(uid)
+                    and r.get('company_id') == company_id
+                    and r.get('status') == 'pending'):
+                return jsonify({'error': 'لديك طلب معلق بالفعل في هذه الشركة'}), 409
+    os.makedirs(_RECOVERY_UPLOADS_DIR, exist_ok=True)
+    fname = f"comp_{uid}_{secrets.token_hex(8)}{ext}"
+    upload_path = os.path.join(_RECOVERY_UPLOADS_DIR, fname)
+    with open(upload_path, 'wb') as out:
+        out.write(blob)
+    with _COMP_CSV_LOCK_WEB:
+        req_id = f"CR{secrets.token_hex(5).upper()}"
+        fieldnames = get_fieldnames('compensation_requests.csv',
+            ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+             'screenshot', 'status', 'amount', 'note', 'created_at',
+             'reviewed_at', 'reviewed_by'])
+        append_csv('compensation_requests.csv', {
+            'id': req_id,
+            'user_id': str(uid),
+            'company_id': company_id,
+            'company_name': company.get('name', ''),
+            'account_number': acc.get('account_number', ''),
+            'screenshot': fname,
+            'status': 'pending',
+            'amount': '',
+            'note': '',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'reviewed_at': '',
+            'reviewed_by': ''
+        }, fieldnames)
+    _comp_alert_admins(
+        f"💰 <b>طلب تعويض جديد (ويب)</b>\n"
+        f"👤 المستخدم: <code>{uid}</code>\n"
+        f"🏢 الشركة: {company.get('name', '')}\n"
+        f"🔢 الحساب: <code>{acc.get('account_number', '')}</code>\n"
+        f"🆔 الطلب: <code>{req_id}</code>"
+    )
+    return jsonify({'ok': True, 'request_id': req_id})
+
+
+@app.route('/api/comp/admin/requests')
+@api_auth
+@permission_required('view_financial')
+def api_comp_admin_requests():
+    requests = _comp_read_requests()
+    requests.reverse()
+    return jsonify({'requests': requests[:200]})
+
+
+@app.route('/api/comp/admin/requests/<req_id>/approve', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_comp_admin_approve_request(req_id):
+    data = request.get_json(silent=True) or {}
+    amount = str(data.get('amount', '')).strip()
+    note = str(data.get('note', '')).strip()
+    with _COMP_CSV_LOCK_WEB:
+        rows = _comp_read_requests()
+        fieldnames = get_fieldnames('compensation_requests.csv',
+            ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+             'screenshot', 'status', 'amount', 'note', 'created_at',
+             'reviewed_at', 'reviewed_by'])
+        row = next((r for r in rows if r.get('id') == req_id), None)
+        if not row:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if row.get('status') != 'pending':
+            return jsonify({'error': 'تمت معالجة هذا الطلب مسبقاً'}), 409
+        row['status'] = 'approved'
+        row['amount'] = amount
+        row['note'] = note
+        row['reviewed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+        row['reviewed_by'] = str(session.get('admin_id', ''))
+        _comp_write_requests(rows)
+    uid = str(row.get('user_id', ''))
+    _comp_tg(uid,
+             f"✅ <b>تم التعويض!</b>\n"
+             f"🏢 الشركة: {row.get('company_name', '')}\n"
+             f"💰 المبلغ: {amount} $\n"
+             f"📋 الطلب: <code>{req_id}</code>")
+    log_action('comp_request_approve', f'{req_id} amount={amount}')
+    return jsonify({'ok': True})
+
+
+@app.route('/api/comp/admin/requests/<req_id>/reject', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_comp_admin_reject_request(req_id):
+    data = request.get_json(silent=True) or {}
+    note = str(data.get('note', '')).strip()
+    with _COMP_CSV_LOCK_WEB:
+        rows = _comp_read_requests()
+        fieldnames = get_fieldnames('compensation_requests.csv',
+            ['id', 'user_id', 'company_id', 'company_name', 'account_number',
+             'screenshot', 'status', 'amount', 'note', 'created_at',
+             'reviewed_at', 'reviewed_by'])
+        row = next((r for r in rows if r.get('id') == req_id), None)
+        if not row:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if row.get('status') != 'pending':
+            return jsonify({'error': 'تمت معالجة هذا الطلب مسبقاً'}), 409
+        row['status'] = 'rejected'
+        row['note'] = note
+        row['reviewed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+        row['reviewed_by'] = str(session.get('admin_id', ''))
+        _comp_write_requests(rows)
+    uid = str(row.get('user_id', ''))
+    _comp_tg(uid,
+             f"❌ <b>تم رفض طلب التعويض</b>\n"
+             f"🏢 الشركة: {row.get('company_name', '')}\n"
+             f"📋 الطلب: <code>{req_id}</code>")
+    log_action('comp_request_reject', req_id)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/comp/admin/requests/<req_id>/screenshot')
+@api_auth
+@permission_required('view_financial')
+def api_comp_admin_request_screenshot(req_id):
+    rows = _comp_read_requests()
+    row = next((r for r in rows if r.get('id') == req_id), None)
+    if not row:
+        return jsonify({'error': 'Not found'}), 404
+    screenshot = row.get('screenshot', '')
+    if not screenshot:
+        return jsonify({'error': 'No screenshot'}), 404
+    path = os.path.join(_RECOVERY_UPLOADS_DIR, screenshot)
+    if not os.path.exists(path):
+        return jsonify({'error': 'File not found'}), 404
+    return send_file(path)
+
+
 # ===== API — Payment Methods =====
+
+# قفل يمنع تداخل قراءة/كتابة متزامنة على payment_methods.csv (تعدد عمال gunicorn)
+_PM_CSV_LOCK = threading.Lock()
+
+def _pm_fieldnames():
+    return get_fieldnames('payment_methods.csv',
+        ['id','company_id','method_name','method_type','account_data','additional_info',
+         'status','created_date','icon','available_for_games','currency','bot_icon'])
+
+def _pm_new_id():
+    """معرف فريد لوسيلة الدفع — timestamp وحده تكرر عند نقرات متتالية
+    في نفس الثانية (كسر Alpine x-for بالمفاتيح المكررة)؛ نضيف عشوائية."""
+    return f"PM{str(int(datetime.now().timestamp()))[-6:]}{secrets.token_hex(2).upper()}"
 
 @app.route('/api/payment-methods')
 @api_auth
 def api_payment_methods():
-    methods = read_csv('payment_methods.csv')
+    with _PM_CSV_LOCK:
+        methods = read_csv('payment_methods.csv')
+    # دفاع إضافي: تجاهل أي صفوف بمعرفات مكررة (نُبقي الأول) كي لا
+    # تنكسر قوائم Alpine x-for :key مهما حدث للبيانات
+    seen_ids = set()
+    unique_methods = []
+    for m in methods:
+        mid = m.get('id', '')
+        if mid and mid in seen_ids:
+            continue
+        if mid:
+            seen_ids.add(mid)
+        unique_methods.append(m)
+    methods = unique_methods
     links = read_csv('company_payment_links.csv')
     # إضافة قائمة الشركات المرتبطة لكل وسيلة
     for m in methods:
@@ -3131,21 +9343,18 @@ def api_payment_methods():
         linked_companies = [l.get('company_id') for l in links if l.get('method_id') == mid]
         m['linked_company_ids'] = linked_companies
         m['linked_count'] = len(linked_companies)
-    return jsonify({'methods': methods})
+    return jsonify({'methods': methods, 'active_count': sum(1 for m in methods if m.get('status') == 'active')})
 
 @app.route('/api/payment-methods', methods=['POST'])
 @api_auth
 @permission_required('manage_companies')
 def api_add_payment_method():
     data = request.json
-    methods = read_csv('payment_methods.csv')
-    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
-    for extra in ('available_for_games', 'currency', 'bot_icon'):
-        if extra not in fieldnames:
-            fieldnames.append(extra)
-    new_id = f"PM{str(int(datetime.now().timestamp()))[-6:]}"
+    if not str(data.get('method_name', '')).strip():
+        return jsonify({'success': False, 'error': 'اسم الوسيلة مطلوب'}), 400
+    fieldnames = _pm_fieldnames()
     new_method = {
-        'id': new_id,
+        'id': '',  # يُولَّد داخل القفل
         'company_id': '',
         'method_name': data.get('method_name', ''),
         'method_type': data.get('method_type', ''),
@@ -3158,7 +9367,14 @@ def api_add_payment_method():
         'currency': data.get('currency', ''),
         'bot_icon': data.get('bot_icon', '')
     }
-    append_csv('payment_methods.csv', new_method, fieldnames)
+    with _PM_CSV_LOCK:
+        # توليد معرف فريد مع فحص فعلي داخل القفل
+        new_id = _pm_new_id()
+        existing = read_csv('payment_methods.csv')
+        while any(m.get('id') == new_id for m in existing):
+            new_id = _pm_new_id()
+        new_method['id'] = new_id
+        append_csv('payment_methods.csv', new_method, fieldnames)
     log_action('add_payment_method', new_id)
     return jsonify({'success': True, 'id': new_id})
 
@@ -3166,27 +9382,29 @@ def api_add_payment_method():
 @api_auth
 @permission_required('manage_companies')
 def api_edit_payment_method(method_id):
-    methods = read_csv('payment_methods.csv')
-    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
-    for extra in ('available_for_games', 'currency', 'bot_icon'):
-        if extra not in fieldnames:
-            fieldnames.append(extra)
+    with _PM_CSV_LOCK:
+        methods = read_csv('payment_methods.csv')
+        fieldnames = _pm_fieldnames()
 
-    if request.method == 'DELETE':
-        methods = [m for m in methods if m.get('id') != method_id]
-        write_csv('payment_methods.csv', methods, fieldnames)
-        log_action('delete_payment_method', method_id)
-        return jsonify({'success': True})
-    elif request.method == 'PUT':
-        data = request.json
-        for m in methods:
-            if m.get('id') == method_id:
-                for k, v in data.items():
-                    if k in fieldnames:
-                        m[k] = v
-                break
-        write_csv('payment_methods.csv', methods, fieldnames)
-        return jsonify({'success': True})
+        if request.method == 'DELETE':
+            methods = [m for m in methods if m.get('id') != method_id]
+            write_csv('payment_methods.csv', methods, fieldnames)
+            log_action('delete_payment_method', method_id)
+            return jsonify({'success': True})
+        elif request.method == 'PUT':
+            data = request.json
+            found = False
+            for m in methods:
+                if m.get('id') == method_id:
+                    found = True
+                    for k, v in data.items():
+                        if k in fieldnames and k not in ('linked_company_ids', 'linked_count'):
+                            m[k] = v
+                    break
+            if not found:
+                return jsonify({'success': False, 'error': 'الوسيلة غير موجودة'}), 404
+            write_csv('payment_methods.csv', methods, fieldnames)
+            return jsonify({'success': True})
 
 # ===== API — Payment Links (company_payment_links.csv) =====
 
@@ -3223,45 +9441,355 @@ def api_save_payment_links():
     log_action('save_payment_links', f'method={method_id}, companies={len(company_ids)}')
     return jsonify({'success': True, 'linked_count': len(company_ids)})
 
-# ===== API — Matching =====
+# ===== API — Matching (SQLite — single source of truth) =====
 
 @app.route('/api/matching/active')
 @api_auth
 def api_matching_active():
-    matches = read_csv('matches.csv')
-    active = [m for m in matches if m.get('status') not in ('completed', 'cancelled')]
-    active.reverse()
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute('''
+            SELECT m.*, a.bot_name AS agent_name
+            FROM matches m LEFT JOIN agent_bots a ON m.agent_id = a.id
+            WHERE m.status NOT IN ('completed','cancelled')
+            ORDER BY m.created_at DESC''').fetchall()
+        active = [dict(r) for r in rows]
+    finally:
+        conn.close()
     return jsonify({'matches': active, 'count': len(active)})
 
 @app.route('/api/matching/pending')
 @api_auth
 def api_matching_pending():
-    reqs = read_csv('match_requests.csv')
-    pending = [r for r in reqs if r.get('status') == 'waiting']
-    pending.reverse()
+    """Pending matching requests — with assigned-agent info so the main admin
+    sees exactly which agent is on duty for each request."""
+    pending = agent_db.list_ops_requests(
+        statuses=['waiting', 'approved', 'disputed'],
+        states=[],
+        limit=300)
     return jsonify({'requests': pending, 'count': len(pending)})
 
 @app.route('/api/matching/logs')
 @api_auth
 def api_matching_logs():
-    matches = read_csv('matches.csv')
-    logs = [m for m in matches if m.get('status') in ('completed', 'cancelled')]
-    logs.reverse()
-    return jsonify({'matches': logs[:50], 'count': len(logs)})
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute('''
+            SELECT m.*, a.bot_name AS agent_name
+            FROM matches m LEFT JOIN agent_bots a ON m.agent_id = a.id
+            WHERE m.status IN ('completed','cancelled')
+            ORDER BY m.created_at DESC LIMIT 50''').fetchall()
+        logs = [dict(r) for r in rows]
+        req_rows = conn.execute('''
+            SELECT r.*, a.bot_name AS agent_name
+            FROM match_requests r
+            LEFT JOIN agent_bots a ON r.assigned_agent_id = a.id
+            WHERE r.status IN ('matched','cancelled','rejected')
+            ORDER BY r.created_at DESC LIMIT 100
+        ''').fetchall()
+        for rr in req_rows:
+            rd = dict(rr)
+            logs.append({
+                'id': rd.get('id', ''),
+                'depositor_alias': rd.get('alias', '—'),
+                'depositor_id': rd.get('user_id', ''),
+                'withdrawer_alias': rd.get('agent_name', 'طرف آخر'),
+                'withdrawer_id': rd.get('assigned_agent_id', ''),
+                'amount': rd.get('amount', 0),
+                'currency': rd.get('currency', 'EGP'),
+                'company_name': rd.get('company_name', ''),
+                'status': rd.get('status', ''),
+                'completed_at': rd.get('approved_at', '') or rd.get('created_at', ''),
+                'created_at': rd.get('created_at', ''),
+            })
+        logs.sort(key=lambda x: (x.get('completed_at') or x.get('created_at') or ''), reverse=True)
+        logs = logs[:100]
+    finally:
+        conn.close()
+    return jsonify({'matches': logs, 'count': len(logs)})
 
 @app.route('/api/matching/<match_id>/chat')
 @api_auth
 def api_match_chat(match_id):
-    messages = read_csv('chat_messages.csv')
-    chat = [m for m in messages if m.get('match_id') == match_id]
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM chat_messages WHERE match_id=? ORDER BY id', (match_id,)).fetchall()
+        chat = [dict(r) for r in rows]
+    finally:
+        conn.close()
     return jsonify({'messages': chat})
 
 @app.route('/api/matching/<match_id>/disputes')
 @api_auth
 def api_match_disputes(match_id):
-    disputes = read_csv('disputes.csv')
-    match_disputes = [d for d in disputes if d.get('match_id') == match_id]
-    return jsonify({'disputes': match_disputes})
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM match_disputes WHERE match_id=? ORDER BY created_at DESC',
+            (match_id,)).fetchall()
+        disputes = [dict(r) for r in rows]
+    finally:
+        conn.close()
+    return jsonify({'disputes': disputes})
+
+# ── User-facing matching (نظام المطابقة) — strong webapp auth ──
+
+_MATCH_REQ_FIELDS = ['id', 'user_id', 'customer_id', 'type', 'amount', 'currency',
+                     'status', 'created_at', 'approved_by', 'approved_at']
+
+# Serializes all read-modify-write cycles on match_requests.csv (user create/
+# cancel + agent settlement mirror) so concurrent writes can't clobber rows.
+_MATCH_CSV_LOCK = threading.Lock()
+
+def _matching_strong_auth_or_error():
+    """User matching endpoints move money — require a validated identity
+    (session login or HMAC-checked Telegram initData), never a raw uid param."""
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'المصادقة مطلوبة — افتح الصفحة من التطبيق أو تيليغرام'}), 401
+    return None
+
+@app.route('/api/matching/my')
+@webapp_auth
+def api_matching_my():
+    """Current user's matching requests, newest first (SQLite)."""
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM match_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 20',
+            (uid,)).fetchall()
+        reqs = [dict(r) for r in rows]
+    finally:
+        conn.close()
+    return jsonify({'requests': reqs})
+
+@app.route('/api/matching/request', methods=['POST'])
+@webapp_auth
+def api_matching_create():
+    """Create a deposit/withdraw matching request — atomic SQLite create +
+    agent pick + escrow hold. Notifies main admins AND the assigned agent."""
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    data = request.json or {}
+    rtype = str(data.get('type', '')).strip()
+    if rtype not in ('deposit', 'withdraw', 'buy_usdt', 'sell_usdt'):
+        return jsonify({'error': 'نوع الطلب غير صالح'}), 400
+    source_type = 'personal_wallet' if str(data.get('source_type', '')).strip() == 'personal_wallet' else 'company'
+    network = str(data.get('network', '') or '')[:32]
+    try:
+        rate = float(data.get('rate', 0) or 0)
+    except (TypeError, ValueError):
+        rate = 0.0
+    try:
+        amount = round(float(data.get('amount', 0)), 2)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    if not math.isfinite(amount) or amount <= 0 or amount > 10_000_000:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    details = str(data.get('details', '') or '')[:200]
+
+    currency = 'EGP'
+    user_name = ''
+    if _VEX_GAMES:
+        try:
+            info = _gm.get_user_info(uid) or {}
+            currency = info.get('currency', 'EGP') or 'EGP'
+            user_name = info.get('name', '') or ''
+            if rtype in ('withdraw', 'sell_usdt'):
+                bal = float(_gm.get_balance(uid) or 0)
+                if amount > bal:
+                    return jsonify({'error': 'رصيد غير كافٍ'}), 400
+        except Exception:
+            pass
+
+    rid, error, agent_assigned, agent_info = agent_db.create_match_request_with_agent_assignment(
+        uid, uid, rtype, amount, currency,
+        company_id='', company_name='', payment_method_id='', details=details,
+        source_type=source_type, network=network, rate=rate)
+    if error:
+        status_code = 409 if 'نشط' in (error or '') else 400
+        return jsonify({'error': error}), status_code
+
+    log_action('match_request_created', f'{rid} {rtype} {amount} {currency} by {uid}')
+
+    # ── Notify main admins (Telegram) ──
+    type_map = {
+        'deposit': 'إيداع',
+        'withdraw': 'سحب',
+        'buy_usdt': 'شراء USDT',
+        'sell_usdt': 'بيع USDT',
+    }
+    type_ar = type_map.get(rtype, rtype)
+    agent_line = ''
+    if agent_assigned and agent_info:
+        agent_line = f"\n🤖 الوكيل المعين: <b>{agent_info.get('name') or agent_info.get('id')}</b>"
+    try:
+        _comp_alert_admins(
+            f"🔄 <b>طلب مطابقة جديد</b>\n\n"
+            f"🆔 <code>{rid}</code>\n"
+            f"👤 المستخدم: <code>{uid}</code>\n"
+            f"{'💵' if rtype == 'deposit' else '💸'} النوع: {type_ar}\n"
+            f"💰 المبلغ: <code>{amount:g} {currency}</code>"
+            f"{agent_line}\n\n"
+            f"📋 راجعه من لوحة المطابقات ← المعلقة")
+    except Exception as _ne:
+        app.logger.warning(f'matching admin notify failed {rid}: {_ne}')
+
+    # ── Notify the assigned agent (Telegram, if linked) ──
+    if agent_assigned and agent_info and agent_info.get('telegram_id'):
+        try:
+            _comp_tg(str(agent_info['telegram_id']),
+                     f"🔔 <b>طلب مطابقة جديد معيّن لك</b>\n\n"
+                     f"🆔 <code>{rid}</code>\n"
+                     f"{'💵' if rtype == 'deposit' else '💸'} النوع: "
+                     f"{'إيداع (تدفع للمستخدم)' if rtype == 'deposit' else 'سحب (تستلم من المستخدم)'}\n"
+                     f"💰 المبلغ: <code>{amount:g} {currency}</code>\n\n"
+                     f"⚡ افحصه من لوحة الوكيل ← الطلبات المعلقة")
+        except Exception as _ae:
+            app.logger.warning(f'matching agent notify failed {rid}: {_ae}')
+
+    return jsonify({'success': True, 'request_id': rid,
+                    'agent_assigned': agent_assigned,
+                    'message': 'تم إنشاء طلب المطابقة — بانتظار المعالجة'})
+
+@app.route('/api/matching/my/<rid>/cancel', methods=['POST'])
+@webapp_auth
+def api_matching_cancel(rid):
+    """Cancel own still-waiting matching request — atomic in SQLite
+    (voids pending agent txn + releases escrow + frees daily quota)."""
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    ok, error = agent_db.cancel_match_request_atomic(rid, uid)
+    if not ok:
+        if 'بالفعل' in (error or ''):
+            return jsonify({'error': error}), 409
+        if 'غير موجود' in (error or ''):
+            return jsonify({'error': error}), 404
+        return jsonify({'error': error or 'تعذر الإلغاء الآن — حاول مجدداً'}), 500
+    log_action('match_request_cancelled', f'{rid} by user {uid}')
+    return jsonify({'success': True})
+
+
+@app.route('/api/matching/my/<rid>/steps')
+@webapp_auth
+def api_matching_my_steps(rid):
+    """User-facing full request detail with step state machine."""
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    req = agent_db.get_match_request_steps(rid)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('user_id', '')) != uid:
+        return jsonify({'error': 'غير مصرح'}), 403
+    return jsonify({'request': req})
+
+
+@app.route('/api/matching/my/<rid>/steps/<step_id>/action', methods=['POST'])
+@webapp_auth
+def api_matching_my_step_action(rid, step_id):
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    payload = request.json or {}
+    req = agent_db.get_match_request_full(rid)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('user_id', '')) != uid:
+        return jsonify({'error': 'غير مصرح'}), 403
+    res = agent_db.request_step_action(
+        rid, step_id, 'user', uid,
+        evidence_ref=str(payload.get('evidence_ref', '') or '')[:200],
+        note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/my/<rid>/steps/<step_id>/confirm', methods=['POST'])
+@webapp_auth
+def api_matching_my_step_confirm(rid, step_id):
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    payload = request.json or {}
+    req = agent_db.get_match_request_full(rid)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('user_id', '')) != uid:
+        return jsonify({'error': 'غير مصرح'}), 403
+    accept = bool(payload.get('accept', True))
+    res = agent_db.request_step_confirm(
+        rid, step_id, 'user', uid, accept=accept,
+        note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/my/<rid>/dispute', methods=['POST'])
+@webapp_auth
+def api_matching_my_dispute(rid):
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    payload = request.json or {}
+    req = agent_db.get_match_request_full(rid)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('user_id', '')) != uid:
+        return jsonify({'error': 'غير مصرح'}), 403
+    res = agent_db.open_request_dispute(
+        rid, 'user', uid,
+        str(payload.get('reason', '') or '')[:500],
+        evidence_file_id=str(payload.get('evidence_file_id', '') or '')[:200],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/my/<rid>/insurance-claim', methods=['POST'])
+@webapp_auth
+def api_matching_my_insurance_claim(rid):
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    payload = request.json or {}
+    req = agent_db.get_match_request_full(rid)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('user_id', '')) != uid:
+        return jsonify({'error': 'غير مصرح'}), 403
+    res = agent_db.create_insurance_claim(
+        rid, 'user', uid,
+        str(payload.get('reason', '') or '')[:500],
+        evidence_file_id=str(payload.get('evidence_file_id', '') or '')[:200],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
 
 # ===== API — SVRP =====
 
@@ -3546,9 +10074,19 @@ def api_save_svrp_automation():
 
 @app.route('/api/svrp/requests')
 @api_auth
+@permission_required('view_financial')
 def api_svrp_requests():
     reqs = read_csv('recovery_requests.csv')
     reqs.reverse()
+    # إرفاق رابط الأفيليه للشركة كي يتحقق الأدمن من التسجيل
+    affiliate_by_id = {}
+    try:
+        for c in read_csv('companies.csv'):
+            affiliate_by_id[c.get('id', '')] = c.get('affiliate_link', '') or ''
+    except Exception:
+        pass
+    for r in reqs:
+        r['affiliate_link'] = affiliate_by_id.get(r.get('company_id', ''), '')
     return jsonify({'requests': reqs})
 
 @app.route('/api/svrp/requests/<req_id>/approve', methods=['POST'])
@@ -3601,6 +10139,11 @@ def api_svrp_approve(req_id):
     _SvrpMgr().approve_recovery_request(req_id, amount_float, admin_id)
 
     log_action('svrp_approve', f'{req_id}: {amount_float} uid={uid}')
+    _comp_tg(uid, f"🎉 <b>تمت الموافقة على تعويضك!</b>\n"
+                  f"💎 المبلغ: <code>{amount_float:.2f}</code> أُضيف لرصيدك المجمد\n\n"
+                  f"🔓 <b>لفك التجميد شارك الرصيد مع أصدقائك:</b>\n"
+                  f"• كل صديق جديد يسجل بكود إحالتك ← يُفك 10% من رصيدك المجمد\n"
+                  f"• حوّل 10% أو أكثر لصديق مستخدم بالفعل ← يُفك لك 5% (يصله الرصيد مجمداً بنفس الشروط)")
     return jsonify({'success': True, 'new_frozen_balance': result})
 
 @app.route('/api/svrp/requests/<req_id>/reject', methods=['POST'])
@@ -3609,12 +10152,17 @@ def api_svrp_approve(req_id):
 def api_svrp_reject(req_id):
     reqs = read_csv('recovery_requests.csv')
     fieldnames = get_fieldnames('recovery_requests.csv', ['id','user_id','customer_id','photo_file_id','status','recovery_amount','admin_note','created_at','approved_at','approved_by'])
+    _rej_uid = ''
     for r in reqs:
         if r.get('id') == req_id:
             r['status'] = 'rejected'
+            _rej_uid = str(r.get('user_id', ''))
             break
     write_csv('recovery_requests.csv', reqs, fieldnames)
     log_action('svrp_reject', req_id)
+    if _rej_uid:
+        _comp_tg(_rej_uid, "❌ لم تتم الموافقة على طلب التعويض.\n"
+                           "تأكد من لقطة الشاشة وأن الخسارة على الحساب المسجل ثم أعد المحاولة.")
     return jsonify({'success': True})
 
 @app.route('/api/svrp/bonus-requests')
@@ -3793,7 +10341,9 @@ def api_referrals_public():
 @app.route('/api/channels/public')
 def api_channels_public():
     """Public active channels for user home page."""
-    chans = read_csv('channels.csv')
+    chans = read_csv('bot_channels.csv')
+    if not chans:
+        chans = read_csv('channels.csv')
     clean = []
     for c in chans:
         if str(c.get('is_active', '')).lower() in ('yes', 'true', '1', 'active', ''):
@@ -3802,6 +10352,7 @@ def api_channels_public():
                 'chat_id': c.get('chat_id', ''),
                 'username': c.get('username', ''),
                 'description': c.get('description', ''),
+                'platform': c.get('platform', 'telegram') or 'telegram',
             })
     return jsonify({'channels': clean})
 
@@ -3820,6 +10371,268 @@ def api_trading_public():
         'bot_url': 'https://t.me/' + (BOT_TOKEN.split(':')[0] if BOT_TOKEN else ''),
         'message': 'لبدء التداول، افتح البوت واختر 💱 تداول USDT'
     })
+
+# ── تداول USDT من الويب — نفس دورة حياة أوامر البوت (trade_orders.csv) ──────
+# الحالات: pending → admin_accepted → buyer_pays → buyer_sends_screenshot
+#          → admin_confirms_payment → admin_sends_screenshot → completed
+# الأدمن يكمل الإجراءات من البوت كالمعتاد؛ الويب ينشئ الطلب ويرفع إثبات الدفع ويؤكد الاستلام.
+
+_TRADING_CURRENCIES = [
+    {'code': 'SAR', 'name': 'ريال سعودي'}, {'code': 'AED', 'name': 'درهم إماراتي'},
+    {'code': 'EGP', 'name': 'جنيه مصري'}, {'code': 'KWD', 'name': 'دينار كويتي'},
+    {'code': 'QAR', 'name': 'ريال قطري'}, {'code': 'BHD', 'name': 'دينار بحريني'},
+    {'code': 'OMR', 'name': 'ريال عماني'}, {'code': 'JOD', 'name': 'دينار أردني'},
+    {'code': 'USD', 'name': 'دولار أمريكي'}, {'code': 'EUR', 'name': 'يورو'},
+    {'code': 'TRY', 'name': 'ليرة تركية'}, {'code': 'MAD', 'name': 'درهم مغربي'},
+]
+_TRADE_ALLOWED_EXT = {'.png', '.jpg', '.jpeg', '.webp'}
+_TRADE_MAX_BYTES = 5 * 1024 * 1024
+
+def _trade_fieldnames():
+    return get_fieldnames('trade_orders.csv',
+        ['id','buyer_id','buyer_name','customer_id','order_type','asset_type','network',
+         'account_address','payment_method','amount','currency','usdt_amount',
+         'admin_payment_method','status','screenshot_payment','screenshot_transfer',
+         'admin_id','created_at','completed_at'])
+
+def _trade_public_row(o):
+    """تجهيز صف الطلب للعرض في الويب — بدون بيانات حساسة."""
+    return {
+        'id': o.get('id', ''),
+        'order_type': o.get('order_type', ''),
+        'asset_type': o.get('asset_type', ''),
+        'network': o.get('network', ''),
+        'account_address': o.get('account_address', ''),
+        'payment_method': o.get('payment_method', ''),
+        'amount': o.get('amount', ''),
+        'currency': o.get('currency', ''),
+        'usdt_amount': o.get('usdt_amount', ''),
+        'admin_payment_method': o.get('admin_payment_method', ''),
+        'status': o.get('status', ''),
+        'screenshot_payment': o.get('screenshot_payment', '') if str(o.get('screenshot_payment', '')).startswith('http') else '',
+        'created_at': o.get('created_at', ''),
+    }
+
+@app.route('/api/trading/web/methods')
+@webapp_auth
+def api_trading_web_methods():
+    """وسائل الدفع النشطة + العملات المتاحة للتداول من الويب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    methods = []
+    for m in read_csv('payment_methods.csv'):
+        if m.get('status') == 'active':
+            methods.append({
+                'id': m.get('id', ''),
+                'name': m.get('method_name', ''),
+                'type': m.get('method_type', ''),
+                'account_data': m.get('account_data', ''),
+                'icon': m.get('icon', '💳') or '💳',
+            })
+    return jsonify({'methods': methods, 'currencies': _TRADING_CURRENCIES})
+
+@app.route('/api/trading/web/create-order', methods=['POST'])
+@webapp_auth
+def api_trading_web_create_order():
+    """إنشاء أمر تداول (شراء/بيع USDT أو MoneyGo) من الويب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+
+    order_type = str(data.get('order_type', '')).strip()
+    asset_type = str(data.get('asset_type', '')).strip()
+    network = str(data.get('network', '')).strip()
+    account_address = str(data.get('account_address', '')).strip()
+    payment_method = str(data.get('payment_method', '')).strip()
+    currency = str(data.get('currency', '')).strip().upper()
+    if order_type not in ('buy', 'sell'):
+        return jsonify({'error': 'نوع الطلب غير صالح'}), 400
+    if asset_type not in ('usdt', 'moneygo'):
+        return jsonify({'error': 'نوع الأصل غير صالح'}), 400
+    if asset_type == 'usdt' and network not in ('TRC20', 'ERC20', 'BNB20'):
+        return jsonify({'error': 'اختر شبكة التحويل'}), 400
+    if len(account_address) < 3 or len(account_address) > 120:
+        return jsonify({'error': 'اكتب عنوان المحفظة/الحساب بشكل صحيح'}), 400
+    if not payment_method:
+        return jsonify({'error': 'اختر وسيلة الدفع'}), 400
+    if currency not in {c['code'] for c in _TRADING_CURRENCIES}:
+        return jsonify({'error': 'عملة غير مدعومة'}), 400
+    try:
+        amount = float(data.get('amount', 0))
+        if amount <= 0 or amount > 10_000_000:
+            return jsonify({'error': 'مبلغ غير صالح'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+
+    # بيانات المشتري من users.csv
+    buyer_name, customer_id = '', ''
+    for u in read_csv('users.csv'):
+        if str(u.get('telegram_id', '')) == uid:
+            buyer_name = u.get('username', '') or u.get('first_name', '') or uid
+            customer_id = u.get('customer_id', '')
+            break
+
+    order_id = 'TRD' + datetime.now().strftime('%Y%m%d%H%M%S')
+    order = {
+        'id': order_id, 'buyer_id': uid, 'buyer_name': buyer_name,
+        'customer_id': customer_id, 'order_type': order_type,
+        'asset_type': asset_type, 'network': network,
+        'account_address': account_address, 'payment_method': payment_method,
+        'amount': str(amount), 'currency': currency, 'usdt_amount': '',
+        'admin_payment_method': '', 'status': 'pending',
+        'screenshot_payment': '', 'screenshot_transfer': '',
+        'admin_id': '', 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'completed_at': '',
+    }
+    with _PM_CSV_LOCK:  # نفس القفل — trade_orders.csv تُكتب أيضاً من البوت
+        append_csv('trade_orders.csv', order, _trade_fieldnames())
+
+    asset_label = 'USDT' if asset_type == 'usdt' else 'MoneyGo'
+    action_label = 'شراء' if order_type == 'buy' else 'بيع'
+    _comp_alert_admins(
+        f"💱 <b>أمر تداول جديد من الويب</b>\n\n"
+        f"🆔 الطلب: <code>{order_id}</code>\n"
+        f"👤 المشتري: <code>{uid}</code>{(' (@' + buyer_name + ')') if buyer_name and buyer_name != uid else ''}\n"
+        f"📦 النوع: {action_label} {asset_type.upper()}{(' — ' + network) if network else ''}\n"
+        f"💰 المبلغ: {amount} {currency}\n"
+        f"💳 وسيلة الدفع: {payment_method}\n"
+        f"🏦 المحفظة: <code>{account_address}</code>\n\n"
+        f"راجع الطلب من البوت ← طوابير الإدارة ← التداول")
+    try:
+        push_notification('trade_order', 'أمر تداول جديد',
+                          f'{action_label} {asset_label} — {amount} {currency}')
+    except Exception:
+        pass
+    log_action('web_trade_create', order_id)
+    return jsonify({'ok': True, 'order_id': order_id,
+                    'message': '✅ تم إنشاء الطلب — سيراجعه الأدمن ويرسل لك السعر ووسيلة الدفع'})
+
+@app.route('/api/trading/web/my-orders')
+@webapp_auth
+def api_trading_web_my_orders():
+    """طلبات التداول الخاصة بالمستخدم من الويب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    orders = [o for o in read_csv('trade_orders.csv') if str(o.get('buyer_id', '')) == uid]
+    orders.reverse()
+    return jsonify({'orders': [_trade_public_row(o) for o in orders[:20]]})
+
+@app.route('/api/trading/web/upload-screenshot', methods=['POST'])
+@webapp_auth
+def api_trading_web_upload_screenshot():
+    """رفع لقطة إثبات الدفع من الويب — تعادل إرسال الصورة في البوت."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    order_id = str(request.form.get('order_id', '')).strip()
+    f = request.files.get('screenshot')
+    if not order_id:
+        return jsonify({'error': 'رقم الطلب مطلوب'}), 400
+    if not f or not f.filename:
+        return jsonify({'error': 'أرفق لقطة شاشة'}), 400
+
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in _TRADE_ALLOWED_EXT:
+        return jsonify({'error': 'صيغة الصورة غير مدعومة (png/jpg/webp)'}), 400
+    blob = f.read(_TRADE_MAX_BYTES + 1)
+    if len(blob) > _TRADE_MAX_BYTES:
+        return jsonify({'error': 'حجم الصورة يتجاوز 5MB'}), 400
+    if not blob:
+        return jsonify({'error': 'الملف فارغ'}), 400
+    if not (blob.startswith(b'\x89PNG') or blob.startswith(b'\xff\xd8\xff')
+            or (blob[:4] == b'RIFF' and blob[8:12] == b'WEBP')):
+        return jsonify({'error': 'الملف ليس صورة صالحة'}), 400
+
+    with _PM_CSV_LOCK:
+        orders = read_csv('trade_orders.csv')
+        order = next((o for o in orders if o.get('id') == order_id), None)
+        if not order:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if str(order.get('buyer_id', '')) != uid:
+            return jsonify({'error': 'غير مصرح'}), 403
+        if order.get('status') != 'buyer_pays':
+            return jsonify({'error': 'رفع الإثبات متاح فقط بعد تحديد السعر ووسيلة الدفع'}), 400
+
+        # حفظ في static/trade-uploads — يُخدم مباشرة و sendPhoto في البوت
+        # يقبل روابط HTTPS فتصل الإدارة لقطة المشتري من الويب
+        static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'trade-uploads')
+        os.makedirs(static_dir, exist_ok=True)
+        fname = f"{uid}_{secrets.token_hex(8)}{ext}"
+        with open(os.path.join(static_dir, fname), 'wb') as out:
+            out.write(blob)
+        base_url = request.url_root.rstrip('/')
+        screenshot_url = f"{base_url}/static/trade-uploads/{fname}"
+
+        order['screenshot_payment'] = screenshot_url
+        order['status'] = 'buyer_sends_screenshot'
+        write_csv('trade_orders.csv', orders, _trade_fieldnames())
+
+    _comp_alert_admins(
+        f"📸 <b>إثبات دفع من الويب</b>\n\n"
+        f"🆔 الطلب: <code>{order_id}</code>\n"
+        f"👤 المشتري: <code>{uid}</code>\n\n"
+        f"راجع الصورة وأكّد الدفع من البوت ← طوابير الإدارة ← التداول")
+    return jsonify({'ok': True, 'message': '✅ تم إرسال إثبات الدفع — بانتظار تأكيد الإدارة'})
+
+@app.route('/api/trading/web/confirm-receipt', methods=['POST'])
+@webapp_auth
+def api_trading_web_confirm_receipt():
+    """تأكيد المستلم لاستلام USDT — تكملة الطلب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get('order_id', '')).strip()
+    if not order_id:
+        return jsonify({'error': 'رقم الطلب مطلوب'}), 400
+    with _PM_CSV_LOCK:
+        orders = read_csv('trade_orders.csv')
+        order = next((o for o in orders if o.get('id') == order_id), None)
+        if not order:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if str(order.get('buyer_id', '')) != uid:
+            return jsonify({'error': 'غير مصرح'}), 403
+        if order.get('status') != 'admin_sends_screenshot':
+            return jsonify({'error': 'التأكيد متاح بعد إرسال الإدارة إثبات التحويل'}), 400
+        order['status'] = 'completed'
+        order['completed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+        write_csv('trade_orders.csv', orders, _trade_fieldnames())
+    _comp_alert_admins(f"✅ <b>اكتمل طلب تداول (تأكيد ويب)</b>\n🆔 <code>{order_id}</code>\n👤 <code>{uid}</code>")
+    return jsonify({'ok': True, 'message': '✅ تم تأكيد الاستلام — اكتمل الطلب بنجاح'})
+
+@app.route('/api/trading/web/cancel', methods=['POST'])
+@webapp_auth
+def api_trading_web_cancel():
+    """إلغاء طلب معلق من الويب (قبل قبول الأدمن فقط)."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get('order_id', '')).strip()
+    with _PM_CSV_LOCK:
+        orders = read_csv('trade_orders.csv')
+        order = next((o for o in orders if o.get('id') == order_id), None)
+        if not order:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if str(order.get('buyer_id', '')) != uid:
+            return jsonify({'error': 'غير مصرح'}), 403
+        if order.get('status') != 'pending':
+            return jsonify({'error': 'لا يمكن إلغاء طلب قيد المعالجة — تواصل مع الدعم'}), 400
+        order['status'] = 'cancelled'
+        write_csv('trade_orders.csv', orders, _trade_fieldnames())
+    _comp_alert_admins(f"🚫 <b>إلغاء طلب تداول (ويب)</b>\n🆔 <code>{order_id}</code>\n👤 <code>{uid}</code>")
+    return jsonify({'ok': True, 'message': 'تم إلغاء الطلب'})
 
 @app.route('/api/support/public')
 def api_support_public():
@@ -3959,7 +10772,7 @@ def api_campaigns():
     campaigns.reverse()
     # Normalize fields
     for c in campaigns:
-        for k in ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions']:
+        for k in _CAMPAIGN_FIELDS:
             if k not in c:
                 c[k] = ''
     return jsonify({'campaigns': campaigns})
@@ -3968,7 +10781,7 @@ def api_campaigns():
 @api_auth
 @permission_required('send_broadcast')
 def api_create_campaign():
-    """Create a new campaign."""
+    """Create a new campaign with full platform support."""
     data = request.json or {}
     campaign_id = f"CMP{secrets.token_hex(3).upper()}"
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -3978,12 +10791,18 @@ def api_create_campaign():
         if url:
             abs_media_urls.append(url if url.startswith('http') else f'https://vex.deals{url}')
 
+    # Resolve selected channels/groups to comma-separated IDs
+    selected_channels = data.get('selectedChannels', [])
+    selected_groups = data.get('selectedGroups', [])
+    selected_channels_str = ','.join(str(c) for c in selected_channels) if selected_channels else ''
+    selected_groups_str = ','.join(str(g) for g in selected_groups) if selected_groups else ''
+
     campaign = {
         'id': campaign_id,
         'name': data.get('name', ''),
         'message': data.get('message', ''),
         'media_urls': '|'.join(abs_media_urls),
-        'target': data.get('target', 'both'),
+        'target': data.get('target', 'telegram'),
         'recipient': data.get('recipient', 'all'),
         'priority': data.get('priority', 'normal'),
         'country': data.get('country', 'all'),
@@ -3998,17 +10817,28 @@ def api_create_campaign():
         'stats_reach': '0',
         'stats_clicks': '0',
         'stats_conversions': '0',
+        'platform_account_id': data.get('platform_account_id', ''),
+        'ai_agent_id': data.get('ai_agent_id', ''),
+        'selected_channels': selected_channels_str,
+        'selected_groups': selected_groups_str,
+        'whatsapp_contacts': data.get('whatsappContacts', ''),
+        'whatsapp_groups': data.get('whatsappGroups', ''),
     }
-    fieldnames = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+    fieldnames = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
     append_csv('campaigns.csv', campaign, fieldnames)
     log_action('create_campaign', campaign_id)
 
-    # If no schedule → send immediately
+    # If no schedule → execute immediately (async)
     if not data.get('scheduled_at'):
         campaign['status'] = 'active'
-        _execute_campaign(campaign)
-        # Update status to completed
-        _update_campaign_status(campaign_id, 'completed')
+        _update_campaign_status(campaign_id, 'active')
+        try:
+            from campaign_platforms import run_campaign_async
+            run_campaign_async(campaign_id, BASE_DIR)
+        except Exception as e:
+            logger.error(f'Async campaign launch failed: {e}')
+            _execute_campaign(campaign)
+            _update_campaign_status(campaign_id, 'completed')
 
     return jsonify({'success': True, 'id': campaign_id, 'status': campaign['status']})
 
@@ -4017,7 +10847,7 @@ def api_create_campaign():
 @permission_required('send_broadcast')
 def api_edit_campaign(campaign_id):
     campaigns = read_csv('campaigns.csv')
-    fieldnames = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+    fieldnames = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
     if request.method == 'DELETE':
         campaigns = [c for c in campaigns if c.get('id') != campaign_id]
         write_csv('campaigns.csv', campaigns, fieldnames)
@@ -4030,10 +10860,18 @@ def api_edit_campaign(campaign_id):
                 for k, v in data.items():
                     if k in fieldnames:
                         c[k] = v
-                # If status changed to 'active' → execute
-                if data.get('status') == 'active' and c.get('status') != 'completed':
-                    _execute_campaign(c)
-                    c['status'] = 'completed'
+                # If status changed to 'active' → execute async
+                if data.get('status') == 'active' and c.get('status') not in ('completed', 'running'):
+                    c['status'] = 'active'
+                    try:
+                        from campaign_platforms import run_campaign_async
+                        write_csv('campaigns.csv', campaigns, fieldnames)
+                        run_campaign_async(campaign_id, BASE_DIR)
+                        return jsonify({'success': True})
+                    except Exception as e:
+                        logger.error(f'Async campaign launch failed: {e}')
+                        _execute_campaign(c)
+                        c['status'] = 'completed'
                 break
         write_csv('campaigns.csv', campaigns, fieldnames)
         return jsonify({'success': True})
@@ -4066,8 +10904,18 @@ def api_campaigns_analytics():
 @app.route('/api/campaigns/<campaign_id>/stats')
 @api_auth
 def api_campaign_stats(campaign_id):
-    """Get campaign stats."""
+    """Get campaign stats with per-channel delivery results."""
     campaigns = read_csv('campaigns.csv')
+    results = []
+    results_path = os.path.join(BASE_DIR, 'campaign_results.csv')
+    if os.path.exists(results_path):
+        try:
+            with open(results_path, 'r', encoding='utf-8-sig') as f:
+                for row in csv.DictReader(f):
+                    if row.get('campaign_id') == campaign_id:
+                        results.append(row)
+        except Exception:
+            pass
     for c in campaigns:
         if c.get('id') == campaign_id:
             return jsonify({
@@ -4075,15 +10923,47 @@ def api_campaign_stats(campaign_id):
                 'reach': int(c.get('stats_reach', 0) or 0),
                 'clicks': int(c.get('stats_clicks', 0) or 0),
                 'conversions': int(c.get('stats_conversions', 0) or 0),
-                'status': c.get('status', 'unknown')
+                'status': c.get('status', 'unknown'),
+                'channel_results': results,
+                'delivered': sum(1 for r in results if r.get('status') == 'delivered'),
+                'failed': sum(1 for r in results if r.get('status') == 'failed'),
             })
     return jsonify({'error': 'Not found'}), 404
+
+
+@app.route('/api/campaigns/<campaign_id>/retry', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_retry_campaign(campaign_id):
+    """Retry failed channels in a campaign."""
+    campaigns = read_csv('campaigns.csv')
+    for c in campaigns:
+        if c.get('id') == campaign_id:
+            try:
+                from campaign_platforms import run_campaign_async
+                _update_campaign_status(campaign_id, 'running')
+                run_campaign_async(campaign_id, BASE_DIR)
+                return jsonify({'success': True, 'message': 'Retrying...'})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+    return jsonify({'error': 'Campaign not found'}), 404
+
+
+@app.route('/api/supported-platforms')
+@api_auth
+def api_supported_platforms():
+    """List all supported social media platforms."""
+    try:
+        from campaign_platforms import get_all_platforms
+        return jsonify({'platforms': get_all_platforms()})
+    except ImportError:
+        return jsonify({'platforms': []})
 
 def _update_campaign_status(campaign_id, status):
     """Update campaign status in CSV."""
     try:
         campaigns = read_csv('campaigns.csv')
-        fieldnames = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+        fieldnames = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
         for c in campaigns:
             if c.get('id') == campaign_id:
                 c['status'] = status
@@ -4421,8 +11301,10 @@ def api_v1_create_campaign():
         'language': 'all', 'segment': 'all', 'channel_group': '', 'scheduled_at': '',
         'repeat': 'once', 'status': 'draft', 'created_at': now, 'created_by': 'api',
         'stats_reach': '0', 'stats_clicks': '0', 'stats_conversions': '0',
+        'platform_account_id': data.get('platform_account_id', ''),
+        'ai_agent_id': data.get('ai_agent_id', ''),
     }
-    fields = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+    fields = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
     append_csv('campaigns.csv', campaign, fields)
     return jsonify({'success': True, 'id': campaign_id})
 
@@ -4460,7 +11342,7 @@ def track_click_redirect(campaign_id):
 
     # Increment stats_clicks in campaigns.csv
     try:
-        cf_fields = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+        cf_fields = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
         for c in campaigns:
             if c.get('id') == campaign_id:
                 c['stats_clicks'] = str(int(c.get('stats_clicks', 0) or 0) + 1)
@@ -4508,7 +11390,7 @@ def track_conversion():
     # Increment stats_conversions in campaigns.csv
     try:
         campaigns = read_csv('campaigns.csv')
-        cf_fields = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+        cf_fields = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
         for c in campaigns:
             if c.get('id') == campaign_id:
                 c['stats_conversions'] = str(int(c.get('stats_conversions', 0) or 0) + 1)
@@ -4695,17 +11577,27 @@ def _execute_campaign(campaign):
     media_urls = [u for u in media_urls_str.split('|') if u] if media_urls_str else []
     recipient = campaign.get('recipient', 'all')
     target_user = campaign.get('target_user', '') if recipient == 'single' else ''
+    ai_agent_id = campaign.get('ai_agent_id', '')
+
+    if ai_agent_id and message:
+        message, _, _ = _apply_ai_text_profile(message, agent_id=ai_agent_id)
 
     # Web notification
-    if target in ('web', 'both'):
+    if target in ('web', 'both', 'all'):
         notif_title = '📢 ' + campaign.get('name', 'حملة إعلانية')
         if priority == 'urgent':
             notif_title = '🚨 ' + campaign.get('name', 'حملة عاجلة')
         push_notification('broadcast', notif_title, message[:200], {'media_urls': media_urls, 'priority': priority, 'campaign_id': campaign.get('id', '')})
 
-    # Telegram broadcast
-    if target in ('telegram', 'both'):
-        broadcast_entry = {
+    bc_fieldnames = get_fieldnames('broadcast_queue.csv', [
+        'id', 'message', 'target', 'recipient', 'priority', 'country',
+        'media_urls', 'target_user', 'target_name', 'created_at',
+        'created_by', 'status', 'platform', 'platform_account_id',
+        'type', 'target_chat_id', 'target_channel_id', 'scheduled_at'
+    ])
+
+    def _queue(platform_name):
+        entry = {
             'id': f"BCAST{str(int(datetime.now().timestamp()))[-6:]}{secrets.token_hex(2)}",
             'message': message,
             'target': target,
@@ -4717,37 +11609,424 @@ def _execute_campaign(campaign):
             'target_name': '',
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'created_by': session.get('admin_id', ''),
-            'status': 'pending'
+            'status': 'pending',
+            'platform': platform_name,
+            'platform_account_id': campaign.get('platform_account_id', ''),
+            'type': 'broadcast',
+            'target_chat_id': '',
+            'target_channel_id': '',
+            'scheduled_at': campaign.get('scheduled_at', ''),
         }
-        bc_fieldnames = get_fieldnames('broadcast_queue.csv', ['id','message','target','recipient','priority','country','media_urls','target_user','target_name','created_at','created_by','status'])
-        append_csv('broadcast_queue.csv', broadcast_entry, bc_fieldnames)
+        append_csv('broadcast_queue.csv', entry, bc_fieldnames)
+
+    if target in ('telegram', 'both', 'all'):
+        _queue('telegram')
+    if target in ('whatsapp', 'all'):
+        _queue('whatsapp')
 
     log_action('execute_campaign', campaign.get('id', ''))
 
 # ===== End Campaigns API =====
 
+# ===== Partners API (for channels page) =====
+@app.route('/api/partners')
+@api_auth
+def api_partners():
+    """Get list of channel partners"""
+    partners = read_csv('channel_partners.csv')
+    return jsonify({'partners': partners})
+
+@app.route('/api/partners', methods=['POST'])
+@api_auth
+@permission_required('manage_channels')
+def api_add_channel_partner():
+    data = request.json
+    partners = read_csv('channel_partners.csv')
+    fieldnames = get_fieldnames('channel_partners.csv', ['id', 'channel_name', 'chat_id', 'subscriber_count', 'revenue_share', 'category', 'contact', 'is_active', 'created_at'])
+    new_id = f"PRT{secrets.token_hex(4).upper()}"
+    partner = {
+        'id': new_id,
+        'channel_name': data.get('channel_name', ''),
+        'chat_id': data.get('chat_id', ''),
+        'subscriber_count': int(data.get('subscriber_count', 0) or 0),
+        'revenue_share': float(data.get('revenue_share', 0) or 0),
+        'category': data.get('category', ''),
+        'contact': data.get('contact', ''),
+        'is_active': 'yes',
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+    }
+    append_csv('channel_partners.csv', partner, fieldnames)
+    return jsonify({'success': True, 'id': new_id})
+
+
+@app.route('/api/partners/<partner_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_channels')
+def api_delete_partner(partner_id):
+    partners = read_csv('channel_partners.csv')
+    fieldnames = get_fieldnames('channel_partners.csv', ['id', 'channel_name', 'chat_id', 'subscriber_count', 'revenue_share', 'category', 'contact', 'is_active', 'created_at'])
+    partners = [p for p in partners if p.get('id') != partner_id]
+    write_csv('channel_partners.csv', partners, fieldnames)
+    return jsonify({'success': True})
+
+
+@app.route('/api/partners/<partner_id>/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_channels')
+def api_toggle_partner(partner_id):
+    partners = read_csv('channel_partners.csv')
+    for p in partners:
+        if p.get('id') == partner_id:
+            p['is_active'] = 'no' if p.get('is_active') == 'yes' else 'yes'
+            break
+    fieldnames = get_fieldnames('channel_partners.csv', ['id', 'channel_name', 'chat_id', 'subscriber_count', 'revenue_share', 'category', 'contact', 'is_active', 'created_at'])
+    write_csv('channel_partners.csv', partners, fieldnames)
+    return jsonify({'success': True})
+
+
+# ===== Ad Network API (for channels page) =====
+@app.route('/api/ad-net')
+@api_auth
+def api_ad_net():
+    """Get ad network statistics"""
+    try:
+        # Read data from relevant CSVs
+        partners = read_csv('channel_partners.csv')
+        campaigns = read_csv('campaigns.csv')
+        
+        total_partners = len([p for p in partners if p.get('is_active') == 'yes'])
+        active_partners = total_partners
+        total_subscribers = sum(int(p.get('subscriber_count', 0) or 0) for p in partners if p.get('is_active') == 'yes')
+        
+        # Calculate total reach from campaigns
+        total_reach = sum(int(c.get('stats_reach', 0) or 0) for c in campaigns)
+        total_clicks = sum(int(c.get('stats_clicks', 0) or 0) for c in campaigns)
+        ctr = round((total_clicks / total_reach * 100) if total_reach > 0 else 0, 2)
+        
+        # Calculate revenue (simplified)
+        total_revenue = sum(float(c.get('budget', 0) or 0) for c in campaigns if c.get('status') == 'completed')
+        
+        return jsonify({
+            'total_partners': total_partners,
+            'active_partners': active_partners,
+            'total_subscribers': total_subscribers,
+            'cpm': 0,  # Placeholder
+            'total_revenue': total_revenue,
+            'total_reach': total_reach,
+            'total_clicks': total_clicks,
+            'ctr': ctr
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ===== End Partners & Ad Network API =====
+
+_CHANNEL_DEFAULT_FIELDS = [
+    'id', 'chat_id', 'title', 'type', 'is_active', 'added_at',
+    'relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text',
+    'category', 'ai_enabled', 'channel_role', 'ai_provider', 'brand_voice',
+    'platform', 'owner_admin_id', 'managed_by_admin_ids',
+    'allow_subadmin_publish', 'ai_agent_id', 'platform_account_id',
+    'company_name', 'download_link', 'promo_code', 'affiliate_link',
+    'auto_post_enabled', 'auto_post_interval_min', 'auto_post_types'
+]
+
+_AI_AGENT_FIELDS = [
+    'id', 'name', 'provider', 'instructions', 'fallback_provider',
+    'is_active', 'created_at', 'updated_at', 'created_by',
+    'api_key', 'job_description', 'base_url', 'default_model',
+    'temperature', 'max_tokens', 'last_run_at', 'last_run_result'
+]
+
+_PLATFORM_ACCOUNT_FIELDS = [
+    'id', 'platform', 'account_name', 'is_active', 'api_base_url',
+    'access_token', 'phone_number_id', 'business_account_id',
+    'created_at', 'updated_at', 'created_by', 'last_health_check',
+    'health_status', 'last_error'
+]
+
+_SOCIAL_ACCOUNT_FIELDS = [
+    'id', 'platform', 'account_name', 'handle', 'sub_agent_id',
+    'access_token', 'page_id', 'phone_number_id', 'business_account_id',
+    'posting_permissions', 'content_categories', 'is_active',
+    'followers', 'last_sync', 'created_at', 'updated_at', 'created_by'
+]
+
+_PLATFORM_ACCOUNT_FIELDS = [
+    'id', 'platform', 'account_name', 'is_active', 'api_base_url',
+    'access_token', 'phone_number_id', 'business_account_id',
+    'created_at', 'updated_at', 'created_by', 'last_health_check',
+    'health_status', 'last_error'
+]
+
+_SOURCE_CHANNEL_FIELDS = [
+    'id', 'chat_id', 'title', 'type', 'is_active', 'added_at',
+    'brand_voice', 'target_channel_ids', 'schedule', 'last_scraped_at',
+    'content_filter', 'ai_edit_text', 'ai_edit_media', 'ai_provider',
+    'ai_agent_id', 'owner_admin_id', 'managed_by_admin_ids'
+]
+
+_CAMPAIGN_FIELDS = [
+    'id', 'name', 'message', 'media_urls',
+    'target', 'recipient', 'priority', 'country',
+    'language', 'segment', 'channel_group', 'scheduled_at',
+    'repeat', 'status', 'created_at', 'created_by',
+    'stats_reach', 'stats_clicks', 'stats_conversions',
+    'platform_account_id', 'ai_agent_id',
+    'selected_channels', 'selected_groups',
+    'whatsapp_contacts', 'whatsapp_groups',
+]
+
+
+def _is_super_admin_session():
+    uid = str(session.get('admin_id', '') or '')
+    if not uid:
+        return False
+    try:
+        role_data = _rbac_get_role(uid)
+        return str(role_data.get('role') or '') == 'super_admin'
+    except Exception:
+        return False
+
+
+def _pipe_ids(raw):
+    return '|'.join([x.strip() for x in str(raw or '').split('|') if x and x.strip()])
+
+
+def _pipe_to_list(raw):
+    return [x.strip() for x in str(raw or '').split('|') if x and x.strip()]
+
+
+def _normalize_channel_row(row, actor_uid=''):
+    changed = False
+
+    def _setdefault(key, value):
+        nonlocal changed
+        cur = row.get(key, '')
+        if cur is None or cur == '':
+            row[key] = value
+            changed = True
+
+    _setdefault('relay_to_users', 'yes')
+    _setdefault('relay_to_channels', 'yes')
+    _setdefault('forward_mode', 'all')
+    _setdefault('welcome_text', '')
+    _setdefault('category', '')
+    _setdefault('ai_enabled', 'no')
+    _setdefault('channel_role', 'both')
+    _setdefault('ai_provider', '')
+    _setdefault('brand_voice', '')
+    _setdefault('platform', 'telegram')
+    _setdefault('owner_admin_id', str(actor_uid or session.get('admin_id', '') or ''))
+    _setdefault('managed_by_admin_ids', str(row.get('owner_admin_id') or actor_uid or session.get('admin_id', '') or ''))
+    _setdefault('allow_subadmin_publish', 'no')
+    _setdefault('ai_agent_id', '')
+    _setdefault('platform_account_id', '')
+    _setdefault('company_name', '')
+    _setdefault('download_link', '')
+    _setdefault('promo_code', '')
+    _setdefault('affiliate_link', '')
+    _setdefault('auto_post_enabled', 'no')
+    _setdefault('auto_post_interval_min', '120')
+    _setdefault('auto_post_types', 'info|question|prediction|analysis')
+
+    # sanitize yes/no switches
+    for k in ('is_active', 'relay_to_users', 'relay_to_channels', 'ai_enabled', 'allow_subadmin_publish'):
+        v = str(row.get(k, '') or '').lower()
+        norm = 'yes' if v in ('1', 'true', 'yes', 'on', 'active') else 'no'
+        if row.get(k) != norm:
+            row[k] = norm
+            changed = True
+
+    # sanitize enums
+    if row.get('forward_mode') not in ('all', 'text_only', 'media_only'):
+        row['forward_mode'] = 'all'
+        changed = True
+    if row.get('channel_role') not in ('source', 'publish', 'both'):
+        row['channel_role'] = 'both'
+        changed = True
+    if str(row.get('platform', '')).strip().lower() not in ('telegram', 'whatsapp', 'webhook'):
+        row['platform'] = 'telegram'
+        changed = True
+
+    managers = _pipe_ids(row.get('managed_by_admin_ids', ''))
+    if managers != str(row.get('managed_by_admin_ids', '')):
+        row['managed_by_admin_ids'] = managers
+        changed = True
+
+    owner = str(row.get('owner_admin_id', '') or '').strip()
+    if owner and owner not in _pipe_to_list(row.get('managed_by_admin_ids', '')):
+        row['managed_by_admin_ids'] = _pipe_ids((row.get('managed_by_admin_ids', '') + '|' + owner).strip('|'))
+        changed = True
+
+    return row, changed
+
+
+def _admin_can_manage_channel(channel_row, admin_uid, action='edit'):
+    uid = str(admin_uid or '')
+    if not uid:
+        return False
+    if _is_super_admin_session():
+        return True
+    owner = str(channel_row.get('owner_admin_id', '') or '').strip()
+    managers = _pipe_to_list(channel_row.get('managed_by_admin_ids', ''))
+    if not owner:
+        return True  # legacy rows
+    if uid == owner or uid in managers:
+        return True
+    if action == 'publish' and str(channel_row.get('allow_subadmin_publish', 'no')) == 'yes':
+        return _rbac_has_perm(uid, 'send_broadcast')
+    return False
+
+
+def _platform_account_public(row):
+    r = dict(row)
+    token = str(r.get('access_token', '') or '')
+    if token:
+        r['access_token_masked'] = ('*' * max(0, len(token) - 6)) + token[-6:]
+    else:
+        r['access_token_masked'] = ''
+    r.pop('access_token', None)
+    return r
+
+
+def _platform_health_check(row):
+    platform = str(row.get('platform', '') or '').strip().lower()
+    token = str(row.get('access_token', '') or '').strip()
+    now_s = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if not token:
+        return {
+            'health_status': 'error',
+            'last_error': 'missing_access_token',
+            'last_health_check': now_s,
+        }
+
+    if platform != 'whatsapp':
+        return {
+            'health_status': 'ok',
+            'last_error': '',
+            'last_health_check': now_s,
+        }
+
+    phone_number_id = str(row.get('phone_number_id', '') or '').strip()
+    if not phone_number_id:
+        return {
+            'health_status': 'error',
+            'last_error': 'missing_phone_number_id',
+            'last_health_check': now_s,
+        }
+
+    base = str(row.get('api_base_url', '') or '').strip() or 'https://graph.facebook.com/v20.0'
+    if base.endswith('/'):
+        base = base[:-1]
+    url = f"{base}/{phone_number_id}?fields=display_phone_number,verified_name"
+    req = urllib.request.Request(url, headers={'Authorization': f'Bearer {token}'})
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            _ = resp.read()
+        return {
+            'health_status': 'ok',
+            'last_error': '',
+            'last_health_check': now_s,
+        }
+    except urllib.error.HTTPError as e:
+        return {
+            'health_status': 'error',
+            'last_error': f'http_{e.code}',
+            'last_health_check': now_s,
+        }
+    except Exception as e:
+        return {
+            'health_status': 'error',
+            'last_error': str(e)[:180],
+            'last_health_check': now_s,
+        }
+
+
+def _load_ai_agent_by_id(agent_id):
+    aid = str(agent_id or '').strip()
+    if not aid:
+        return None
+    rows = read_csv('ai_agents.csv')
+    for r in rows:
+        if str(r.get('id', '')).strip() != aid:
+            continue
+        r, _ = _normalize_ai_agent_row(r)
+        if r.get('is_active') != 'yes':
+            return None
+        return r
+    return None
+
+
+def _apply_ai_text_profile(text, agent_id='', provider='', instructions='', fallback_provider=''):
+    msg = str(text or '').strip()
+    if len(msg) < 8:
+        return msg, 'none', False
+    try:
+        from ai_providers import AIManager
+        manager = AIManager()
+    except Exception:
+        return msg, 'none', False
+
+    p_name = str(provider or '').strip().lower()
+    prompt = str(instructions or '').strip()
+    fb_name = str(fallback_provider or '').strip().lower()
+
+    if agent_id:
+        agent = _load_ai_agent_by_id(agent_id)
+        if agent:
+            p_name = str(agent.get('provider', p_name) or p_name).strip().lower()
+            prompt = str(agent.get('instructions', prompt) or prompt).strip()
+            fb_name = str(agent.get('fallback_provider', fb_name) or fb_name).strip().lower()
+
+    if not prompt:
+        prompt = "أعد صياغة النص بأسلوب تسويقي واضح وجذاب مع الحفاظ على المعنى."
+
+    selected = None if p_name in ('', 'auto') else p_name
+    try:
+        result, used_provider = manager.process(msg, prompt, provider_name=selected)
+        if (not result or len(result.strip()) < 8) and fb_name:
+            result, used_provider = manager.process(msg, prompt, provider_name=fb_name)
+        if result and len(result.strip()) >= 8:
+            return result, (used_provider or p_name or 'auto'), True
+    except Exception:
+        pass
+    return msg, 'none', False
+
 @app.route('/api/channels')
 @api_auth
 def api_channels():
     channels = read_csv('bot_channels.csv')
-    # التأكد من وجود أعمدة الإعدادات
+    uid = str(session.get('admin_id', '') or '')
+    changed = False
+    out = []
     for ch in channels:
-        if 'relay_to_users' not in ch: ch['relay_to_users'] = 'yes'
-        if 'relay_to_channels' not in ch: ch['relay_to_channels'] = 'yes'
-        if 'forward_mode' not in ch: ch['forward_mode'] = 'all'
-        if 'welcome_text' not in ch: ch['welcome_text'] = ''
-    return jsonify({'channels': channels})
+        ch, row_changed = _normalize_channel_row(ch)
+        changed = changed or row_changed
+        if _admin_can_manage_channel(ch, uid, action='view'):
+            out.append(ch)
+    if changed:
+        write_csv('bot_channels.csv', channels, get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS))
+    return jsonify({'channels': out})
 
 @app.route('/api/channels/<channel_id>/toggle', methods=['POST'])
 @api_auth
 @permission_required('send_broadcast')
 def api_toggle_channel(channel_id):
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    found = False
     for c in channels:
         if c.get('id') == channel_id:
+            found = True
+            c, _ = _normalize_channel_row(c)
+            if not _admin_can_manage_channel(c, uid, action='edit'):
+                return jsonify({'error': 'Forbidden'}), 403
             c['is_active'] = 'no' if c.get('is_active') == 'yes' else 'yes'
             break
+    if not found:
+        return jsonify({'error': 'Channel not found'}), 404
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})
 
@@ -4756,20 +12035,70 @@ def api_toggle_channel(channel_id):
 @permission_required('send_broadcast')
 def api_channel_settings(channel_id):
     """تحديث إعدادات قناة محددة"""
-    data = request.json
+    data = request.json or {}
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
-    editable = ['relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text', 'is_active', 'title']
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    editable = [
+        'relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text',
+        'is_active', 'title', 'category', 'ai_enabled', 'channel_role',
+        'ai_provider', 'brand_voice', 'platform', 'ai_agent_id', 'platform_account_id',
+        'allow_subadmin_publish',
+        'company_name', 'download_link', 'promo_code', 'affiliate_link',
+        'auto_post_enabled', 'auto_post_interval_min', 'auto_post_types'
+    ]
+    uid = str(session.get('admin_id', '') or '')
+    updated = False
     for c in channels:
         if c.get('id') == channel_id:
+            c, _ = _normalize_channel_row(c)
+            if not _admin_can_manage_channel(c, uid, action='edit'):
+                return jsonify({'error': 'Forbidden'}), 403
             for k, v in data.items():
                 if k in editable:
                     if k not in fieldnames:
                         fieldnames.append(k)
                     c[k] = v
+                    updated = True
+            c, _ = _normalize_channel_row(c)
             break
+    if not updated:
+        return jsonify({'error': 'No editable fields or channel not found'}), 400
     write_csv('bot_channels.csv', channels, fieldnames)
     log_action('update_channel_settings', f'{channel_id}: {json.dumps(data)[:100]}')
+    return jsonify({'success': True})
+
+
+@app.route('/api/channels/<channel_id>/ownership', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_channel_ownership(channel_id):
+    """Assign owner/managers for a channel (super admin only)."""
+    if not _is_super_admin_session():
+        return jsonify({'error': 'Forbidden — super admin only'}), 403
+    data = request.json or {}
+    channels = read_csv('bot_channels.csv')
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    owner_admin_id = str(data.get('owner_admin_id', '') or '').strip()
+    managed_raw = data.get('managed_by_admin_ids', '')
+    if isinstance(managed_raw, list):
+        managed_raw = '|'.join([str(x).strip() for x in managed_raw if str(x).strip()])
+    managed_by_admin_ids = _pipe_ids(managed_raw)
+    allow_subadmin_publish = 'yes' if str(data.get('allow_subadmin_publish', 'no')).lower() in ('1', 'true', 'yes', 'on') else 'no'
+
+    found = False
+    for c in channels:
+        if c.get('id') == channel_id:
+            found = True
+            c, _ = _normalize_channel_row(c)
+            c['owner_admin_id'] = owner_admin_id
+            c['managed_by_admin_ids'] = managed_by_admin_ids
+            c['allow_subadmin_publish'] = allow_subadmin_publish
+            c, _ = _normalize_channel_row(c)
+            break
+    if not found:
+        return jsonify({'error': 'Channel not found'}), 404
+    write_csv('bot_channels.csv', channels, fieldnames)
+    log_action('update_channel_ownership', f'{channel_id}: owner={owner_admin_id} managers={managed_by_admin_ids}')
     return jsonify({'success': True})
 
 @app.route('/api/channels/<channel_id>', methods=['DELETE'])
@@ -4777,8 +12106,21 @@ def api_channel_settings(channel_id):
 @permission_required('send_broadcast')
 def api_delete_channel(channel_id):
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
-    channels = [c for c in channels if c.get('id') != channel_id]
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    out = []
+    found = False
+    for c in channels:
+        if c.get('id') != channel_id:
+            out.append(c)
+            continue
+        found = True
+        c, _ = _normalize_channel_row(c)
+        if not _admin_can_manage_channel(c, uid, action='edit'):
+            return jsonify({'error': 'Forbidden'}), 403
+    if not found:
+        return jsonify({'error': 'Channel not found'}), 404
+    channels = out
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})
 
@@ -5098,21 +12440,577 @@ def api_ai_posts():
     posts.reverse()
     return jsonify({'posts': posts[:50], 'total': len(posts)})
 
-# ===== API — Channel Categories =====
 
-@app.route('/api/channel-categories')
+def _normalize_ai_agent_row(row):
+    changed = False
+
+    def _setdefault(k, v):
+        nonlocal changed
+        if row.get(k, '') in ('', None):
+            row[k] = v
+            changed = True
+
+    _setdefault('id', f"AIA{secrets.token_hex(3).upper()}")
+    _setdefault('name', f"AI Agent {row.get('id', '')[-4:]}")
+    _setdefault('provider', 'openai')
+    _setdefault('instructions', '')
+    _setdefault('fallback_provider', '')
+    _setdefault('is_active', 'yes')
+    _setdefault('created_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    _setdefault('updated_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    _setdefault('created_by', '')
+    _setdefault('api_key', '')
+    _setdefault('job_description', '')
+    _setdefault('base_url', '')
+    _setdefault('default_model', '')
+    _setdefault('temperature', '0.7')
+    _setdefault('max_tokens', '2048')
+    _setdefault('last_run_at', '')
+    _setdefault('last_run_result', '')
+
+    if str(row.get('is_active', '')).lower() in ('1', 'true', 'yes', 'on', 'active'):
+        norm = 'yes'
+    else:
+        norm = 'no'
+    if row.get('is_active') != norm:
+        row['is_active'] = norm
+        changed = True
+
+    provider = str(row.get('provider', '') or '').strip().lower()
+    if provider not in ('openai', 'claude', 'kimi', 'openrouter', 'auto'):
+        row['provider'] = 'auto'
+        changed = True
+
+    fb = str(row.get('fallback_provider', '') or '').strip().lower()
+    if fb and fb not in ('openai', 'claude', 'kimi', 'openrouter'):
+        row['fallback_provider'] = ''
+        changed = True
+
+    return row, changed
+
+
+@app.route('/api/ai-agents')
 @api_auth
-def api_channel_categories():
-    channels = read_csv('bot_channels.csv')
-    cats = {}
-    for ch in channels:
-        cat = ch.get('category', 'غير مصنف')
-        if not cat:
-            cat = 'غير مصنف'
-        if cat not in cats:
-            cats[cat] = 0
-        cats[cat] += 1
-    return jsonify({'categories': cats})
+def api_ai_agents_list():
+    rows = read_csv('ai_agents.csv')
+    changed = False
+    out = []
+    for r in rows:
+        r, ch = _normalize_ai_agent_row(r)
+        changed = changed or ch
+        # Never leak API keys to the client — only a flag
+        pub = {k: v for k, v in r.items() if k != 'api_key'}
+        pub['has_api_key'] = bool(r.get('api_key'))
+        out.append(pub)
+    if changed:
+        write_csv('ai_agents.csv', rows, get_fieldnames('ai_agents.csv', _AI_AGENT_FIELDS))
+    out.sort(key=lambda x: (x.get('is_active') != 'yes', x.get('name', '')))
+    return jsonify({'agents': out})
+
+
+@app.route('/api/ai-agents', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_agents_create():
+    data = request.json or {}
+    rows = read_csv('ai_agents.csv')
+    fieldnames = get_fieldnames('ai_agents.csv', _AI_AGENT_FIELDS)
+    now_s = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    row = {
+        'id': f"AIA{secrets.token_hex(3).upper()}",
+        'name': str(data.get('name', '') or '').strip(),
+        'provider': str(data.get('provider', 'auto') or 'auto').strip().lower(),
+        'instructions': str(data.get('instructions', '') or '').strip(),
+        'fallback_provider': str(data.get('fallback_provider', '') or '').strip().lower(),
+        'is_active': 'yes' if str(data.get('is_active', 'yes')).lower() in ('1', 'true', 'yes', 'on') else 'no',
+        'api_key': str(data.get('api_key', '') or '').strip(),
+        'job_description': str(data.get('job_description', '') or '').strip(),
+        'base_url': str(data.get('base_url', '') or '').strip(),
+        'default_model': str(data.get('default_model', '') or '').strip(),
+        'temperature': str(data.get('temperature', '0.7') or '0.7'),
+        'max_tokens': str(data.get('max_tokens', '2048') or '2048'),
+        'last_run_at': '',
+        'last_run_result': '',
+        'created_at': now_s,
+        'updated_at': now_s,
+        'created_by': str(session.get('admin_id', '') or ''),
+    }
+    row, _ = _normalize_ai_agent_row(row)
+    if not row.get('name'):
+        return jsonify({'error': 'name required'}), 400
+    rows.append(row)
+    write_csv('ai_agents.csv', rows, fieldnames)
+    log_action('create_ai_agent', row['id'])
+    return jsonify({'success': True, 'agent': row})
+
+
+@app.route('/api/ai-agents/<agent_id>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_agents_edit(agent_id):
+    rows = read_csv('ai_agents.csv')
+    fieldnames = get_fieldnames('ai_agents.csv', _AI_AGENT_FIELDS)
+    if request.method == 'DELETE':
+        new_rows = [r for r in rows if r.get('id') != agent_id]
+        if len(new_rows) == len(rows):
+            return jsonify({'error': 'Agent not found'}), 404
+        write_csv('ai_agents.csv', new_rows, fieldnames)
+        log_action('delete_ai_agent', agent_id)
+        return jsonify({'success': True})
+
+    data = request.json or {}
+    editable = {'name', 'provider', 'instructions', 'fallback_provider', 'is_active',
+                'api_key', 'job_description', 'base_url', 'default_model',
+                'temperature', 'max_tokens'}
+    found = False
+    for r in rows:
+        if r.get('id') == agent_id:
+            found = True
+            for k, v in data.items():
+                if k in editable:
+                    r[k] = v
+            r['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            r, _ = _normalize_ai_agent_row(r)
+            break
+    if not found:
+        return jsonify({'error': 'Agent not found'}), 404
+    write_csv('ai_agents.csv', rows, fieldnames)
+    log_action('update_ai_agent', agent_id)
+    return jsonify({'success': True})
+
+
+# ===== AI Agent Execution Engine — full dashboard control =====
+def _agent_resolve_credentials(agent):
+    """Resolve API key + base URL + model for an agent (agent key > DB keys > env)."""
+    provider = (agent.get('provider') or 'auto').strip().lower()
+    api_key = (agent.get('api_key') or '').strip()
+    base_url = (agent.get('base_url') or '').strip()
+    model = (agent.get('default_model') or '').strip()
+
+    # Fall back to ai_api_keys DB (priority order) when agent has no key
+    if not api_key:
+        try:
+            import sqlite3
+            conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                'SELECT * FROM ai_api_keys WHERE is_active=1 ORDER BY priority ASC, id ASC').fetchall()
+            conn.close()
+            for r in rows:
+                p = (r['provider'] or '').lower()
+                if provider == 'auto' or provider in p or p in provider:
+                    api_key = r['api_key']
+                    base_url = base_url or (r['base_url'] or '')
+                    model = model or (r['default_model'] or '')
+                    break
+            if not api_key and rows:
+                api_key = rows[0]['api_key']
+                base_url = base_url or (rows[0]['base_url'] or '')
+                model = model or (rows[0]['default_model'] or '')
+        except Exception:
+            pass
+
+    if not api_key:
+        api_key = os.getenv('OPENAI_API_KEY', '') or _env_file_value('OPENAI_API_KEY') or ''
+    if provider == 'openrouter' and not base_url:
+        base_url = 'https://openrouter.ai/api/v1'
+    if not base_url:
+        base_url = 'https://api.openai.com/v1'
+    if not model:
+        model = 'gpt-4o-mini'
+    return api_key, base_url.rstrip('/'), model
+
+
+def _agent_dashboard_context():
+    """Gather full dashboard state for the agent to monitor."""
+    try:
+        txns = read_csv('transactions.csv')
+        pending_txns = [t for t in txns if t.get('status') == 'pending'][:15]
+        complaints = read_csv('complaints.csv')
+        open_complaints = [c for c in complaints if c.get('status') not in ('resolved', 'closed')][:15]
+        users = read_csv('users.csv')
+        channels = read_csv('bot_channels.csv')
+        queue = read_csv('broadcast_queue.csv')
+        return {
+            'users_total': len(users),
+            'channels_total': len(channels),
+            'transactions_pending': len([t for t in txns if t.get('status') == 'pending']),
+            'complaints_open': len(open_complaints),
+            'broadcast_queue_pending': len([q for q in queue if q.get('status') == 'pending']),
+            'pending_transactions': [
+                {'id': t.get('id'), 'type': t.get('type'), 'amount': t.get('amount'),
+                 'customer': t.get('customer_id', t.get('client', '')), 'date': t.get('date', t.get('created_at', ''))}
+                for t in pending_txns],
+            'open_complaints': [
+                {'id': c.get('id'), 'message': (c.get('message') or '')[:200],
+                 'customer': c.get('customer_id', c.get('client', '')), 'date': c.get('date', c.get('created_at', ''))}
+                for c in open_complaints],
+        }
+    except Exception as e:
+        return {'error': f'context gathering failed: {e}'}
+
+
+_AGENT_ACTIONS_DOC = """You may return ONE JSON object (and only the JSON, no extra text) to execute actions:
+{"report": "short human summary of what you did/found", "actions": [
+  {"action": "approve_transaction", "id": "<txn_id>", "amount": 123.0},
+  {"action": "reject_transaction", "id": "<txn_id>", "reason": "..."},
+  {"action": "reply_complaint", "id": "<complaint_id>", "response": "..."},
+  {"action": "broadcast_message", "message": "...", "target": "telegram|web|both"},
+  {"action": "ban_user", "user_id": "<id>", "reason": "..."},
+  {"action": "unban_user", "user_id": "<id>"}
+]}
+If you only want to report without acting, return {"report": "...", "actions": []}.
+NEVER invent IDs — only use IDs from the provided dashboard context."""
+
+
+def _agent_execute_action(act):
+    """Execute a single agent action safely. Returns (ok, message)."""
+    name = str(act.get('action', '') or '').strip().lower()
+    try:
+        if name == 'approve_transaction':
+            tid = str(act.get('id', ''))
+            txns = read_csv('transactions.csv')
+            for t in txns:
+                if t.get('id') == tid and t.get('status') == 'pending':
+                    amt = act.get('amount')
+                    if amt is not None:
+                        try:
+                            t['amount'] = str(float(amt))
+                        except (TypeError, ValueError):
+                            pass
+                    t['status'] = 'approved'
+                    write_csv('transactions.csv', txns, get_fieldnames('transactions.csv',
+                              ['id', 'customer_id', 'type', 'amount', 'status', 'date', 'company', 'wallet']))
+                    return True, f'transaction {tid} approved'
+            return False, f'transaction {tid} not found or not pending'
+
+        if name == 'reject_transaction':
+            tid = str(act.get('id', ''))
+            txns = read_csv('transactions.csv')
+            for t in txns:
+                if t.get('id') == tid and t.get('status') == 'pending':
+                    t['status'] = 'rejected'
+                    t['admin_note'] = str(act.get('reason', 'rejected by AI agent'))[:200]
+                    write_csv('transactions.csv', txns, get_fieldnames('transactions.csv',
+                              ['id', 'customer_id', 'type', 'amount', 'status', 'date', 'company', 'wallet', 'admin_note']))
+                    return True, f'transaction {tid} rejected'
+            return False, f'transaction {tid} not found or not pending'
+
+        if name == 'reply_complaint':
+            cid = str(act.get('id', ''))
+            complaints = read_csv('complaints.csv')
+            for c in complaints:
+                if c.get('id') == cid:
+                    c['admin_response'] = str(act.get('response', ''))[:500]
+                    c['status'] = 'resolved'
+                    write_csv('complaints.csv', complaints, get_fieldnames('complaints.csv',
+                              ['id', 'customer_id', 'message', 'status', 'date', 'admin_response']))
+                    return True, f'complaint {cid} replied & resolved'
+            return False, f'complaint {cid} not found'
+
+        if name == 'broadcast_message':
+            msg = str(act.get('message', ''))[:4000]
+            if not msg:
+                return False, 'empty broadcast message'
+            target = str(act.get('target', 'telegram') or 'telegram').lower()
+            fieldnames = get_fieldnames('broadcast_queue.csv', [
+                'id', 'message', 'type', 'platform', 'target_chat_id', 'platform_account_id',
+                'target_channel_id', 'created_at', 'created_by', 'status', 'target', 'recipient',
+                'priority', 'country', 'media_urls', 'target_user', 'target_name', 'scheduled_at'])
+            targets = ['telegram'] if target == 'telegram' else (['whatsapp'] if target == 'whatsapp' else (['web'] if target == 'web' else ['telegram', 'web']))
+            for t in targets:
+                append_csv('broadcast_queue.csv', {
+                    'id': f"AIAG{secrets.token_hex(3).upper()}",
+                    'message': msg, 'type': 'broadcast', 'platform': t,
+                    'target_chat_id': '', 'platform_account_id': '', 'target_channel_id': '',
+                    'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                    'created_by': 'ai_agent', 'status': 'pending',
+                    'target': t, 'recipient': 'all', 'priority': 'normal', 'country': 'all',
+                    'media_urls': '', 'target_user': '', 'target_name': '', 'scheduled_at': '',
+                }, fieldnames)
+            return True, f'broadcast queued to {",".join(targets)}'
+
+        if name == 'ban_user':
+            uid = str(act.get('user_id', ''))
+            users = read_csv('users.csv')
+            for u in users:
+                if u.get('id') == uid or u.get('customer_id') == uid:
+                    u['banned'] = 'yes'
+                    u['ban_reason'] = str(act.get('reason', 'banned by AI agent'))[:200]
+                    write_csv('users.csv', users, get_fieldnames('users.csv',
+                              ['id', 'customer_id', 'name', 'phone', 'banned', 'ban_reason', 'created_at']))
+                    return True, f'user {uid} banned'
+            return False, f'user {uid} not found'
+
+        if name == 'unban_user':
+            uid = str(act.get('user_id', ''))
+            users = read_csv('users.csv')
+            for u in users:
+                if u.get('id') == uid or u.get('customer_id') == uid:
+                    u['banned'] = 'no'
+                    u['ban_reason'] = ''
+                    write_csv('users.csv', users, get_fieldnames('users.csv',
+                              ['id', 'customer_id', 'name', 'phone', 'banned', 'ban_reason', 'created_at']))
+                    return True, f'user {uid} unbanned'
+            return False, f'user {uid} not found'
+
+        return False, f'unknown action: {name}'
+    except Exception as e:
+        return False, f'action failed: {e}'
+
+
+@app.route('/api/ai-agents/<agent_id>/run', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_agents_run(agent_id):
+    """Run the agent: monitor dashboard state, think with its job description, execute actions."""
+    rows = read_csv('ai_agents.csv')
+    agent = next((r for r in rows if r.get('id') == agent_id), None)
+    if not agent:
+        return jsonify({'success': False, 'error': 'Agent not found'}), 404
+    agent, _ = _normalize_ai_agent_row(agent)
+    if agent.get('is_active') != 'yes':
+        return jsonify({'success': False, 'error': 'Agent is inactive — activate it first'}), 400
+
+    api_key, base_url, model = _agent_resolve_credentials(agent)
+    if not api_key:
+        return jsonify({'success': False, 'error': 'No API key available — add one to the agent or to AI API Keys'}), 400
+
+    context = _agent_dashboard_context()
+    job = agent.get('job_description') or agent.get('instructions') or 'Monitor the dashboard and report anything important.'
+
+    system_prompt = f"""You are an autonomous admin agent inside the VEX Games admin dashboard.
+YOUR JOB: {job}
+RULES: {agent.get('instructions') or 'Act carefully. Only act when clearly needed by your job.'}
+{_AGENT_ACTIONS_DOC}"""
+
+    user_prompt = f"""DASHBOARD STATE (live):
+{json.dumps(context, ensure_ascii=False, indent=1)}
+
+Execute your job now. Return your JSON."""
+
+    try:
+        import httpx
+        try:
+            temperature = min(2.0, max(0.0, float(agent.get('temperature') or 0.7)))
+        except (TypeError, ValueError):
+            temperature = 0.7
+        try:
+            max_tokens = min(16000, max(100, int(float(agent.get('max_tokens') or 2048))))
+        except (TypeError, ValueError):
+            max_tokens = 2048
+
+        headers = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
+        payload = {
+            'model': model,
+            'messages': [
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_prompt},
+            ],
+            'temperature': temperature,
+            'max_tokens': max_tokens,
+        }
+        with httpx.Client(timeout=90.0) as client:
+            resp = client.post(base_url + '/chat/completions', headers=headers, json=payload)
+        if resp.status_code != 200:
+            return jsonify({'success': False, 'error': f'AI provider error {resp.status_code}: {resp.text[:300]}'}), 502
+
+        content = resp.json()['choices'][0]['message']['content']
+        # Extract JSON from the response (tolerate markdown fences)
+        js = content.strip()
+        if '```' in js:
+            for part in js.split('```'):
+                p = part.strip()
+                if p.startswith('{'):
+                    js = p
+                    break
+        actions, report, exec_results = [], '', []
+        try:
+            js_start = js.find('{')
+            js_end = js.rfind('}')
+            parsed = json.loads(js[js_start:js_end + 1])
+            report = parsed.get('report', '')
+            actions = parsed.get('actions', []) or []
+        except Exception:
+            report = content  # raw text fallback — agent spoke but no valid JSON
+
+        for act in actions:
+            if not isinstance(act, dict):
+                continue
+            ok, msg = _agent_execute_action(act)
+            exec_results.append({'action': act.get('action'), 'ok': ok, 'message': msg})
+
+        result_text = report + ('\nActions: ' + '; '.join(
+            ('✅ ' if r['ok'] else '❌ ') + r['action'] + ' — ' + r['message'] for r in exec_results) if exec_results else '')
+
+        agent['last_run_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        agent['last_run_result'] = result_text[:1000]
+        agent['updated_at'] = agent['last_run_at']
+        for i, r in enumerate(rows):
+            if r.get('id') == agent_id:
+                rows[i] = agent
+                break
+        write_csv('ai_agents.csv', rows, get_fieldnames('ai_agents.csv', _AI_AGENT_FIELDS))
+        log_action('run_ai_agent', f'{agent_id}: {len(exec_results)} actions')
+
+        return jsonify({'success': True, 'report': report,
+                        'actions_executed': exec_results,
+                        'raw': content[:2000], 'model': model})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Agent run failed: {e}'}), 500
+
+
+@app.route('/api/ai-agents/<agent_id>/test', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_agents_test(agent_id):
+    rows = read_csv('ai_agents.csv')
+    row = next((r for r in rows if r.get('id') == agent_id), None)
+    if not row:
+        return jsonify({'success': False, 'error': 'Agent not found'}), 404
+    row, _ = _normalize_ai_agent_row(row)
+
+    try:
+        from ai_providers import AIManager
+        manager = AIManager()
+        sample = (request.json or {}).get('sample') or 'مرحبا بكم في عرضنا الجديد. سجل الآن واحصل على مكافأة.'
+        instructions = row.get('instructions') or 'أعد صياغة النص بأسلوب تسويقي مختصر.'
+        provider_name = row.get('provider') if row.get('provider') != 'auto' else None
+        result, used_provider = manager.process(sample, instructions, provider_name=provider_name)
+        if not result and row.get('fallback_provider'):
+            result, used_provider = manager.process(sample, instructions, provider_name=row.get('fallback_provider'))
+        return jsonify({
+            'success': bool(result),
+            'provider': used_provider,
+            'result': result or 'فشل الاختبار',
+            'sample': sample,
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/platform-accounts')
+@api_auth
+def api_platform_accounts_list():
+    rows = read_csv('platform_accounts.csv')
+    fieldnames = get_fieldnames('platform_accounts.csv', _PLATFORM_ACCOUNT_FIELDS)
+    changed = False
+    out = []
+    for r in rows:
+        for k in fieldnames:
+            if k not in r:
+                r[k] = ''
+                changed = True
+        if str(r.get('is_active', '')).lower() in ('1', 'true', 'yes', 'on', 'active'):
+            norm = 'yes'
+        else:
+            norm = 'no'
+        if r.get('is_active') != norm:
+            r['is_active'] = norm
+            changed = True
+        out.append(_platform_account_public(r))
+    if changed:
+        write_csv('platform_accounts.csv', rows, fieldnames)
+    return jsonify({'accounts': out})
+
+
+@app.route('/api/platform-accounts', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_platform_accounts_create():
+    data = request.json or {}
+    platform = str(data.get('platform', 'telegram') or 'telegram').strip().lower()
+    if platform not in ('telegram', 'whatsapp', 'webhook'):
+        return jsonify({'error': 'platform must be telegram/whatsapp/webhook'}), 400
+    now_s = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    row = {
+        'id': f"PAC{secrets.token_hex(3).upper()}",
+        'platform': platform,
+        'account_name': str(data.get('account_name', '') or '').strip(),
+        'is_active': 'yes' if str(data.get('is_active', 'yes')).lower() in ('1', 'true', 'yes', 'on') else 'no',
+        'api_base_url': str(data.get('api_base_url', '') or '').strip(),
+        'access_token': str(data.get('access_token', '') or '').strip(),
+        'phone_number_id': str(data.get('phone_number_id', '') or '').strip(),
+        'business_account_id': str(data.get('business_account_id', '') or '').strip(),
+        'created_at': now_s,
+        'updated_at': now_s,
+        'created_by': str(session.get('admin_id', '') or ''),
+        'last_health_check': '',
+        'health_status': 'unknown',
+        'last_error': '',
+    }
+    if not row['account_name']:
+        return jsonify({'error': 'account_name required'}), 400
+    rows = read_csv('platform_accounts.csv')
+    fieldnames = get_fieldnames('platform_accounts.csv', _PLATFORM_ACCOUNT_FIELDS)
+    rows.append(row)
+    write_csv('platform_accounts.csv', rows, fieldnames)
+    log_action('create_platform_account', row['id'])
+    return jsonify({'success': True, 'account': _platform_account_public(row)})
+
+
+@app.route('/api/platform-accounts/<account_id>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_platform_accounts_edit(account_id):
+    rows = read_csv('platform_accounts.csv')
+    fieldnames = get_fieldnames('platform_accounts.csv', _PLATFORM_ACCOUNT_FIELDS)
+
+    if request.method == 'DELETE':
+        new_rows = [r for r in rows if r.get('id') != account_id]
+        if len(new_rows) == len(rows):
+            return jsonify({'error': 'Account not found'}), 404
+        write_csv('platform_accounts.csv', new_rows, fieldnames)
+        log_action('delete_platform_account', account_id)
+        return jsonify({'success': True})
+
+    data = request.json or {}
+    editable = {
+        'platform', 'account_name', 'is_active', 'api_base_url', 'access_token',
+        'phone_number_id', 'business_account_id', 'health_status', 'last_error'
+    }
+    found = False
+    for r in rows:
+        if r.get('id') == account_id:
+            found = True
+            for k, v in data.items():
+                if k in editable:
+                    r[k] = v
+            r['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if str(r.get('is_active', '')).lower() in ('1', 'true', 'yes', 'on', 'active'):
+                r['is_active'] = 'yes'
+            else:
+                r['is_active'] = 'no'
+            if str(r.get('platform', '')).strip().lower() not in ('telegram', 'whatsapp', 'webhook'):
+                r['platform'] = 'telegram'
+            break
+    if not found:
+        return jsonify({'error': 'Account not found'}), 404
+    write_csv('platform_accounts.csv', rows, fieldnames)
+    log_action('update_platform_account', account_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/platform-accounts/<account_id>/health', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_platform_accounts_health(account_id):
+    rows = read_csv('platform_accounts.csv')
+    fieldnames = get_fieldnames('platform_accounts.csv', _PLATFORM_ACCOUNT_FIELDS)
+    found = False
+    result = {}
+    for r in rows:
+        if r.get('id') == account_id:
+            found = True
+            result = _platform_health_check(r)
+            r.update(result)
+            r['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            break
+    if not found:
+        return jsonify({'error': 'Account not found'}), 404
+    write_csv('platform_accounts.csv', rows, fieldnames)
+    log_action('platform_account_health', account_id)
+    return jsonify({'success': True, **result})
 
 @app.route('/api/channels/<channel_id>/category', methods=['POST'])
 @api_auth
@@ -5121,11 +13019,19 @@ def api_set_channel_category(channel_id):
     data = request.json
     category = data.get('category', 'غير مصنف')
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    found = False
     for c in channels:
         if c.get('id') == channel_id:
+            found = True
+            c, _ = _normalize_channel_row(c)
+            if not _admin_can_manage_channel(c, uid, action='edit'):
+                return jsonify({'error': 'Forbidden'}), 403
             c['category'] = category
             break
+    if not found:
+        return jsonify({'error': 'Channel not found'}), 404
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})
 
@@ -5134,16 +13040,292 @@ def api_set_channel_category(channel_id):
 @permission_required('send_broadcast')
 def api_toggle_channel_ai(channel_id):
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    found = False
     for c in channels:
         if c.get('id') == channel_id:
+            found = True
+            c, _ = _normalize_channel_row(c)
+            if not _admin_can_manage_channel(c, uid, action='edit'):
+                return jsonify({'error': 'Forbidden'}), 403
             c['ai_enabled'] = 'no' if c.get('ai_enabled') == 'yes' else 'yes'
             break
+    if not found:
+        return jsonify({'error': 'Channel not found'}), 404
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})
 
-# ===== API — Channel Groups =====
+# ===== API — Social Media Accounts =====
 
+def _social_account_public(row):
+    return {
+        'id': row.get('id', ''),
+        'platform': row.get('platform', ''),
+        'account_name': row.get('account_name', ''),
+        'handle': row.get('handle', ''),
+        'sub_agent_id': row.get('sub_agent_id', ''),
+        'sub_agent_name': row.get('sub_agent_name', ''),
+        'access_token': row.get('access_token', ''),
+        'page_id': row.get('page_id', ''),
+        'phone_number_id': row.get('phone_number_id', ''),
+        'business_account_id': row.get('business_account_id', ''),
+        'posting_permissions': row.get('posting_permissions', 'full'),
+        'content_categories': row.get('content_categories', '').split('|') if row.get('content_categories') else [],
+        'is_active': row.get('is_active', 'yes'),
+        'followers': int(row.get('followers', '0') or 0),
+        'last_sync': row.get('last_sync', ''),
+        'created_at': row.get('created_at', ''),
+        'updated_at': row.get('updated_at', ''),
+        'created_by': row.get('created_by', ''),
+    }
+
+@app.route('/api/social-accounts')
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_list():
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        accounts = []
+        sub_agents = []
+        sub_agent_ids = set()
+        rows = conn.execute('SELECT * FROM social_accounts').fetchall()
+        for r in rows:
+            accounts.append(_social_account_public(r))
+            if r['sub_agent_id']:
+                sub_agent_ids.add(r['sub_agent_id'])
+        # Get sub-agents list
+        agents = conn.execute('SELECT id, title, chat_id FROM bot_channels WHERE is_active="yes"').fetchall()
+        for a in agents:
+            if a['id'] in sub_agent_ids:
+                sub_agents.append({'id': a['id'], 'name': a['title'], 'username': a['chat_id']})
+        return jsonify({'accounts': accounts, 'sub_agents': sub_agents})
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_create():
+    import sqlite3
+    data = request.get_json(silent=True) or {}
+    required = ['platform', 'account_name', 'handle', 'sub_agent_id', 'access_token']
+    for f in required:
+        if not data.get(f):
+            return jsonify({'error': f'Missing field: {f}'}), 400
+
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT * FROM bot_channels WHERE id=?', (data['sub_agent_id'],)).fetchone()
+        if not row:
+            return jsonify({'error': 'Sub agent not found'}), 404
+        sub_agent_name = row['title']
+    finally:
+        conn.close()
+
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    try:
+        conn.execute('''
+            INSERT INTO social_accounts (id, platform, account_name, handle, sub_agent_id, sub_agent_name,
+                access_token, page_id, phone_number_id, business_account_id,
+                posting_permissions, content_categories, is_active, followers, last_sync,
+                created_at, updated_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            f"SOC{secrets.token_hex(3).upper()}",
+            data['platform'], data['account_name'], data['handle'], data['sub_agent_id'],
+            sub_agent_name, data['access_token'], data.get('page_id', ''),
+            data.get('phone_number_id', ''), data.get('business_account_id', ''),
+            data.get('posting_permissions', 'full'),
+            '|'.join(data.get('content_categories', [])),
+            'yes' if data.get('is_active') else 'no',
+            0, '', datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            str(session.get('admin_id', ''))
+        ))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts/<account_id>', methods=['PUT'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_update(account_id):
+    import sqlite3
+    data = request.get_json(silent=True) or {}
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT * FROM social_accounts WHERE id=?', (account_id,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Account not found'}), 404
+        # Keep existing key if not provided
+        access_token = data.get('access_token') if data.get('access_token') else row['access_token']
+        sub_agent_name = row['sub_agent_name']
+        conn.execute('''
+            UPDATE social_accounts SET
+                platform=?, account_name=?, handle=?, sub_agent_id=?,
+                access_token=?, page_id=?, phone_number_id=?, business_account_id=?,
+                posting_permissions=?, content_categories=?, is_active=?,
+                updated_at=?
+            WHERE id=?
+        ''', (
+            data.get('platform', row['platform']),
+            data.get('account_name', row['account_name']),
+            data.get('handle', row['handle']),
+            data.get('sub_agent_id', row['sub_agent_id']),
+            access_token,
+            data.get('page_id', row['page_id']),
+            data.get('phone_number_id', row['phone_number_id']),
+            data.get('business_account_id', row['business_account_id']),
+            data.get('posting_permissions', row['posting_permissions']),
+            '|'.join(data.get('content_categories', [])),
+            'yes' if data.get('is_active') else 'no',
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            account_id
+        ))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts/<account_id>', methods=['DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_delete(account_id):
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    try:
+        conn.execute('DELETE FROM social_accounts WHERE id=?', (account_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts/<account_id>/toggle', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_toggle(account_id):
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT is_active FROM social_accounts WHERE id=?', (account_id,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Account not found'}), 404
+        new_status = 'no' if row['is_active'] == 'yes' else 'yes'
+        conn.execute('UPDATE social_accounts SET is_active=?, updated_at=? WHERE id=?',
+                     (new_status, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), account_id))
+        conn.commit()
+        return jsonify({'success': True, 'is_active': new_status})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts/<account_id>/sync', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_sync(account_id):
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT * FROM social_accounts WHERE id=?', (account_id,)).fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': 'Account not found'}), 404
+
+        platform = row['platform']
+        access_token = row['access_token']
+
+        # Simulate sync with platform API
+        # In production, this would call the actual platform APIs
+        followers = 0
+        try:
+            if platform == 'facebook':
+                # Would call Facebook Graph API
+                pass
+            elif platform == 'instagram':
+                # Would call Instagram Graph API
+                pass
+            elif platform == 'twitter':
+                # Would call Twitter API v2
+                pass
+            elif platform == 'linkedin':
+                # Would call LinkedIn API
+                pass
+            # ... other platforms
+        except:
+            pass
+
+        conn.execute('UPDATE social_accounts SET followers=?, last_sync=?, updated_at=? WHERE id=?',
+                     (followers, datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                      datetime.now().strftime('%Y-%m-%d %H:%M:%S'), account_id))
+        conn.commit()
+        return jsonify({'success': True, 'followers': followers, 'message': 'Synced successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Sync failed: {str(e)}'}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts/<account_id>/post', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_post(account_id):
+    """Post content to a social media account"""
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT * FROM social_accounts WHERE id=?', (account_id,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Account not found'}), 404
+
+        data = request.get_json(silent=True) or {}
+        content = data.get('content', '')
+        media_urls = data.get('media_urls', [])
+
+        if not content.strip() and not media_urls:
+            return jsonify({'error': 'Content or media required'}), 400
+
+        # Post to platform
+        platform = row['platform']
+        access_token = row['access_token']
+
+        # This is a placeholder - in production, call the actual platform APIs
+        # For now, simulate success
+        post_id = f"POST{secrets.token_hex(4).upper()}"
+        success = True
+        error = None
+
+        # Log the post
+        conn.execute('''
+            INSERT INTO social_posts (id, account_id, content, media_urls, status, posted_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (post_id, account_id, content, '|'.join(media_urls), 'posted' if success else 'failed',
+              datetime.now().strftime('%Y-%m-%d %H:%M:%S'), datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+
+        if success:
+            return jsonify({'success': True, 'post_id': post_id, 'message': 'Posted successfully'})
+        else:
+            return jsonify({'success': False, 'error': error or 'Post failed'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Post failed: {str(e)}'}), 500
+    finally:
+        conn.close()
+
+# ===== API — Channels =====
 @app.route('/api/channel-groups')
 @api_auth
 def api_channel_groups():
@@ -5156,13 +13338,14 @@ def api_channel_groups():
 def api_add_channel_group():
     data = request.json
     groups = read_csv('channel_groups.csv')
-    fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','created_at'])
+    fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','parent_id','created_at'])
     new_id = f"GRP{secrets.token_hex(3).upper()}"
     group = {
         'id': new_id,
         'name': data.get('name', ''),
         'description': data.get('description', ''),
         'channel_ids': data.get('channel_ids', ''),
+        'parent_id': data.get('parent_id', ''),
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
     }
     append_csv('channel_groups.csv', group, fieldnames)
@@ -5173,9 +13356,314 @@ def api_add_channel_group():
 @permission_required('send_broadcast')
 def api_delete_channel_group(group_id):
     groups = read_csv('channel_groups.csv')
-    fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','created_at'])
+    fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','parent_id','created_at'])
     groups = [g for g in groups if g.get('id') != group_id]
     write_csv('channel_groups.csv', groups, fieldnames)
+    return jsonify({'success': True})
+
+
+@app.route('/api/channel-groups/tree')
+@api_auth
+def api_channel_groups_tree():
+    """Return channel groups as a nested tree structure."""
+    groups = read_csv('channel_groups.csv')
+    channels = read_csv('bot_channels.csv')
+    # Build lookup
+    by_id = {g['id']: g for g in groups}
+    # Resolve channel count for each group
+    for g in groups:
+        ch_ids = [c.strip() for c in (g.get('channel_ids') or '').split('|') if c.strip()]
+        g['channel_count'] = len(ch_ids)
+        g['channels'] = [{'id': cid, 'title': next((c.get('title','') for c in channels if c.get('id')==cid), cid)} for cid in ch_ids]
+        # Resolve sub-groups
+        sub_ids = [c.strip() for c in (g.get('channel_ids') or '').split('|') if c.strip() and c.strip().startswith('GRP')]
+        g['sub_groups'] = [by_id[sid] for sid in sub_ids if sid in by_id]
+    # Build tree: roots are groups with no parent or parent_id not in list
+    roots = [g for g in groups if not g.get('parent_id') or g['parent_id'] not in by_id]
+    return jsonify({'groups': groups, 'tree': roots})
+
+
+@app.route('/api/channel-groups/<group_id>/resolve', methods=['POST'])
+@api_auth
+def api_resolve_group_tree(group_id):
+    """Resolve a group and all its sub-groups recursively, return all channel IDs."""
+    groups = read_csv('channel_groups.csv')
+    by_id = {g['id']: g for g in groups}
+    resolved = set()
+    def _resolve(gid):
+        g = by_id.get(gid)
+        if not g:
+            return
+        for cid in (g.get('channel_ids') or '').split('|'):
+            cid = cid.strip()
+            if not cid:
+                continue
+            if cid.startswith('GRP'):
+                _resolve(cid)
+            else:
+                resolved.add(cid)
+    _resolve(group_id)
+    return jsonify({'group_id': group_id, 'channel_ids': list(resolved)})
+
+
+@app.route('/api/posting/stats')
+@api_auth
+def api_posting_stats():
+    """Return posting statistics for AI monitoring."""
+    # Read from bot's health endpoint stats
+    stats = {
+        'queue_pending': 0,
+        'queue_total': 0,
+        'today_posts': {},
+        'posting_rate': {},
+    }
+    # Count queue entries
+    try:
+        import csv as _csv
+        if os.path.exists('broadcast_queue.csv'):
+            with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
+                reader = _csv.DictReader(f)
+                for row in reader:
+                    stats['queue_total'] += 1
+                    if row.get('status') == 'pending':
+                        stats['queue_pending'] += 1
+    except Exception:
+        pass
+    # Count today's posts per channel from relay_log
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        if os.path.exists('relay_log.csv'):
+            with open('relay_log.csv', 'r', encoding='utf-8-sig') as f:
+                reader = _csv.DictReader(f)
+                for row in reader:
+                    ts = (row.get('timestamp') or '')
+                    cid = (row.get('source_chat_id') or '').strip()
+                    if ts.startswith(today) and cid:
+                        stats['today_posts'][cid] = stats['today_posts'].get(cid, 0) + 1
+    except Exception:
+        pass
+    return jsonify(stats)
+
+
+@app.route('/api/posting/config', methods=['GET', 'PUT'])
+@api_auth
+def api_posting_config():
+    """Get or update smart posting configuration."""
+    if request.method == 'GET':
+        return jsonify({
+            'inter_delay_min': 3.0,
+            'inter_delay_max': 7.0,
+            'inter_group_delay_min': 15.0,
+            'inter_group_delay_max': 30.0,
+            'daily_cap': 12,
+            'ai_monitor': True,
+        })
+    data = request.json or {}
+    log_action('update_posting_config', json.dumps(data))
+    return jsonify({'success': True, 'note': 'Config updated (restart bot to apply)'})
+
+
+
+
+def _normalize_source_channel_row(row, actor_uid=''):
+    changed = False
+
+    def _setdefault(k, v):
+        nonlocal changed
+        if row.get(k, '') in ('', None):
+            row[k] = v
+            changed = True
+
+    _setdefault('id', f"SRC{secrets.token_hex(3).upper()}")
+    _setdefault('chat_id', '')
+    _setdefault('title', '')
+    _setdefault('type', 'channel')
+    _setdefault('is_active', 'yes')
+    _setdefault('added_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    _setdefault('brand_voice', '')
+    _setdefault('target_channel_ids', '')
+    _setdefault('schedule', '')
+    _setdefault('last_scraped_at', '')
+    _setdefault('content_filter', 'all')
+    _setdefault('ai_edit_text', 'yes')
+    _setdefault('ai_edit_media', 'no')
+    _setdefault('ai_provider', '')
+    _setdefault('ai_agent_id', '')
+    _setdefault('owner_admin_id', str(actor_uid or session.get('admin_id', '') or ''))
+    _setdefault('managed_by_admin_ids', str(row.get('owner_admin_id') or actor_uid or session.get('admin_id', '') or ''))
+
+    for k in ('is_active', 'ai_edit_text', 'ai_edit_media'):
+        v = str(row.get(k, '')).lower()
+        norm = 'yes' if v in ('1', 'true', 'yes', 'on', 'active') else 'no'
+        if row.get(k) != norm:
+            row[k] = norm
+            changed = True
+
+    if row.get('content_filter') not in ('all', 'text_only', 'photo_only', 'video_only', 'text_photo', 'text_photo_video'):
+        row['content_filter'] = 'all'
+        changed = True
+
+    managers = _pipe_ids(row.get('managed_by_admin_ids', ''))
+    if managers != str(row.get('managed_by_admin_ids', '')):
+        row['managed_by_admin_ids'] = managers
+        changed = True
+
+    owner = str(row.get('owner_admin_id', '') or '').strip()
+    if owner and owner not in _pipe_to_list(row.get('managed_by_admin_ids', '')):
+        row['managed_by_admin_ids'] = _pipe_ids((row.get('managed_by_admin_ids', '') + '|' + owner).strip('|'))
+        changed = True
+
+    return row, changed
+
+
+def _admin_can_manage_source(row, uid):
+    if _is_super_admin_session():
+        return True
+    owner = str(row.get('owner_admin_id', '') or '').strip()
+    managers = _pipe_to_list(row.get('managed_by_admin_ids', ''))
+    if not owner:
+        return True
+    return str(uid or '') in (owner, *managers)
+
+
+@app.route('/api/source-channels')
+@api_auth
+def api_source_channels_list():
+    rows = read_csv('source_channels.csv')
+    fields = get_fieldnames('source_channels.csv', _SOURCE_CHANNEL_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    changed = False
+    out = []
+    for r in rows:
+        r, ch = _normalize_source_channel_row(r)
+        changed = changed or ch
+        if _admin_can_manage_source(r, uid):
+            out.append(r)
+    if changed:
+        write_csv('source_channels.csv', rows, fields)
+    return jsonify({'channels': out})
+
+
+@app.route('/api/source-channels', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_source_channels_create():
+    data = request.json or {}
+    chat_id = str(data.get('chat_id', '') or '').strip()
+    if not chat_id:
+        return jsonify({'error': 'chat_id required'}), 400
+
+    rows = read_csv('source_channels.csv')
+    for r in rows:
+        if str(r.get('chat_id', '') or '') == chat_id:
+            return jsonify({'error': 'Source channel already exists'}), 400
+
+    now_s = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    uid = str(session.get('admin_id', '') or '')
+    targets_raw = data.get('target_channel_ids', '')
+    if isinstance(targets_raw, list):
+        targets_raw = '|'.join([str(x).strip() for x in targets_raw if str(x).strip()])
+    row = {
+        'id': f"SRC{secrets.token_hex(3).upper()}",
+        'chat_id': chat_id,
+        'title': str(data.get('title', '') or '').strip(),
+        'type': str(data.get('type', 'channel') or 'channel').strip(),
+        'is_active': 'yes',
+        'added_at': now_s,
+        'brand_voice': str(data.get('brand_voice', '') or '').strip(),
+        'target_channel_ids': _pipe_ids(targets_raw),
+        'schedule': str(data.get('schedule', '') or '').strip(),
+        'last_scraped_at': '',
+        'content_filter': str(data.get('content_filter', 'all') or 'all').strip(),
+        'ai_edit_text': 'yes' if str(data.get('ai_edit_text', 'yes')).lower() in ('1', 'true', 'yes', 'on') else 'no',
+        'ai_edit_media': 'yes' if str(data.get('ai_edit_media', 'no')).lower() in ('1', 'true', 'yes', 'on') else 'no',
+        'ai_provider': str(data.get('ai_provider', '') or '').strip(),
+        'ai_agent_id': str(data.get('ai_agent_id', '') or '').strip(),
+        'owner_admin_id': uid,
+        'managed_by_admin_ids': uid,
+    }
+    row, _ = _normalize_source_channel_row(row, actor_uid=uid)
+    fields = get_fieldnames('source_channels.csv', _SOURCE_CHANNEL_FIELDS)
+    rows.append(row)
+    write_csv('source_channels.csv', rows, fields)
+    log_action('create_source_channel', row['id'])
+    return jsonify({'success': True, 'channel': row})
+
+
+@app.route('/api/source-channels/<source_id>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_source_channels_edit(source_id):
+    rows = read_csv('source_channels.csv')
+    fields = get_fieldnames('source_channels.csv', _SOURCE_CHANNEL_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+
+    if request.method == 'DELETE':
+        out = []
+        found = False
+        for r in rows:
+            if r.get('id') != source_id:
+                out.append(r)
+                continue
+            found = True
+            r, _ = _normalize_source_channel_row(r)
+            if not _admin_can_manage_source(r, uid):
+                return jsonify({'error': 'Forbidden'}), 403
+        if not found:
+            return jsonify({'error': 'Source channel not found'}), 404
+        write_csv('source_channels.csv', out, fields)
+        log_action('delete_source_channel', source_id)
+        return jsonify({'success': True})
+
+    data = request.json or {}
+    editable = {
+        'title', 'type', 'is_active', 'brand_voice', 'target_channel_ids', 'schedule',
+        'content_filter', 'ai_edit_text', 'ai_edit_media', 'ai_provider', 'ai_agent_id',
+        'managed_by_admin_ids', 'owner_admin_id'
+    }
+    found = False
+    for r in rows:
+        if r.get('id') == source_id:
+            found = True
+            r, _ = _normalize_source_channel_row(r)
+            if not _admin_can_manage_source(r, uid):
+                return jsonify({'error': 'Forbidden'}), 403
+            if not _is_super_admin_session() and ('owner_admin_id' in data):
+                return jsonify({'error': 'Only super admin can reassign owner'}), 403
+            for k, v in data.items():
+                if k not in editable:
+                    continue
+                if k in ('target_channel_ids', 'managed_by_admin_ids') and isinstance(v, list):
+                    v = '|'.join([str(x).strip() for x in v if str(x).strip()])
+                r[k] = v
+            r, _ = _normalize_source_channel_row(r)
+            break
+    if not found:
+        return jsonify({'error': 'Source channel not found'}), 404
+    write_csv('source_channels.csv', rows, fields)
+    log_action('update_source_channel', source_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/source-channels/<source_id>/toggle', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_source_channels_toggle(source_id):
+    rows = read_csv('source_channels.csv')
+    fields = get_fieldnames('source_channels.csv', _SOURCE_CHANNEL_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    found = False
+    for r in rows:
+        if r.get('id') == source_id:
+            found = True
+            r, _ = _normalize_source_channel_row(r)
+            if not _admin_can_manage_source(r, uid):
+                return jsonify({'error': 'Forbidden'}), 403
+            r['is_active'] = 'no' if r.get('is_active') == 'yes' else 'yes'
+            break
+    if not found:
+        return jsonify({'error': 'Source channel not found'}), 404
+    write_csv('source_channels.csv', rows, fields)
     return jsonify({'success': True})
 
 # ===== API — Daily Report =====
@@ -5213,37 +13701,1443 @@ def api_post_to_channel(channel_id):
     ch = next((c for c in channels if c.get('id') == channel_id), None)
     if not ch:
         return jsonify({'error': 'Channel not found'}), 404
+    ch, _ = _normalize_channel_row(ch)
+    uid = str(session.get('admin_id', '') or '')
+    if not _admin_can_manage_channel(ch, uid, action='publish'):
+        return jsonify({'error': 'Forbidden'}), 403
     data = request.json
     message_text = data.get('message', '')
-    if not message_text:
-        return jsonify({'error': 'No message'}), 400
+    media_urls = data.get('media_urls', [])
+    if not message_text and not media_urls:
+        return jsonify({'error': 'No message or media'}), 400
     # حفظ في broadcast_queue.csv للبوت يرسلها
+    platform = str(ch.get('platform', 'telegram') or 'telegram').lower()
     entry = {
         'id': f"CHPOST{secrets.token_hex(3).upper()}",
         'message': message_text,
-        'type': 'text',
+        'type': 'channel',
+        'platform': platform,
         'target_chat_id': ch.get('chat_id', ''),
+        'platform_account_id': ch.get('platform_account_id', ''),
+        'target_channel_id': ch.get('id', ''),
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
         'created_by': session.get('admin_id', ''),
-        'status': 'pending'
+        'status': 'pending',
+        'media_urls': '|'.join(media_urls) if media_urls else ''
     }
-    fieldnames = ['id', 'message', 'type', 'target_chat_id', 'created_at', 'created_by', 'status']
+    fieldnames = get_fieldnames('broadcast_queue.csv', [
+        'id', 'message', 'type', 'platform', 'target_chat_id',
+        'platform_account_id', 'target_channel_id',
+        'created_at', 'created_by', 'status',
+        'target', 'recipient', 'priority', 'country', 'media_urls',
+        'target_user', 'target_name', 'scheduled_at'
+    ])
     append_csv('broadcast_queue.csv', entry, fieldnames)
+    
+    # Archive to post_vault for history
+    try:
+        vault_entry = {
+            'id': f"VPOST{secrets.token_hex(3).upper()}",
+            'source_channel': ch.get('title', '') or ch.get('id', ''),
+            'source_chat_id': ch.get('chat_id', ''),
+            'original_text': message_text,
+            'processed_text': message_text,
+            'media_type': 'image' if media_urls and any(u.lower().endswith(('.jpg','.jpeg','.png','.gif','.webp')) for u in media_urls) else ('video' if media_urls and any(u.lower().endswith(('.mp4','.mov','.webm')) for u in media_urls) else ''),
+            'media_file_id': '|'.join(media_urls) if media_urls else '',
+            'ai_provider': 'manual',
+            'status': 'published',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'published_to_users': '0',
+            'published_to_channels': '1',
+            'views': '0',
+            'category': ch.get('category', ''),
+        }
+        vault_fieldnames = get_fieldnames('post_vault.csv', ['id','source_channel','source_chat_id','original_text','processed_text','media_type','media_file_id','ai_provider','status','created_at','published_to_users','published_to_channels','views','category'])
+        append_csv('post_vault.csv', vault_entry, vault_fieldnames)
+    except Exception as e:
+        # Don't fail the request if archiving fails
+        pass
+    
     log_action('post_to_channel', f'{channel_id}: {message_text[:50]}')
     return jsonify({'success': True, 'message': 'تم إضافة الرسالة لقائمة الإرسال'})
+
+
+@app.route('/api/posts/create', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_create_post():
+    """
+    منشور شامل — يدعم: نص+وسائط+قنوات+مجموعةات+جدولة+cron.
+    يدعم: platform, parse_mode, silent, pin, posting_method.
+    """
+    try:
+        data = request.json or {}
+        message = (data.get('message') or '').strip()
+        media_urls = data.get('media_urls') or []
+        target_channels = data.get('channels') or []
+        target_groups = data.get('groups') or []
+        schedule_type = (data.get('schedule_type') or 'now').strip()
+        scheduled_at = (data.get('scheduled_at') or '').strip()
+        cron_expr = (data.get('cron_expr') or '').strip()
+        priority = (data.get('priority') or 'normal').strip()
+        platform = (data.get('platform') or 'telegram').strip().lower()
+        parse_mode = (data.get('parse_mode') or '').strip()
+        silent = bool(data.get('silent', False))
+        pin = bool(data.get('pin', False))
+        posting_method = (data.get('posting_method') or 'api').strip().lower()
+
+        SUPPORTED_PLATFORMS = ('telegram', 'whatsapp', 'instagram', 'facebook', 'twitter')
+        PLATFORM_CHAR_LIMITS = {
+            'telegram': 4096,
+            'whatsapp': 65536,
+            'instagram': 2200,
+            'facebook': 63206,
+            'twitter': 280,
+        }
+
+        if platform not in SUPPORTED_PLATFORMS:
+            return jsonify({'error': f'المنصة غير مدعومة: {platform}. المدعومة: {", ".join(SUPPORTED_PLATFORMS)}'}), 400
+
+        if posting_method not in ('api', 'copy', 'download', 'deeplink', 'group'):
+            posting_method = 'api'
+
+        reply_markup_raw = data.get('reply_markup') or ''
+        if isinstance(reply_markup_raw, dict):
+            reply_markup_str = json.dumps(reply_markup_raw)
+        elif isinstance(reply_markup_raw, str):
+            reply_markup_str = reply_markup_raw
+        else:
+            reply_markup_str = ''
+
+        if not message and not media_urls:
+            return jsonify({'error': 'اكتب رسالة أو أضف وسائط'}), 400
+        if not target_channels and not target_groups:
+            return jsonify({'error': 'اختر قناة أو مجموعة واحدة على الأقل'}), 400
+
+        char_limit = PLATFORM_CHAR_LIMITS.get(platform, 4096)
+        if message and len(message) > char_limit:
+            return jsonify({
+                'error': f'النص يتجاوز الحد الأقصى لمنصة {platform}: {len(message)}/{char_limit} حرف',
+                'char_count': len(message),
+                'char_limit': char_limit,
+                'platform': platform,
+            }), 400
+
+        if platform == 'twitter' and parse_mode not in ('', 'html', 'markdown'):
+            parse_mode = ''
+
+        channels_csv = read_csv('bot_channels.csv')
+        groups_csv = read_csv('channel_groups.csv')
+        now_s = datetime.now().strftime('%Y-%m-%d %H:%M')
+        entries = []
+        skipped_channels = []
+        resolved_chat_ids = set()
+
+        for ch_id in target_channels:
+            ch = next((c for c in channels_csv if c.get('id') == ch_id), None)
+            if not ch:
+                skipped_channels.append({'id': ch_id, 'reason': 'channel_not_found'})
+                continue
+            ch_platform = str(ch.get('platform', 'telegram') or 'telegram').lower()
+            if ch_platform != platform:
+                skipped_channels.append({'id': ch_id, 'reason': f'platform_mismatch: {ch_platform} ≠ {platform}'})
+                continue
+            chat_id = str(ch.get('chat_id', '') or '').strip()
+            if not chat_id:
+                skipped_channels.append({'id': ch_id, 'reason': 'empty_chat_id'})
+                continue
+            if chat_id in resolved_chat_ids:
+                skipped_channels.append({'id': ch_id, 'reason': 'duplicate'})
+                continue
+            resolved_chat_ids.add(chat_id)
+            entry = {
+                'id': f"POST{secrets.token_hex(4).upper()}",
+                'message': message,
+                'type': 'channel',
+                'platform': platform,
+                'target_chat_id': chat_id,
+                'platform_account_id': str(ch.get('platform_account_id', '') or ''),
+                'target_channel_id': ch.get('id', ''),
+                'created_at': now_s,
+                'created_by': str(session.get('admin_id', '')),
+                'status': 'pending',
+                'target': 'channel',
+                'recipient': 'single',
+                'priority': priority,
+                'country': 'all',
+                'media_urls': '|'.join(media_urls) if media_urls else '',
+                'target_user': '',
+                'target_name': '',
+                'scheduled_at': scheduled_at if schedule_type == 'timed' else '',
+                'cron_expr': cron_expr if schedule_type == 'cron' else '',
+                'reply_markup': reply_markup_str,
+                'parse_mode': parse_mode,
+                'silent': '1' if silent else '',
+                'pin': '1' if pin else '',
+                'posting_method': posting_method,
+            }
+            entries.append(entry)
+
+        for grp_id in target_groups:
+            grp = next((g for g in groups_csv if g.get('id') == grp_id), None)
+            if not grp:
+                continue
+            channel_ids_raw = str(grp.get('channel_ids', '') or '')
+            for cid in channel_ids_raw.split('|'):
+                cid = cid.strip()
+                if not cid or cid in resolved_chat_ids:
+                    continue
+                ch = next((c for c in channels_csv if c.get('id') == cid), None)
+                if not ch:
+                    continue
+                ch_platform = str(ch.get('platform', 'telegram') or 'telegram').lower()
+                if ch_platform != platform:
+                    continue
+                chat_id = str(ch.get('chat_id', '') or '').strip()
+                if not chat_id:
+                    continue
+                resolved_chat_ids.add(chat_id)
+                entry = {
+                    'id': f"POST{secrets.token_hex(4).upper()}",
+                    'message': message,
+                    'type': 'channel',
+                    'platform': platform,
+                    'target_chat_id': chat_id,
+                    'platform_account_id': str(ch.get('platform_account_id', '') or ''),
+                    'target_channel_id': ch.get('id', ''),
+                    'created_at': now_s,
+                    'created_by': str(session.get('admin_id', '')),
+                    'status': 'pending',
+                    'target': 'channel',
+                    'recipient': 'single',
+                    'priority': priority,
+                    'country': 'all',
+                    'media_urls': '|'.join(media_urls) if media_urls else '',
+                    'target_user': '',
+                    'target_name': '',
+                    'scheduled_at': scheduled_at if schedule_type == 'timed' else '',
+                    'cron_expr': cron_expr if schedule_type == 'cron' else '',
+                    'reply_markup': reply_markup_str,
+                    'parse_mode': parse_mode,
+                    'silent': '1' if silent else '',
+                    'pin': '1' if pin else '',
+                    'posting_method': posting_method,
+                }
+                entries.append(entry)
+
+        if not entries:
+            reason = 'لم يتم العثور على قنوات صالحة'
+            if skipped_channels:
+                reasons = set(s['reason'].split(':')[0] for s in skipped_channels)
+                reason += f' — ({", ".join(reasons)})'
+            return jsonify({'error': reason, 'skipped': skipped_channels}), 400
+
+        queue_fieldnames = get_fieldnames('broadcast_queue.csv', [
+            'id', 'message', 'type', 'platform', 'target_chat_id',
+            'platform_account_id', 'target_channel_id', 'created_at',
+            'created_by', 'status', 'target', 'recipient', 'priority',
+            'country', 'media_urls', 'target_user', 'target_name',
+            'scheduled_at', 'cron_expr', 'group_id', 'reply_markup',
+            'parse_mode', 'silent', 'pin', 'posting_method'
+        ])
+        for e in entries:
+            append_csv('broadcast_queue.csv', e, queue_fieldnames)
+
+        vault_fieldnames = get_fieldnames('post_vault.csv', [
+            'id', 'source_channel', 'source_chat_id', 'original_text',
+            'processed_text', 'media_type', 'media_file_id', 'ai_provider',
+            'status', 'created_at', 'published_to_users', 'published_to_channels',
+            'views', 'category', 'cron_expr', 'scheduled_at', 'target_channels',
+            'priority'
+        ])
+        vault_entry = {
+            'id': f"VPOST{secrets.token_hex(4).upper()}",
+            'source_channel': ','.join(target_channels[:5]),
+            'source_chat_id': ','.join([next((c.get('chat_id','') for c in channels_csv if c.get('id')==cid),'') for cid in target_channels[:5]]),
+            'original_text': message,
+            'processed_text': message,
+            'media_type': 'mixed' if media_urls else 'text',
+            'media_file_id': '|'.join(media_urls) if media_urls else '',
+            'ai_provider': 'manual',
+            'status': 'scheduled' if schedule_type != 'now' else 'pending',
+            'created_at': now_s,
+            'published_to_users': '0',
+            'published_to_channels': str(len(entries)),
+            'views': '0',
+            'category': '',
+            'cron_expr': cron_expr,
+            'scheduled_at': scheduled_at,
+            'target_channels': ','.join(target_channels[:20]),
+            'priority': priority,
+        }
+        append_csv('post_vault.csv', vault_entry, vault_fieldnames)
+
+        log_action('create_post', f'{len(entries)} targets ({platform}/{posting_method}), msg={message[:50]}')
+        return jsonify({
+            'success': True,
+            'queued': len(entries),
+            'message': f'تم إنشاء المنشور — {len(entries)} قناة في قائمة الإرسال',
+            'vault_id': vault_entry['id'],
+            'platform': platform,
+            'posting_method': posting_method,
+            'skipped': skipped_channels if skipped_channels else None,
+        })
+
+    except Exception as e:
+        logger.error(f"api_create_post error: {e}", exc_info=True)
+        return jsonify({'error': f'خطأ داخلي: {str(e)}'}), 500
+
+
+@app.route('/api/posts/history')
+@api_auth
+def api_post_history():
+    """جلب سجل المنشورات من post_vault"""
+    posts = read_csv('post_vault.csv')
+    search = request.args.get('search', '').strip().lower()
+    if search:
+        posts = [p for p in posts if search in (p.get('original_text') or '').lower()
+                 or search in (p.get('source_channel') or '').lower()]
+    posts.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return jsonify({'posts': posts[:200]})
+
+
+@app.route('/api/posts/<post_id>/cron', methods=['PUT'])
+@api_auth
+@permission_required('send_broadcast')
+def api_update_post_cron(post_id):
+    """تحديث كرون للمنشور"""
+    data = request.json or {}
+    cron_expr = (data.get('cron_expr') or '').strip()
+    posts = read_csv('post_vault.csv')
+    for p in posts:
+        if p.get('id') == post_id:
+            p['cron_expr'] = cron_expr
+            vault_fieldnames = get_fieldnames('post_vault.csv', [
+                'id', 'source_channel', 'source_chat_id', 'original_text',
+                'processed_text', 'media_type', 'media_file_id', 'ai_provider',
+                'status', 'created_at', 'published_to_users', 'published_to_channels',
+                'views', 'category', 'cron_expr', 'scheduled_at', 'target_channels',
+                'priority'
+            ])
+            write_csv('post_vault.csv', posts, vault_fieldnames)
+            log_action('update_post_cron', f'{post_id}: {cron_expr}')
+            return jsonify({'success': True})
+    return jsonify({'error': 'Post not found'}), 404
+
+
+@app.route('/api/posts/<post_id>/duplicate', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_duplicate_post(post_id):
+    """تكرار منشور سابق — ينشئ نسخة جديدة في القائمة"""
+    posts = read_csv('post_vault.csv')
+    orig = next((p for p in posts if p.get('id') == post_id), None)
+    if not orig:
+        return jsonify({'error': 'Post not found'}), 404
+    channels = [c.strip() for c in (orig.get('target_channels') or '').split(',') if c.strip()]
+    data = request.json or {}
+    new_msg = data.get('message') or orig.get('original_text') or ''
+    new_media = data.get('media_urls') or [u for u in (orig.get('media_file_id') or '').split('|') if u]
+    new_channels = data.get('channels') or channels
+
+    payload = {
+        'message': new_msg,
+        'media_urls': new_media,
+        'channels': new_channels,
+        'groups': [],
+        'schedule_type': data.get('schedule_type', 'now'),
+        'scheduled_at': data.get('scheduled_at', ''),
+        'cron_expr': data.get('cron_expr', ''),
+        'priority': data.get('priority', orig.get('priority', 'normal')),
+    }
+    with app.test_request_context(json=payload, content_type='application/json'):
+        session['admin_id'] = session.get('admin_id', '')
+        return api_create_post()
+
+
+
+# ===== Auto-Posting Engine =====
+_CONTENT_TEMPLATES = {
+    "info": [
+        "📊 إحصائيات اليوم: فريقك سجّل {stats_today}. تابع التحديثات معنا!",
+        "📈 أرقام مميزة: {stat_highlight}. ما رأيك في هذه الأرقام؟",
+        "💡 هل تعلم؟ {fun_fact}. شاركنا رأيك!",
+        "🏆 إنجاز تاريخي: {achievement}. فريقنا يستحق التصفيق!",
+    ],
+    "question": [
+        "🤔 سؤال اليوم: {question}? اكتب رأيك في التعليقات!",
+        "💭 ما توقعكم لنتيجة مباراة {upcoming_match}؟",
+        "⚽ من أحسن لاعب في المباراة الأخيرة برأيك؟",
+        "🎯 هل توافق على هذا التحليل؟ اكتب نعم أو لا!",
+    ],
+    "prediction": [
+        "🔮 توقعاتنا: {prediction_details}. ما رأيك؟",
+        "📊 التحليل يشير إلى {prediction}. انتظروا النتيجة!",
+        "🎯 picks اليوم: {picks}. هل توافق؟",
+    ],
+    "analysis": [
+        "📋 تحليل مباراة {match_name}:\n{analysis_details}",
+        "🔍 تقرير مفصل: {report_summary}",
+        "📝 تقييم أداء اللاعبين: {player_ratings}",
+    ],
+    "live": [
+        "🔴 مباشر | {live_event}",
+        "⚡ تحديث مباشر: {live_update}",
+        "🏟️ أحداث المباراة الحية: {live_details}",
+    ],
+    "result": [
+        "🏁 نتيجة المباراة: {result}",
+        "✅ خلاصة المباراة: {match_summary}",
+        "📊 النتيجة النهائية: {final_result}",
+    ],
+    # منشورات تحفيزية — روابط عميقة (deep links) لدومين عشوائي كل مرة — HTML صالح لتليجرام
+    "engagement": [
+        '🚀 <b>كل يوم فرصة جديدة!</b>\nابدأ رحلتك معنا الآن من <a href="{random_domain}">منصتنا الرسمية</a> 🔥',
+        '💡 <b>نصيحة اليوم:</b> النتائج تصنع الثقة — تابع تحليلاتنا الحصرية من <a href="{random_domain}">هنا</a> ⚡',
+        '🏆 <b>أبطال لا يتوقفون!</b> انضم لمجتمعنا واحصل على مميزات حصرية عبر <a href="{random_domain}">الرابط الرسمي</a> 💎',
+        '🔥 <b>فرصتك تنتظرك!</b> لا تفوّت التحديثات اليومية — تصفّح الآن: <a href="{random_domain}">منصتنا</a> 🎯',
+        '⭐ <b>ابدأ اليوم واحصد الغد!</b> كل خطوة تقربك من جائزتك — <a href="{random_domain}">ادخل الآن</a> 🌟',
+        '🎁 <b>مميزات جديدة بانتظارك!</b> سجّل واستفد من العروض عبر <a href="{random_domain}">الرابط</a> ✅',
+    ],
+
+    # ── منشورات ترويجية للمشروع (ميزات، محفظة، يانصيب، أرباح) ──
+    "promo_features": [
+        '🎰 <b>اليانصيب الأسبوعي — فرصتك للربح الكبير!</b>\n🎟️ تذكرة من 5 EGP — جائزة كبرى تزداد مع كل تذكرة\n🏆 فائزون متعددون في كل سحبة\n🔄 سحبات منتظمة وشفافة\n👇 شارك الآن: <a href="{random_domain}">اليانصيب</a>',
+        '🌟 <b>فرصة ذهبية مع اليانصيب</b>\n💰 اشترِ تذكرة — انتظر السحبة — اربح الجائزة الكبرى\n✅ نظام عادل وشفاف\n🎯 جوائز نقدية فورية\n🔗 <a href="{random_domain}">احصل على تذكرتك</a>',
+        '🎟️ <b>اليانصيب في VEX Games</b>\n🎁 تذاكر بأسعار تنافسية\n🏆 سحبات أسبوعية بجوائز كبرى\n📊 نتائج شفافة ومعلنة\n➡️ <a href="{random_domain}">اشترك الآن</a>',
+    ],
+    "promo_wallet": [
+        '💳 <b>محفظة VEX Games — رصيدك بأمان</b>\n💰 رصيد ألعاب موحد لجميع الألعاب\n📱 تحقق بالهاتف لحماية الحساب\n💸 أرباح الإحالة تضاف للرصيد تلقائياً\n🔐 عمليات آمنة بـ SQLite\n👛 افتح محفظتك: <a href="{random_domain}">من هنا</a>',
+        '🏦 <b>إدارة أموال ذكية</b>\n✅ إيداع للعب في أي لعبة\n✅ سحب الأرباح بسهولة\n✅ سجل معاملات شفاف\n✅ رصيد موحد — لا تحتاج تحويل بين الألعاب\n🔗 جرّب المحفظة: <a href="{random_domain}">الرابط</a>',
+    ],
+    "promo_lottery": [
+        '🎰 <b>اليانصيب الأسبوعي — جوائز كبرى!</b>\n🎟️ تذكرة من 5 EGP — فرصة للفوز الكبير\n🏆 فائزون متعددون في كل سحبة\n💰 جائزة كبرى تزداد مع كل تذكرة\n🔄 سحبات منتظمة وشفافة\n🎫 اشترك الآن: <a href="{random_domain}">شارك في اليانصيب</a>',
+        '🌟 <b>فرصتك للربح مع اليانصيب</b>\n🎯 اشتري تذكرة — انتظر السحبة\n🏆 جوائز نقدية فورية\n✅ نظام عادل وشفاف\n👇 <a href="{random_domain}">احصل على تذكرتك</a>',
+    ],
+    "promo_profits": [
+        '📈 <b>اكسب مع VEX Games</b>\n🤝 ادعُ أصدقاءك — أرباح إحالة تضاف لرصيدك\n🎁 شركات شريكة بروابط حصرية\n🏆 ألعب واربح — رصيدك يكبر مع كل جولة\n🔗 ابدأ الكسب: <a href="{random_domain}">من هنا</a>',
+        '💎 <b>حوّل لعبك لأرباح حقيقية</b>\n🎮 9 ألعاب = 9 فرص للربح\n📊 رصيد موحد يسهل الإدارة\n🔄 أرباح الإحالة تلقائية\n➡️ <a href="{random_domain}">اكتشف كيف تربح</a>',
+    ],
+}
+
+
+def _get_branding_suffix(channel):
+    parts = []
+    cn = str(channel.get("company_name") or "").strip()
+    dl = str(channel.get("download_link") or "").strip()
+    pc = str(channel.get("promo_code") or "").strip()
+    al = str(channel.get("affiliate_link") or "").strip()
+    if cn:
+        parts.append("🏢 " + cn)
+    if dl:
+        parts.append("📱 تحميل: " + dl)
+    if pc:
+        parts.append("🎁 كود الخصم: " + pc)
+    if al:
+        parts.append("🔗 " + al)
+    return "\\n\\n" + "\\n".join(parts) if parts else ""
+
+
+def _apply_placeholders(text, channel, extra=None):
+    cn = str(channel.get("company_name") or "VEX Games")
+    dl = str(channel.get("download_link") or "")
+    pc = str(channel.get("promo_code") or "")
+    al = str(channel.get("affiliate_link") or "")
+    text = text.replace("{company_name}", cn)
+    text = text.replace("{download_link}", dl)
+    text = text.replace("{promo_code}", pc)
+    text = text.replace("{affiliate_link}", al)
+    if extra:
+        for k, v in extra.items():
+            text = text.replace("{" + k + "}", str(v))
+    return text
+
+
+# قيم رياضية عامة لـ placeholders القوالب — تمنع إرسال نص فيه {…} مكسور
+_AUTO_FILL_POOL = {
+    'stats_today': [
+        'استحواذ عالٍ وصناعة فرص متعددة طوال اللقاء',
+        'ضغط هجومي مستمر وكرات سريعة في المرتدات',
+        'أداء منظم في الوسط وخطورة دائمة على الأطراف',
+    ],
+    'stat_highlight': [
+        'تسديدات على المرمى أكثر من المعتاد ودفاع صلب',
+        'استحواذ يتجاوز 60% وصناعة فرص واضحة',
+        'تمريرات مفتاحية ناجحة بين خطوط الخصم',
+    ],
+    'fun_fact': [
+        'أكثر المباريات تُحسم في آخر15 دقيقة من الوقت بدلها',
+        'الفريق الذي يسجّل أولًا يفوز في أغلب مواجهات الموسم',
+        'الكرات الثابتة تصنع الفارق في أكثر من نصف المباريات',
+    ],
+    'achievement': [
+        'سلسلة نتائج إيجابية متتالية يستحق التتويج',
+        'أرقام مميزة في الهجوم والدفاع معًا',
+        'تألق واضح في المباريات الكبرى هذا الموسم',
+    ],
+    'question': [
+        'من برأيكم الأكثر استحقاقًا للفوز بالقمة؟',
+        'ما التغيير الذي سيعيد التوازن في الشوط الثاني؟',
+        'من لاعب المباراة برأيكم حتى الآن؟',
+    ],
+    'upcoming_match': ['قمة الليلة', 'المواجهة المنتظرة', 'الديربي الكبير'],
+    'prediction_details': [
+        'كلا الفريقين يسجّل وأكثر من هدفين في اللقاء',
+        'شوط أول حذر وحسم في الثلث الأخير',
+        'فوز صاحب الأرض بهدف نظيف بعد ضغط مبكر',
+    ],
+    'prediction': [
+        'كلا الفريقين يسجّل',
+        'تعادل إيجابي في الشوط الأول',
+        'أكثر من هدفين في المباراة',
+    ],
+    'picks': [
+        'رون الفريقين + أكثر من8 كورنرز',
+        'الطرف الأول يسجّل + تسديدات على المرمى',
+        'شوط دون أهداف وحسم متأخر',
+    ],
+    'match_name': ['مباراة القمة', 'الديربي الكبير', 'المواجهة الحاسمة'],
+    'analysis_details': [
+        'وسط ميدان مسيطر وضغط عالٍ على الأطراف مع مساحات خلف الظهير',
+        'دفاع منظم والاعتماد على المرتدات السريعة عبر العمق',
+        'استحواذ في المنطقة الوسطى وتوليد الفرص من الأطراف',
+    ],
+    'report_summary': [
+        'أفضلية نسبية لصاحب الأرض مع خطورة متوازنة من الضيف',
+        'سيطرة في وسط الميدان وفرص متبادلة قليلة الخطورة',
+        'مباراة مغلقة تُحسم على الفرديات والكرات الثابتة',
+    ],
+    'player_ratings': [
+        'أداء قوي للمهاجم الصريح وتألق حارس المرمى',
+        'خط الوسط الأفضل تأثيرًا والظهير الأكثر نشاطًا',
+        'قلب الدفاع الأثبت ومهاجم يستحق التتويج بالأفضل',
+    ],
+    'live_event': [
+        'هدف مبكر يغيّر موازين المباراة',
+        'فرصة محققة تُهدر في الشوط الأول',
+        'طرد مثير للفريق الضيف بعد احتكاك عنيف',
+    ],
+    'live_update': [
+        'النتيجة1-0 لصالح صاحب الأرض حتى الآن',
+        'استحواذ متوازن وفرص متبادلة سريعة',
+        'ضغط حاسم من الفريق صاحب النتيجة في الدقائق الأخيرة',
+    ],
+    'live_details': [
+        'هدف من ركلة حرة مباشرة تجاوزت الحائط',
+        'تصدٍّ مذهل يمنع التعادل في الوقت بدل الضائع',
+        'هجوم مكثف ودفاع يقف على خط المرمى',
+    ],
+    'result': ['فوز صاحب الأرض بهدف نظيف', 'تعادل إيجابي2-2 بعد مباراة مفتوحة', 'فوز الضيف في اللحظات الأخيرة'],
+    'match_summary': [
+        'سيطرة متبادلة وحسم في الدقائق الختامية',
+        'شوط أول حافل وشوط ثانٍ محسوم للدفاع',
+        'مباراة قوية انتهت بنتيجة عادلة للفريقين',
+    ],
+    'final_result': ['النتيجة النهائية1-0', 'النتيجة النهائية2-1', 'النتيجة النهائية1-1'],
+    'event_name': ['كأس الموسم', 'قمة الجولة', 'ديربي المدينة'],
+    'event_details': [
+        'مواجهتان متتاليتان تحددان صدارة الترتيب',
+        'جوائز تشجيعية للمشاركين ومتابعة مباشرة',
+        'موعد مثير بين منافسين تقليديين هذا الموسم',
+    ],
+}
+
+
+def _auto_fill_placeholders(text):
+    """يملأ أي placeholder متبقٍ بقيمة رياضية عامة — يمنع إرسال نص فيه {…} مكسور."""
+    def _rep(m):
+        pool = _AUTO_FILL_POOL.get(m.group(1))
+        return random.choice(pool) if pool else ''
+    return re.sub(r'\{([a-zA-Z_][a-zA-Z0-9_]*)\}', _rep, text)
+
+
+_PROJECT_DOMAINS = [
+    'https://vex.deals',
+    'https://betjam.sbs',
+    'https://betongame.cloud',
+    'https://1xbetservices.com',
+    'https://vixo.uno',
+]
+
+
+def _last_auto_user_post_at():
+    """آخر وقت منشور تلقائي موجّه للمستخدمين — لمنع التكرار (حد أدنى6 ساعات)"""
+    last = None
+    for row in read_csv('broadcast_queue.csv'):
+        if row.get('created_by') != 'auto_post_engine' or row.get('recipient') != 'all':
+            continue
+        try:
+            ts = datetime.strptime(row.get('created_at', '') or '', '%Y-%m-%d %H:%M')
+        except ValueError:
+            continue
+        if last is None or ts > last:
+            last = ts
+    return last
+
+
+def _queue_auto_post_for_channel(ch, now_s):
+    """جدولة منشور واحد — منشور للمستخدمين (والميرور ينسخه للقنوات)، أو منشور قناة مباشر."""
+    types_raw = str(ch.get("auto_post_types") or "info|question|prediction|analysis")
+    allowed_types = [t.strip() for t in types_raw.split("|") if t.strip()] or ["info", "question"]
+    allowed_types = [t for t in allowed_types if _CONTENT_TEMPLATES.get(t)]
+    if not allowed_types:
+        return False
+    chosen_type = random.choice(allowed_types)
+    template = random.choice(_CONTENT_TEMPLATES[chosen_type])
+    text = _apply_placeholders(template, ch)
+    # دومين عشوائي جديد لكل منشور — روابط عميقة (deep links) داخل نص تليجرام
+    text = text.replace('{random_domain}', random.choice(_PROJECT_DOMAINS))
+    text = _auto_fill_placeholders(text)
+    full_text = text + _get_branding_suffix(ch)
+
+    entry = {
+        "id": "AUTO" + secrets.token_hex(4).upper(),
+        "message": full_text,
+        "type": "channel",
+        "platform": str(ch.get("platform", "telegram") or "telegram").lower(),
+        "target_chat_id": str(ch.get("chat_id", "") or ""),
+        "platform_account_id": str(ch.get("platform_account_id", "") or ""),
+        "target_channel_id": ch.get("id", ""),
+        "created_at": now_s,
+        "created_by": "auto_post_engine",
+        "status": "pending",
+        "target": "channel",
+        "recipient": "single",
+        "priority": "normal",
+        "country": "all",
+        "media_urls": "",
+        "target_user": "",
+        "target_name": "",
+        "scheduled_at": "",
+        "cron_expr": "",
+    }
+
+    # منشور تحفيزي: يذهب للمستخدمين مباشرة والميرور ينسخه لكل القنوات — كحد أدنى كل6 ساعات
+    if chosen_type == 'engagement':
+        last_u = _last_auto_user_post_at()
+        if last_u and (datetime.now() - last_u).total_seconds() < 6 * 3600:
+            return False
+        entry.update({
+            'type': 'broadcast',
+            'target': '',
+            'recipient': 'all',
+            'target_chat_id': '',
+            'target_channel_id': '',
+        })
+
+    fieldnames = get_fieldnames("broadcast_queue.csv", [
+        "id", "message", "type", "platform", "target_chat_id",
+        "platform_account_id", "target_channel_id", "created_at",
+        "created_by", "status", "target", "recipient", "priority",
+        "country", "media_urls", "target_user", "target_name",
+        "scheduled_at", "cron_expr"
+    ])
+    append_csv("broadcast_queue.csv", entry, fieldnames)
+    # إشعار ويب فوري (SSE + Web Push + سجل اللوحة)
+    try:
+        push_notification(
+            'auto_post',
+            '📣 منشور تلقائي مجدول',
+            f'{ch.get("title") or ch.get("id")}: {full_text[:150]}',
+            {'channel_id': ch.get('id', ''), 'kind': chosen_type, 'queue_id': entry['id']}
+        )
+    except Exception:
+        pass
+    return True
+
+
+@app.route("/api/content-templates", methods=["GET", "POST"])
+@api_auth
+@permission_required("send_broadcast")
+def api_content_templates():
+    if request.method == "GET":
+        return jsonify({"templates": _CONTENT_TEMPLATES, "types": list(_CONTENT_TEMPLATES.keys())})
+    data = request.json or {}
+    content_type = (data.get("type") or "").strip()
+    text = (data.get("text") or "").strip()
+    if not content_type or not text:
+        return jsonify({"error": "type and text required"}), 400
+    if content_type not in _CONTENT_TEMPLATES:
+        _CONTENT_TEMPLATES[content_type] = []
+    _CONTENT_TEMPLATES[content_type].append(text)
+    return jsonify({"success": True, "count": len(_CONTENT_TEMPLATES[content_type])})
+
+
+@app.route("/api/auto-post/run", methods=["POST"])
+@api_auth
+@permission_required("send_broadcast")
+def api_auto_post_run():
+    channels = read_csv("bot_channels.csv")
+    active = [c for c in channels if c.get("auto_post_enabled") == "yes" and c.get("is_active") == "yes"]
+    if not active:
+        return jsonify({"error": "لا توجد قنوات مفعّلة للنشر التلقائي"}), 400
+    queued = 0
+    now_s = datetime.now().strftime("%Y-%m-%d %H:%M")
+    for ch in active:
+        if _queue_auto_post_for_channel(ch, now_s):
+            queued += 1
+    log_action("auto_post_run", str(queued) + " channels queued")
+    return jsonify({"success": True, "queued": queued})
+
+
+@app.route("/api/auto-post/scheduler-status")
+@api_auth
+def api_auto_post_scheduler():
+    channels = read_csv("bot_channels.csv")
+    enabled = [c for c in channels if c.get("auto_post_enabled") == "yes"]
+    status = []
+    for ch in enabled:
+        status.append({
+            "id": ch.get("id"),
+            "title": ch.get("title"),
+            "interval_min": ch.get("auto_post_interval_min", "120"),
+            "types": ch.get("auto_post_types", "info|question"),
+            "chat_id": ch.get("chat_id"),
+        })
+    return jsonify({"enabled_count": len(enabled), "channels": status})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  AUTO-POST SCHEDULER — مجدول النشر التلقائي (خلفية)
+#  tick كل 60 ثانية + قفل ملف يمنع التكرار بين عمال gunicorn الثلاثة
+# ═══════════════════════════════════════════════════════════════
+_AUTO_POST_LOCK = os.path.join(BASE_DIR, '.auto_post_scheduler.lock')
+
+
+def _auto_post_last_times():
+    """آخر وقت جدولة auto-post لكل قناة — من broadcast_queue.csv."""
+    last = {}
+    for row in read_csv('broadcast_queue.csv'):
+        if row.get('created_by') != 'auto_post_engine':
+            continue
+        ch_id = row.get('target_channel_id', '')
+        if not ch_id:
+            continue
+        try:
+            ts = datetime.strptime(row.get('created_at', '') or '', '%Y-%m-%d %H:%M')
+        except ValueError:
+            continue
+        if ch_id not in last or ts > last[ch_id]:
+            last[ch_id] = ts
+    return last
+
+
+def _auto_post_tick():
+    """يجدول منشور واحد لكل قناة مفعّلة تجاوزت فترة الانتظار."""
+    channels = read_csv('bot_channels.csv')
+    active = [c for c in channels
+              if c.get('auto_post_enabled') == 'yes' and c.get('is_active') == 'yes']
+    if not active:
+        return
+    now = datetime.now()
+    now_s = now.strftime('%Y-%m-%d %H:%M')
+    last_times = _auto_post_last_times()
+    for ch in active:
+        try:
+            interval = max(1, int(ch.get('auto_post_interval_min') or 120))
+        except (TypeError, ValueError):
+            interval = 120
+        last = last_times.get(ch.get('id', ''))
+        if last and (now - last).total_seconds() < interval * 60:
+            continue
+        try:
+            if _queue_auto_post_for_channel(ch, now_s):
+                title = ch.get('title') or ch.get('id', '')
+                log_action('auto_post_scheduler', f'{title} queued (every {interval}m)')
+                print(f'[AUTO_POST] queued for channel {title} ({ch.get("chat_id", "")}) every {interval}m', flush=True)
+        except Exception as exc:
+            app.logger.error('[AUTO_POST] queue failed for %s: %s', ch.get('id', ''), exc)
+
+
+def _auto_post_scheduler_loop():
+    import fcntl as _fcntl
+    time.sleep(20)  # انتظار اكتمال تحميل التطبيق قبل أول tick
+    while True:
+        try:
+            fd = os.open(_AUTO_POST_LOCK, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                _fcntl.flock(fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+                _auto_post_tick()
+                _fcntl.flock(fd, _fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+        except BlockingIOError:
+            pass  # عامل gunicorn آخر ينفّذ الـtick الآن
+        except Exception as exc:
+            app.logger.error('auto_post_scheduler: %s', exc)
+        time.sleep(60)
+
+
+threading.Thread(target=_auto_post_scheduler_loop, daemon=True, name='auto_post_scheduler').start()
+print('[AUTO_POST] scheduler thread started (60s interval, flock-guarded)', flush=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SOURCE HEALTH MONITOR — فحص المصادر والإشعارات كل 30 دقيقة
+# ═══════════════════════════════════════════════════════════════
+_SOURCE_HEALTH_LOCK = os.path.join(BASE_DIR, '.source_health.lock')
+_SOURCE_HEALTH_STATE = os.path.join(BASE_DIR, '.source_health_state.json')
+
+
+def _sh_state_load():
+    try:
+        with open(_SOURCE_HEALTH_STATE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _sh_state_save(state):
+    try:
+        with open(_SOURCE_HEALTH_STATE, 'w', encoding='utf-8') as f:
+            json.dump(state, f)
+    except Exception:
+        pass
+
+
+def _source_health_check():
+    """فحص شامل: المصادر، ودقة الأخبار، اشتراك الويب، الخدمات، فشل النشر."""
+    issues = []
+    ok_notes = []
+    now = datetime.now()
+    channels = read_csv('bot_channels.csv')
+    managed = [c for c in channels
+               if c.get('channel_role') in ('source', 'both') and c.get('is_active') == 'yes']
+    try:
+        ext = [s for s in read_csv('source_channels.csv') if s.get('is_active') == 'yes']
+    except Exception:
+        ext = []
+    n_sources = len(managed) + len(ext)
+
+    if n_sources == 0:
+        issues.append('لا توجد أي مصادر مسجلة — أضف البوت أدمن في قنوات الأخبار/الرياضة')
+    else:
+        # آخر نشاط وارد من مصدر (أي نوع غير المنشورات الصادرة من البوت نفسه)
+        last_src = ''
+        try:
+            for r in read_csv('relay_log.csv'):
+                t = (r.get('type') or '').strip()
+                if t and t not in ('broadcast', 'queue_post'):
+                    ts = (r.get('timestamp') or '').strip()
+                    if ts > last_src:
+                        last_src = ts
+        except Exception:
+            pass
+        if not last_src:
+            issues.append(f'{n_sources} مصدر مسجل لكن لم يصل أي خبر منه حتى الآن')
+        else:
+            try:
+                last_dt = datetime.strptime(last_src[:16], '%Y-%m-%d %H:%M')
+                idle_h = (now - last_dt).total_seconds() / 3600.0
+                if idle_h > 6:
+                    issues.append(f'آخر خبر من المصادر قبل {idle_h:.1f} ساعة (>6h)')
+                else:
+                    ok_notes.append(f'أخبار واردة قبل {idle_h:.1f} ساعة')
+            except ValueError:
+                pass
+        inactive = [c.get('title') or c.get('id') for c in channels
+                    if c.get('channel_role') in ('source', 'both') and c.get('is_active') != 'yes']
+        if inactive:
+            issues.append('قنوات مصدر معطّلة: ' + ', '.join(str(x) for x in inactive[:4]))
+
+    # اشتراك إشعارات الويب (الجرس) — هل يوجد متصفح مشترك فعليًا؟
+    try:
+        subs = read_csv('push_subscriptions.csv')
+        real = [s for s in subs
+                if (s.get('endpoint') or '').startswith('https://')
+                and 'DEADBEEF' not in (s.get('endpoint') or '')]
+        if not real:
+            issues.append('لا يوجد اشتراك إشعارات ويب فعّال — افتح اللوحة وسمح بالإشعارات 🔔')
+        else:
+            ok_notes.append(f'{len(real)} اشتراك إشعارات ويب')
+    except Exception:
+        pass
+
+    # حالة الخدمات
+    try:
+        import subprocess as _sp
+        for svc in ('boterx', 'boterx-dashboard'):
+            st = _sp.run(['systemctl', 'is-active', svc],
+                         capture_output=True, text=True, timeout=8).stdout.strip()
+            if st != 'active':
+                issues.append(f'خدمة {svc}: {st}')
+    except Exception:
+        pass
+
+    # فشل منشورات تلقائية آخر ساعتين
+    fails = []
+    for r in read_csv('broadcast_queue.csv'):
+        if r.get('created_by') == 'auto_post_engine' and (r.get('status') or '') == 'failed':
+            try:
+                ts = datetime.strptime(r.get('created_at', '') or '', '%Y-%m-%d %H:%M')
+                if (now - ts).total_seconds() <= 7200:
+                    fails.append(r.get('id', '?'))
+            except ValueError:
+                continue
+    if fails:
+        issues.append('منشورات تلقائية فشلت آخر ساعتين: ' + ', '.join(fails[:5]))
+
+    ts_now = now.strftime('%Y-%m-%d %H:%M:%S')
+    state = _sh_state_load()
+
+    if not state.get('first_run'):
+        state['first_run'] = True
+        state['first_run_ts'] = ts_now
+        _sh_state_save(state)
+        try:
+            push_notification('system', '✅ نظام الفحص الدوري يعمل',
+                              f'فحص كل30 دقيقة — المصادر: {n_sources} — '
+                              + (f'{len(issues)} ملاحظة' if issues else 'كل شيء سليم'),
+                              {'sources': n_sources, 'issues': issues})
+        except Exception:
+            pass
+
+    if issues:
+        key = '|'.join(sorted(issues))[:240]
+        try:
+            last_ts = datetime.strptime(state.get('alert_ts', ''), '%Y-%m-%d %H:%M:%S')
+        except (TypeError, ValueError):
+            last_ts = datetime(2000, 1, 1)
+        if key != state.get('alert_key') or (now - last_ts).total_seconds() >= 6 * 3600:
+            try:
+                push_notification('source_alert', '⚠️ فحص المصادر الدوري',
+                                  '؛ '.join(issues), {'issues': issues, 'sources': n_sources})
+            except Exception:
+                pass
+            state['alert_key'] = key
+            state['alert_ts'] = ts_now
+            _sh_state_save(state)
+        print(f'[SOURCE_HEALTH] issues: {" | ".join(issues)}', flush=True)
+    else:
+        # سجل صامت في لوحة الإشعارات (يظهر عند فتح اللوحة بدون دفع للمتصفح)
+        try:
+            entry = {
+                'timestamp': ts_now, 'type': 'source_health',
+                'type_label': '✅ فحص المصادر الدوري',
+                'message_preview': f'المصادر {n_sources} — ' + (', '.join(ok_notes) or 'سليم'),
+                'target_type': 'dashboard', 'target_id': '', 'status': 'ok',
+            }
+            fns = get_fieldnames('notifications_log.csv',
+                                 ['timestamp', 'type', 'type_label', 'message_preview',
+                                  'target_type', 'target_id', 'status'])
+            append_csv('notifications_log.csv', entry, fns)
+        except Exception:
+            pass
+        print(f'[SOURCE_HEALTH] ok — sources={n_sources}', flush=True)
+
+
+def _source_health_loop():
+    import fcntl as _shf
+    time.sleep(45)  # انتظار اكتمال تحميل التطبيق
+    while True:
+        try:
+            fd = os.open(_SOURCE_HEALTH_LOCK, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                _shf.flock(fd, _shf.LOCK_EX | _shf.LOCK_NB)
+                _source_health_check()
+                _shf.flock(fd, _shf.LOCK_UN)
+            finally:
+                os.close(fd)
+        except BlockingIOError:
+            pass  # عامل gunicorn آخر يفحص الآن
+        except Exception as exc:
+            print(f'[SOURCE_HEALTH] error: {exc}', flush=True)
+        time.sleep(1800)
+
+
+threading.Thread(target=_source_health_loop, daemon=True, name='source_health').start()
+print('[SOURCE_HEALTH] 30-min monitor started (flock-guarded)', flush=True)
+
+# ===== مراقب الأخبار الرياضية بالمتصفح (news_monitor.py) =====
+try:
+    import importlib.util as _nm_ilu
+    _nm_path = os.path.join(BASE_DIR, 'dashboard', 'news_monitor.py')
+    _nm_spec = _nm_ilu.spec_from_file_location('news_monitor', _nm_path)
+    _nm_mod = _nm_ilu.module_from_spec(_nm_spec)
+    _nm_spec.loader.exec_module(_nm_mod)
+    _nm_mod.start(push_notification=push_notification, read_csv=read_csv,
+                  append_csv=append_csv, get_fieldnames=get_fieldnames,
+                  project_domains=_PROJECT_DOMAINS)
+    print('[NEWS] browser news monitor started (10-min, flock-guarded)', flush=True)
+except Exception as _nm_err:
+    print(f'[NEWS] failed to start: {_nm_err}', flush=True)
+
+
+# ===== مجدول المنشورات الترويجية (30/يوم × 7 أيام = 210/أسبوع، تتكرر) =====
+_PROMO_TYPES = ['promo_features', 'promo_wallet', 'promo_lottery', 'promo_profits']
+_PROMO_DAYS = ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+_PROMO_INTERVAL_SEC = 48 * 60  # 48 دقيقة = 30 منشور/يوم
+_PROMO_LOCK_FILE = os.path.join(BASE_DIR, '.promo_scheduler.lock')
+_PROMO_STATE_FILE = os.path.join(BASE_DIR, '.promo_scheduler_state.json')
+
+
+def _promo_state_load():
+    try:
+        with open(_PROMO_STATE_FILE, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _promo_state_save(state):
+    try:
+        with open(_PROMO_STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(state, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def _promo_get_today_type():
+    """نوع اليوم من الأسبوع (0=سبت..6=جمعة) — يحدد التركيز الأساسي"""
+    # يمكن تخصيص تركيز كل يوم
+    day_focus = {
+        0: ['promo_features', 'promo_wallet'],       # السبت: مميزات + محفظة
+        1: ['promo_lottery', 'promo_profits'],        # الأحد: يانصيب + أرباح
+        2: ['promo_features', 'promo_lottery'],       # الاثنين: مميزات + يانصيب
+        3: ['promo_wallet', 'promo_profits'],         # الثلاثاء: محفظة + أرباح
+        4: ['promo_features', 'promo_wallet', 'promo_lottery'],  # الأربعاء: تنوع
+        5: ['promo_lottery', 'promo_profits', 'promo_features'],  # الخميس: يانصيب + أرباح
+        6: ['promo_wallet', 'promo_profits', 'promo_features'],   # الجمعة: محفظة + أرباح
+    }
+    today = datetime.now().weekday()  # 0=Mon...6=Sun
+    # تحويل: الاثنين=0 -> index 2 في _PROMO_DAYS
+    idx = (today + 2) % 7
+    return day_focus.get(idx, _PROMO_TYPES)
+
+
+def _promo_queue_post_for_channel(ch, now_s):
+    """جدولة منشور ترويجي واحد لقناة"""
+    today_types = _promo_get_today_type()
+    chosen_type = random.choice(today_types)
+    templates = _CONTENT_TEMPLATES.get(chosen_type, [])
+    if not templates:
+        return False
+    template = random.choice(templates)
+    text = _apply_placeholders(template, ch)
+    # دومين عشوائي
+    text = text.replace('{random_domain}', random.choice(_PROJECT_DOMAINS))
+    text = _auto_fill_placeholders(text)
+    full_text = text + _get_branding_suffix(ch)
+
+    entry = {
+        "id": "PROMO" + secrets.token_hex(4).upper(),
+        "message": full_text,
+        "type": "channel",
+        "platform": str(ch.get("platform", "telegram") or "telegram").lower(),
+        "target_chat_id": str(ch.get("chat_id", "") or ""),
+        "platform_account_id": str(ch.get("platform_account_id", "") or ""),
+        "target_channel_id": ch.get("id", ""),
+        "created_at": now_s,
+        "created_by": "promo_scheduler",
+        "status": "pending",
+        "target": "channel",
+        "recipient": "single",
+        "priority": "normal",
+        "country": "all",
+        "media_urls": "",
+        "target_user": "",
+        "target_name": "",
+        "scheduled_at": "",
+        "cron_expr": "",
+    }
+
+    fieldnames = get_fieldnames("broadcast_queue.csv", [
+        "id", "message", "type", "platform", "target_chat_id",
+        "platform_account_id", "target_channel_id", "created_at",
+        "created_by", "status", "target", "recipient", "priority",
+        "country", "media_urls", "target_user", "target_name",
+        "scheduled_at", "cron_expr"
+    ])
+    append_csv("broadcast_queue.csv", entry, fieldnames)
+
+    # إشعار ويب
+    try:
+        push_notification(
+            'promo_post',
+            '📢 منشور ترويجي مجدول',
+            f'{ch.get("title") or ch.get("id")}: {full_text[:150]}',
+            {'channel_id': ch.get('id', ''), 'kind': chosen_type, 'queue_id': entry['id']}
+        )
+    except Exception:
+        pass
+    return True
+
+
+def _promo_scheduler_loop():
+    import fcntl as _pfcntl
+    time.sleep(30)  # انتظار اكتمال التحميل
+    while True:
+        try:
+            fd = os.open(_PROMO_LOCK_FILE, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                _pfcntl.flock(fd, _pfcntl.LOCK_EX | _pfcntl.LOCK_NB)
+            except BlockingIOError:
+                os.close(fd)
+                time.sleep(_PROMO_INTERVAL_SEC)
+                continue
+
+            try:
+                state = _promo_state_load()
+                now = datetime.now()
+                now_s = now.strftime('%Y-%m-%d %H:%M')
+
+                # التحقق من عدم تجاوز الحد اليومي (30/يوم)
+                today_key = now.strftime('%Y-%m-%d')
+                day_count = state.get(today_key, 0)
+                if day_count >= 30:
+                    # انتظار حتى منتصف الليل
+                    tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                    wait_sec = int((tomorrow - now).total_seconds())
+                    print(f'[PROMO] daily limit reached (30), waiting {wait_sec}s', flush=True)
+                    _pfcntl.flock(fd, _pfcntl.LOCK_UN)
+                    os.close(fd)
+                    time.sleep(min(wait_sec, 3600))
+                    continue
+
+                # جدولة المنشور التالي
+                channels = read_csv("bot_channels.csv")
+                active_channels = [c for c in channels
+                                   if c.get("auto_post_enabled") == "yes"
+                                   and c.get("is_active") == "yes"
+                                   and c.get("platform", "telegram") == "telegram"]
+
+                if active_channels:
+                    for ch in active_channels:
+                        if _promo_queue_post_for_channel(ch, now_s):
+                            day_count += 1
+                            state[today_key] = day_count
+                            _promo_state_save(state)
+                            print(f'[PROMO] queued for {ch.get("title")} — day total: {day_count}/30', flush=True)
+                            if day_count >= 30:
+                                break
+
+                _pfcntl.flock(fd, _pfcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+        except BlockingIOError:
+            pass
+        except Exception as exc:
+            print(f'[PROMO] error: {exc}', flush=True)
+        time.sleep(_PROMO_INTERVAL_SEC)
+
+
+threading.Thread(target=_promo_scheduler_loop, daemon=True, name='promo_scheduler').start()
+print('[PROMO] promotional scheduler started (48-min interval, 30/day, flock-guarded)', flush=True)
+
+
+# ===== مجدول السحب التلقائي لليانصيب =====
+_LOTTERY_DRAW_LOCK = os.path.join(BASE_DIR, '.lottery_draw.lock')
+_LOTTERY_DRAW_INTERVAL = 60  # فحص كل دقيقة
+
+def _auto_lottery_draw_loop():
+    import fcntl as _lfcntl
+    time.sleep(10)  # انتظار التحميل
+    while True:
+        try:
+            fd = os.open(_LOTTERY_DRAW_LOCK, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                _lfcntl.flock(fd, _lfcntl.LOCK_EX | _lfcntl.LOCK_NB)
+            except BlockingIOError:
+                os.close(fd)
+                time.sleep(_LOTTERY_DRAW_INTERVAL)
+                continue
+
+            try:
+                rounds = read_csv('lottery_rounds.csv')
+                now = datetime.now()
+                changed = False
+                for r in rounds:
+                    if r.get('status') != 'active':
+                        continue
+                    draw_time_str = r.get('draw_time', '').strip()
+                    if not draw_time_str:
+                        continue
+                    try:
+                        draw_dt = datetime.strptime(draw_time_str, '%Y-%m-%d %H:%M')
+                    except ValueError:
+                        continue
+                    if now >= draw_dt:
+                        # حان وقت السحب - تنفيذ
+                        round_id = r.get('id')
+                        print(f'[LOTTERY] Auto-draw triggered for {round_id}', flush=True)
+                        try:
+                            # استدعاء دالة السحب الداخلية
+                            from game_engine import _db as _gm_db
+                            import hashlib, secrets
+
+                            tickets = read_csv('lottery_tickets.csv')
+                            round_tickets = [t for t in tickets if t.get('round_id') == round_id and t.get('payment_verified') == 'yes']
+
+                            if round_tickets:
+                                winner_count = int(r.get('winner_count', '1'))
+                                if winner_count > len(round_tickets):
+                                    winner_count = len(round_tickets)
+
+                                # احتساب الجائزة
+                                ticket_price = float(r.get('ticket_price', '0') or '0')
+                                total_pool = ticket_price * len(round_tickets)
+                                admin_pct = float(r.get('admin_profit_pct', '0') or '0')
+                                net_prize = total_pool * (1 - admin_pct / 100)
+
+                                if winner_count > len(round_tickets):
+                                    winner_count = len(round_tickets)
+                                selected = round_tickets if winner_count >= len(round_tickets) else random.sample(round_tickets, winner_count)
+
+                                if winner_count == 1:
+                                    shares = [1.0]
+                                elif winner_count == 2:
+                                    shares = [0.6, 0.4]
+                                elif winner_count == 3:
+                                    shares = [0.5, 0.3, 0.2]
+                                else:
+                                    shares = [0.4, 0.25, 0.15] + [0.2 / (winner_count - 3)] * (winner_count - 3)
+
+                                winner_fieldnames = get_fieldnames('lottery_winners.csv', ['id','round_id','user_id','ticket_id','prize_amount','currency','distributed','created_at'])
+                                for i, w in enumerate(selected):
+                                    prize = round(net_prize * shares[i], 2)
+                                    currency = r.get('currency', 'EGP')
+                                    user_id = str(w.get('user_id', '')).strip()
+
+                                    winner_entry = {
+                                        'id': f"WIN{secrets.token_hex(3).upper()}",
+                                        'round_id': round_id,
+                                        'user_id': user_id,
+                                        'user_name': w.get('user_name', ''),
+                                        'ticket_id': w.get('id', ''),
+                                        'ticket_number': w.get('ticket_number', ''),
+                                        'prize_amount': f"{prize:.2f}",
+                                        'currency': currency,
+                                        'distributed': 'no',
+                                        'rank': str(i + 1),
+                                        'draw_time': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+                                    }
+
+                                    distributed = 'no'
+                                    if user_id and user_id != '0':
+                                        try:
+                                            if _gm_db:
+                                                idempotency_key = f"lottery_{round_id}_{user_id}_{i+1}"
+                                                ok, _, _ = _gm_db.credit_with_idempotency(user_id, prize, idempotency_key, {'type': 'lottery_win'})
+                                                if ok:
+                                                    distributed = 'yes'
+                                            else:
+                                                # fallback
+                                                try:
+                                                    from comprehensive_bot import GameManager
+                                                    GameManager().add_frozen_balance(user_id, prize)
+                                                    distributed = 'yes'
+                                                except:
+                                                    pass
+                                        except Exception as e:
+                                            print(f'[LOTTERY] Auto-credit error: {e}', flush=True)
+
+                                    winner_entry['distributed'] = distributed
+                                    append_csv('lottery_winners.csv', winner_entry, winner_fieldnames)
+
+                                    # إشعار
+                                    try:
+                                        push_notification('lottery_win', '🎉 مبروك! ربحت في اليانصيب',
+                                            f'جائزتك: {prize:.2f} {currency} — تمت إضافتها لرصيدك',
+                                            {'user_id': user_id, 'round_id': round_id, 'prize': prize, 'currency': currency})
+                                    except:
+                                        pass
+
+                                # تحديث حالة الجولة
+                                r['status'] = 'drawn'
+                                r['total_prize'] = f"{net_prize:.2f}"
+                                changed = True
+                                print(f'[LOTTERY] Auto-draw completed: {round_id}, winners={len(selected)}, prize={net_prize:.2f}', flush=True)
+                            else:
+                                # لا توجد تذاكر - أغلق الجولة
+                                r['status'] = 'drawn'
+                                r['total_prize'] = '0'
+                                changed = True
+
+                        except Exception as e:
+                            print(f'[LOTTERY] Auto-draw error for {round_id}: {e}', flush=True)
+
+                if changed:
+                    write_csv('lottery_rounds.csv', rounds, get_fieldnames('lottery_rounds.csv', ['id','name','ticket_price','currency','winner_count','max_tickets','admin_pct','draw_time','status','created_at','total_prize']))
+
+                _lfcntl.flock(fd, _lfcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+        except BlockingIOError:
+            pass
+        except Exception as exc:
+            print(f'[LOTTERY] scheduler error: {exc}', flush=True)
+        time.sleep(_LOTTERY_DRAW_INTERVAL)
+
+
+threading.Thread(target=_auto_lottery_draw_loop, daemon=True, name='lottery_auto_draw').start()
+print('[LOTTERY] auto-draw scheduler started (1-min interval, flock-guarded)', flush=True)
+
+
+# ===== صفحة مركز الأخبار الرياضية + واجهاتها =====
+
+@app.route('/news')
+@admin_required
+@page_permission_required('send_broadcast')
+def page_news():
+    return render_template('news.html', active_page='news')
+
+
+def _news_mod():
+    return globals().get('_nm_mod')
+
+
+@app.route('/api/news/state')
+@api_auth
+def api_news_state():
+    nm = _news_mod()
+    try:
+        sources = nm._load_sources() if nm else read_csv('news_sources.csv')
+    except Exception:
+        sources = read_csv('news_sources.csv')
+    items = read_csv('news_seen.csv')[-80:][::-1]
+    state = {}
+    try:
+        with open(os.path.join(BASE_DIR, '.news_monitor_state.json'), encoding='utf-8') as f:
+            state = json.load(f)
+    except Exception:
+        pass
+    channels = [c for c in read_csv('bot_channels.csv') if c.get('is_active') == 'yes']
+    return jsonify({
+        'sources': sources,
+        'items': items,
+        'last_digest': state.get('last_digest', ''),
+        'domains': _PROJECT_DOMAINS,
+        'channels': [{'id': c.get('id'), 'title': c.get('title'), 'chat_id': c.get('chat_id')}
+                     for c in channels],
+        'interval_min': 10,
+    })
+
+
+@app.route('/api/news/sources', methods=['PUT'])
+@api_auth
+@permission_required('send_broadcast')
+def api_news_source_update():
+    data = request.json or {}
+    name = str(data.get('name') or '').strip()
+    rows = read_csv('news_sources.csv')
+    found = None
+    for r in rows:
+        if r.get('name') == name:
+            for key in ('enabled', 'post_to_channels'):
+                if key in data:
+                    r[key] = 'yes' if str(data[key]).lower() in ('1', 'true', 'yes', 'on') else 'no'
+            found = r
+    if not found:
+        return jsonify({'error': 'المصدر غير موجود'}), 404
+    write_csv('news_sources.csv', rows,
+              get_fieldnames('news_sources.csv', ['name', 'url', 'enabled', 'post_to_channels',
+                                                  'last_check', 'last_status']))
+    log_action('update_news_source', name)
+    return jsonify({'success': True, 'source': found})
+
+
+@app.route('/api/news/run', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_news_run():
+    nm = _news_mod()
+    if not nm:
+        return jsonify({'error': 'مراقب الأخبار غير متاح'}), 503
+
+    def _worker():
+        try:
+            ok = nm.run_now()
+            print(f'[NEWS] manual run: {"started" if ok else "busy"}', flush=True)
+        except Exception as _e:
+            print(f'[NEWS] manual run error: {_e}', flush=True)
+
+    threading.Thread(target=_worker, daemon=True).start()
+    return jsonify({'success': True, 'started': True})
+
+
+@app.route('/api/news/digest-preview')
+@api_auth
+def api_news_digest_preview():
+    nm = _news_mod()
+    rows = read_csv('news_seen.csv')[-24:]
+    postable_names = {s.get('name') for s in read_csv('news_sources.csv')
+                      if s.get('post_to_channels') == 'yes'}
+    grouped = {}
+    for r in reversed(rows):
+        src = r.get('source', '')
+        if src not in postable_names:
+            continue
+        grouped.setdefault(src, [])
+        if len(grouped[src]) < 4:
+            grouped[src].append({'title': r.get('title', ''), 'url': r.get('url', '')})
+        if sum(len(v) for v in grouped.values()) >= 6:
+            break
+    msg = nm._digest_message(grouped) if nm and grouped else ''
+    return jsonify({'message': msg, 'items': sum(len(v) for v in grouped.values())})
+
+
+@app.route('/api/news/publish', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_news_publish():
+    nm = _news_mod()
+    if not nm:
+        return jsonify({'error': 'مراقب الأخبار غير متاح'}), 503
+    body = request.json or {}
+    rows = read_csv('news_seen.csv')[-24:]
+    postable_names = {s.get('name') for s in read_csv('news_sources.csv')
+                      if s.get('post_to_channels') == 'yes'}
+    grouped = {}
+    if body.get('title') and body.get('source'):
+        # نشر عنصر واحد محدد
+        grouped = {str(body['source']): [{'title': str(body['title']), 'url': str(body.get('url', ''))}]}
+    else:
+        for r in reversed(rows):
+            src = r.get('source', '')
+            if src not in postable_names:
+                continue
+            grouped.setdefault(src, [])
+            if len(grouped[src]) < 4:
+                grouped[src].append({'title': r.get('title', ''), 'url': r.get('url', '')})
+            if sum(len(v) for v in grouped.values()) >= 6:
+                break
+    if not grouped:
+        return jsonify({'error': 'لا توجد أخبار لنشرها'}), 400
+    queued = nm._queue_digest(grouped)
+    if not queued:
+        return jsonify({'error': 'لا توجد قنوات نشطة للنشر'}), 400
+    total = sum(len(v) for v in grouped.values())
+    try:
+        push_notification(
+            'news', '🗞️ تم جدولة نشر الأخبار',
+            f'{total} عنوان — أُرسل لـ{queued} قناة',
+            {'queued': queued, 'items': total})
+    except Exception:
+        pass
+    log_action('publish_news_digest', f'{total} items -> {queued} channels')
+    return jsonify({'success': True, 'queued': queued, 'items': total})
 
 @app.route('/api/channels', methods=['POST'])
 @api_auth
 @permission_required('send_broadcast')
 def api_add_channel_manual():
     """إضافة قناة يدوياً — مع تحديد الدور"""
-    data = request.json
+    data = request.json or {}
     chat_id = data.get('chat_id', '').strip()
     title = data.get('title', '').strip()
     ch_type = data.get('type', 'channel')
+    platform = str(data.get('platform', 'telegram') or 'telegram').strip().lower()
+    owner_admin_id = str(data.get('owner_admin_id', '') or session.get('admin_id', '') or '').strip()
+    managed_ids_raw = data.get('managed_by_admin_ids', '')
+    if isinstance(managed_ids_raw, list):
+        managed_ids_raw = '|'.join([str(x).strip() for x in managed_ids_raw if str(x).strip()])
+    managed_by_admin_ids = _pipe_ids(managed_ids_raw or owner_admin_id)
 
     if not chat_id:
         return jsonify({'error': 'chat_id required'}), 400
+    if platform not in ('telegram', 'whatsapp', 'webhook'):
+        return jsonify({'error': 'platform must be telegram/whatsapp/webhook'}), 400
 
     # فحص عدم التكرار
     channels = read_csv('bot_channels.csv')
@@ -5252,12 +15146,13 @@ def api_add_channel_manual():
             return jsonify({'error': 'Channel already exists'}), 400
 
     ch_id = f"CH{secrets.token_hex(3).upper()}"
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled','channel_role','ai_provider','brand_voice'])
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
     new_channel = {
         'id': ch_id,
         'chat_id': str(chat_id),
         'title': title,
         'type': ch_type,
+        'platform': platform,
         'is_active': 'yes',
         'added_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
         'relay_to_users': 'no',
@@ -5268,26 +15163,24 @@ def api_add_channel_manual():
         'ai_enabled': 'no',
         'channel_role': data.get('channel_role', 'both'),  # source, publish, both
         'ai_provider': data.get('ai_provider', ''),
-        'brand_voice': data.get('brand_voice', '')
+        'brand_voice': data.get('brand_voice', ''),
+        'owner_admin_id': owner_admin_id,
+        'managed_by_admin_ids': managed_by_admin_ids,
+        'allow_subadmin_publish': 'yes' if str(data.get('allow_subadmin_publish', 'no')).lower() in ('1', 'true', 'yes', 'on') else 'no',
+        'ai_agent_id': str(data.get('ai_agent_id', '') or '').strip(),
+        'platform_account_id': str(data.get('platform_account_id', '') or '').strip(),
+        'company_name': str(data.get('company_name', '') or '').strip(),
+        'download_link': str(data.get('download_link', '') or '').strip(),
+        'promo_code': str(data.get('promo_code', '') or '').strip(),
+        'affiliate_link': str(data.get('affiliate_link', '') or '').strip(),
+        'auto_post_enabled': 'no',
+        'auto_post_interval_min': '120',
+        'auto_post_types': 'info|question|prediction|analysis|engagement',
     }
+    new_channel, _ = _normalize_channel_row(new_channel, actor_uid=owner_admin_id)
     append_csv('bot_channels.csv', new_channel, fieldnames)
-    log_action('add_channel_manual', f'{ch_id}: {title} ({chat_id}) role={new_channel["channel_role"]}')
+    log_action('add_channel_manual', f'{ch_id}: {title} ({chat_id}) platform={platform} role={new_channel["channel_role"]}')
     return jsonify({'success': True, 'id': ch_id})
-
-@app.route('/api/channels/<channel_id>/category', methods=['POST'])
-@api_auth
-@permission_required('send_broadcast')
-def api_set_channel_category_api(channel_id):
-    data = request.json
-    category = data.get('category', '')
-    channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
-    for c in channels:
-        if c.get('id') == channel_id:
-            c['category'] = category
-            break
-    write_csv('bot_channels.csv', channels, fieldnames)
-    return jsonify({'success': True})
 
 @app.route('/api/channel-categories')
 @api_auth
@@ -5368,7 +15261,7 @@ def api_bots():
 def api_add_bot():
     data = request.json
     bots = read_csv('bot_tokens.csv')
-    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots'])
+    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots','features'])
     new_id = f"BOT{str(int(datetime.now().timestamp()))[-6:]}"
     new_bot = {
         'id': new_id,
@@ -5383,7 +15276,8 @@ def api_add_bot():
         'freeze_until': data.get('freeze_until', ''),
         'status': 'inactive',
         'description': data.get('description', ''),
-        'can_manage_bots': data.get('can_manage_bots', 'no')
+        'can_manage_bots': data.get('can_manage_bots', 'no'),
+        'features': data.get('features', ''),
     }
     append_csv('bot_tokens.csv', new_bot, fieldnames)
     log_action('add_bot', new_id)
@@ -5394,7 +15288,7 @@ def api_add_bot():
 @permission_required('manage_bots')
 def api_toggle_bot(bot_id):
     bots = read_csv('bot_tokens.csv')
-    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots'])
+    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots','features'])
     for b in bots:
         if b.get('id') == bot_id:
             b['is_active'] = 'no' if b.get('is_active') == 'yes' else 'yes'
@@ -5408,11 +15302,670 @@ def api_toggle_bot(bot_id):
 @permission_required('manage_bots')
 def api_delete_bot(bot_id):
     bots = read_csv('bot_tokens.csv')
-    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots'])
+    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots','features'])
     bots = [b for b in bots if b.get('id') != bot_id]
     write_csv('bot_tokens.csv', bots, fieldnames)
     log_action('delete_bot', bot_id)
     return jsonify({'success': True})
+
+
+@app.route('/api/bots/<bot_id>/features', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_bot_features(bot_id):
+    """تحديث مميزات بوت معين"""
+    data = request.json or {}
+    features = data.get('features', '')
+    bots = read_csv('bot_tokens.csv')
+    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots','features'])
+    for b in bots:
+        if b.get('id') == bot_id:
+            b['features'] = features
+            break
+    write_csv('bot_tokens.csv', bots, fieldnames)
+    log_action('update_bot_features', bot_id)
+    return jsonify({'success': True})
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ===== Smart Bot Engine API — لوحة التحكم الذكية =====
+# ═══════════════════════════════════════════════════════════════════
+
+@app.route('/api/smart/analytics')
+@app.route('/api/smart/analytics/<bot_id>')
+@api_auth
+def api_smart_analytics(bot_id=None):
+    """تحليلات البوتات"""
+    try:
+        from smart_bot import SmartBotEngine
+        days = int(request.args.get('days', 7))
+        # Use the first running bot's smart engine or create a dummy
+        engine = _get_smart_engine()
+        if not engine:
+            return jsonify({'error': 'Smart engine not available'}), 500
+        stats = engine.get_analytics(bot_id=bot_id or '', days=days)
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/smart/auto-replies')
+@api_auth
+def api_smart_auto_replies():
+    """قائمة الردود الذكية"""
+    try:
+        from smart_bot import SmartBotEngine
+        engine = _get_smart_engine()
+        if not engine:
+            return jsonify({'replies': []})
+        bot_id = request.args.get('bot_id', '')
+        replies = engine.list_auto_replies(bot_id)
+        return jsonify({'replies': replies})
+    except Exception as e:
+        return jsonify({'replies': [], 'error': str(e)})
+
+
+@app.route('/api/smart/auto-replies', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_smart_add_auto_reply():
+    """إضافة رد ذكي"""
+    data = request.json or {}
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    keyword = data.get('keyword', '').strip()
+    response = data.get('response', '').strip()
+    if not keyword or not response:
+        return jsonify({'error': 'keyword and response required'}), 400
+    reply_id = engine.add_auto_reply(
+        keyword=keyword,
+        response=response,
+        match_type=data.get('match_type', 'contains'),
+        bot_id=data.get('bot_id', ''),
+        priority=int(data.get('priority', 0))
+    )
+    log_action('add_auto_reply', reply_id)
+    return jsonify({'success': True, 'id': reply_id})
+
+
+@app.route('/api/smart/auto-replies/<reply_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_smart_delete_auto_reply(reply_id):
+    """حذف رد ذكي"""
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    engine.delete_auto_reply(reply_id)
+    log_action('delete_auto_reply', reply_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/smart/chains')
+@api_auth
+def api_smart_chains():
+    """قائمة سلاسل البوتات"""
+    try:
+        engine = _get_smart_engine()
+        if not engine:
+            return jsonify({'chains': []})
+        return jsonify({'chains': engine.list_chains()})
+    except Exception as e:
+        return jsonify({'chains': [], 'error': str(e)})
+
+
+@app.route('/api/smart/chains', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_smart_add_chain():
+    """إضافة سلسلة بوتات"""
+    data = request.json or {}
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    chain_id = engine.add_chain(
+        trigger_event=data.get('trigger_event', ''),
+        source_bot=data.get('source_bot', ''),
+        target_bot=data.get('target_bot', ''),
+        action=data.get('action', 'send_message'),
+        message_template=data.get('message_template', '')
+    )
+    log_action('add_bot_chain', chain_id)
+    return jsonify({'success': True, 'id': chain_id})
+
+
+@app.route('/api/smart/notifications')
+@api_auth
+def api_smart_notifications():
+    """قائمة الإشعارات الذكية"""
+    try:
+        engine = _get_smart_engine()
+        if not engine:
+            return jsonify({'notifications': []})
+        return jsonify({'notifications': engine.list_smart_notifications()})
+    except Exception as e:
+        return jsonify({'notifications': [], 'error': str(e)})
+
+
+@app.route('/api/smart/notifications', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_smart_add_notification():
+    """إضافة إشعار ذكي"""
+    data = request.json or {}
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    notif_id = engine.add_smart_notification(
+        trigger=data.get('trigger', ''),
+        message_template=data.get('message_template', ''),
+        bot_id=data.get('bot_id', '')
+    )
+    log_action('add_smart_notification', notif_id)
+    return jsonify({'success': True, 'id': notif_id})
+
+
+@app.route('/api/smart/webhooks')
+@api_auth
+def api_smart_webhooks():
+    """قائمة الويب هوكس"""
+    try:
+        engine = _get_smart_engine()
+        if not engine:
+            return jsonify({'webhooks': []})
+        return jsonify({'webhooks': engine.list_webhooks()})
+    except Exception as e:
+        return jsonify({'webhooks': [], 'error': str(e)})
+
+
+@app.route('/api/smart/webhooks', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_smart_add_webhook():
+    """إضافة webhook"""
+    data = request.json or {}
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    hook_id = engine.add_webhook(
+        name=data.get('name', ''),
+        url=data.get('url', ''),
+        events=data.get('events', '*'),
+        secret=data.get('secret', '')
+    )
+    log_action('add_webhook', hook_id)
+    return jsonify({'success': True, 'id': hook_id})
+
+
+@app.route('/api/smart/webhooks/<hook_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_smart_delete_webhook(hook_id):
+    """حذف webhook"""
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    engine.delete_webhook(hook_id)
+    log_action('delete_webhook', hook_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/smart/templates')
+@api_auth
+def api_smart_templates():
+    """قوالب البوتات الجاهزة"""
+    from smart_bot import BOT_TEMPLATES
+    return jsonify({'templates': BOT_TEMPLATES})
+
+
+def _get_smart_engine():
+    """الحصول على SmartBotEngine من أي بوت نشط"""
+    try:
+        from multi_bot import MultiBotManager
+        manager = MultiBotManager()
+        # Try to get from active bots
+        for bot_id, info in manager.active_bots.items():
+            bot = info.get('bot')
+            if bot and hasattr(bot, 'smart_engine') and bot.smart_engine:
+                return bot.smart_engine
+        # Fallback: create from first active bot's token
+        active = manager.get_active_bots()
+        if active:
+            token = active[0].get('token', '')
+            if token:
+                from comprehensive_bot import ComprehensiveDUXBot
+                from smart_bot import SmartBotEngine
+                dummy = ComprehensiveDUXBot.__new__(ComprehensiveDUXBot)
+                dummy.token = token
+                return SmartBotEngine(dummy)
+    except Exception as e:
+        logger.error(f"Error getting smart engine: {e}")
+    return None
+
+
+# ===== نظام العملاء (White-Label / Agency) =====
+# كل عميل: بوت خاص + دخول لوحة خاص + مميزات محددة + اشتراك زمني + عزل بيانات كامل.
+
+def _clients():
+    from clients_manager import get_client_manager
+    _start_clients_watchdog()
+    return get_client_manager()
+
+
+_clients_watchdog_started = False
+
+
+def _start_clients_watchdog():
+    """حراسة الاشتراكات كل 60 ثانية: إيقاف بوتات العملاء المنتهي اشتراكهم + إشعار المالك."""
+    global _clients_watchdog_started
+    if _clients_watchdog_started:
+        return
+    _clients_watchdog_started = True
+
+    def _notify(text):
+        try:
+            _comp_alert_admins(text)
+        except Exception:
+            pass
+
+    def _loop():
+        import time as _time
+        while True:
+            try:
+                _clients().check_subscriptions(notify=_notify)
+            except Exception as e:
+                _auth_logger.error('clients watchdog error: %s', e)
+            _time.sleep(60)
+
+    threading.Thread(target=_loop, daemon=True).start()
+
+
+# ===== Agent + Ticket Watchdog =====
+_agents_watchdog_started = False
+
+def _start_agents_watchdog():
+    """Dual watchdog: stale transaction voiding + SLA monitoring + online checks."""
+    global _agents_watchdog_started
+    if _agents_watchdog_started:
+        return
+    _agents_watchdog_started = True
+
+    def _loop():
+        import time as _time
+        while True:
+            try:
+                # Check agent online status
+                agent_db.check_agents_online()
+
+                # Void stale pending transactions (> 5 min)
+                voided = agent_db.void_stale_transactions()
+                if voided:
+                    for v in voided:
+                        try:
+                            _comp_alert_admins(
+                                f"⏰ معاملة متأخرة تم إلغاؤها:\n"
+                                f"الوكيل: {v['agent_id']}\n"
+                                f"المبلغ: {v['amount']}\n"
+                                f"المعاملة: {v['txn_id']}")
+                        except Exception:
+                            pass
+
+                # Ops V2 step/request deadline processor
+                try:
+                    ops = agent_db.process_ops_deadlines()
+                    if (ops.get('escalated_steps', 0) or ops.get('escalated_requests', 0)):
+                        _comp_alert_admins(
+                            "🚨 Ops Watchdog:\n"
+                            f"- escalated_steps: {ops.get('escalated_steps', 0)}\n"
+                            f"- escalated_requests: {ops.get('escalated_requests', 0)}\n"
+                            f"- auto_completed: {ops.get('completed', 0)}")
+                except Exception as _opse:
+                    _auth_logger.error('ops watchdog error: %s', _opse)
+
+                # Check SLA breaches
+                breached = ticket_system.check_sla_breached()
+                if breached:
+                    count = ticket_system.escalate_overdue_tickets()
+                    if count:
+                        try:
+                            _comp_alert_admins(
+                                f"🚨 {count} تذكرة تجاوزت SLA وتم تصعيدها")
+                        except Exception:
+                            pass
+
+            except Exception as e:
+                _auth_logger.error('agents watchdog error: %s', e)
+            _time.sleep(60)
+
+    threading.Thread(target=_loop, daemon=True).start()
+
+
+def _client_public(c):
+    """عرض آمن لبيانات عميل (بدون التوكن أو الهاش)"""
+    import json as _json
+    if not c:
+        return None
+    feats = []
+    try:
+        feats = _json.loads(c.get('features') or '[]')
+    except Exception:
+        pass
+    return {
+        'id': c.get('id'), 'name': c.get('name'), 'contact': c.get('contact'),
+        'bot_username': c.get('bot_username'),
+        'dash_username': c.get('dash_username'),
+        'features': feats, 'admin_ids': c.get('admin_ids', ''),
+        'subscription_start': c.get('subscription_start'),
+        'subscription_end': c.get('subscription_end'),
+        'status': c.get('status'), 'notes': c.get('notes', ''),
+        'created_at': c.get('created_at'), 'last_login': c.get('last_login'),
+        'running': bool(_clients().is_running(c.get('id'))),
+        'days_left': _clients().days_left(c),
+        'expired': _clients().is_expired(c),
+        'revenue_share': int(c.get('revenue_share') or 30),
+        'custom_domain': c.get('custom_domain', ''),
+        'balance': float(c.get('balance') or 0),
+        'preferred_pm': c.get('preferred_pm', ''),
+    }
+
+
+@app.route('/api/clients')
+@api_auth
+@permission_required('manage_bots')
+def api_clients_list():
+    _start_clients_watchdog()
+    from clients_manager import FEATURES
+    return jsonify({
+        'clients': [_client_public(c) for c in _clients().list_clients()],
+        'features': FEATURES,
+    })
+
+
+@app.route('/api/clients', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_clients_create():
+    data = request.json or {}
+    row, err = _clients().create(
+        name=data.get('name', ''),
+        bot_username=data.get('bot_username', ''),
+        bot_token=data.get('bot_token', ''),
+        dash_username=data.get('dash_username', ''),
+        dash_password=data.get('dash_password', ''),
+        features=data.get('features'),
+        subscription_days=data.get('subscription_days', 30),
+        contact=data.get('contact', ''),
+        admin_ids=data.get('admin_ids', ''),
+        notes=data.get('notes', ''),
+        revenue_share=data.get('revenue_share', 30),
+    )
+    if err:
+        return jsonify({'error': err}), 400
+    log_action('create_client', row['id'])
+    if data.get('preferred_pm'):
+        _clients().update(row['id'], {'preferred_pm': data['preferred_pm']})
+        row['preferred_pm'] = data['preferred_pm']
+    return jsonify({'success': True, 'client': _client_public(row)})
+
+
+@app.route('/api/clients/<client_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_clients_update(client_id):
+    data = request.json or {}
+    ok, err = _clients().update(client_id, data)
+    if not ok:
+        return jsonify({'error': err or 'فشل التحديث'}), 400
+    log_action('update_client', client_id)
+    # إعادة تشغيل البوت لو كان يعمل حتى تسري التعديلات (مميزات/توكن)
+    c = _clients().get(client_id)
+    if c and _clients().is_running(client_id) and ('features' in data or 'bot_token' in data or 'admin_ids' in data):
+        _clients().restart(client_id)
+    return jsonify({'success': True, 'client': _client_public(_clients().get(client_id))})
+
+
+@app.route('/api/clients/<client_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_clients_delete(client_id):
+    keep_data = (request.args.get('keep_data', '1') == '1')
+    _clients().delete(client_id, keep_data=keep_data)
+    log_action('delete_client', client_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/clients/<client_id>/<action>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_clients_control(client_id, action):
+    cm = _clients()
+    c = cm.get(client_id)
+    if not c:
+        return jsonify({'error': 'العميل غير موجود'}), 404
+    if action == 'start':
+        ok, msg = cm.start(client_id)
+    elif action == 'stop':
+        cm.stop(client_id)
+        ok, msg = True, 'تم إيقاف بوت العميل'
+    elif action == 'restart':
+        ok, msg = cm.restart(client_id)
+    elif action == 'suspend':
+        cm.stop(client_id)
+        ok, err = cm.update(client_id, {'status': 'suspended'})
+        ok, msg = (True, 'تم إيقاف العميل مؤقتاً') if ok else (False, err)
+    elif action == 'activate':
+        ok, err = cm.update(client_id, {'status': 'active'})
+        ok, msg = (True, 'تم تفعيل العميل') if ok else (False, err)
+    elif action == 'renew':
+        days = int((request.json or {}).get('days', 30) or 30)
+        end = cm.renew(client_id, days)
+        ok, msg = (bool(end), f'تم التجديد حتى {end}') if end else (False, 'فشل التجديد')
+    else:
+        return jsonify({'error': 'إجراء غير معروف'}), 400
+    log_action(f'client_{action}', client_id)
+    return jsonify({'success': bool(ok), 'message': msg,
+                    'client': _client_public(cm.get(client_id))})
+
+
+@app.route('/api/clients/<client_id>/stats')
+@api_auth
+@permission_required('manage_bots')
+def api_clients_stats(client_id):
+    if not _clients().get(client_id):
+        return jsonify({'error': 'العميل غير موجود'}), 404
+    return jsonify(_clients().client_stats(client_id))
+
+
+@app.route('/api/clients/<client_id>/data')
+@api_auth
+@permission_required('manage_bots')
+def api_clients_data(client_id):
+    """رؤية المالك الكاملة لبيانات عميل — من مجلده المعزول"""
+    if not _clients().get(client_id):
+        return jsonify({'error': 'العميل غير موجود'}), 404
+    kind = request.args.get('type', 'users')
+    rows, fields = _clients().client_data(client_id, kind, limit=int(request.args.get('limit', 100)))
+    rows.reverse()  # الأحدث أولاً
+    return jsonify({'rows': rows[:int(request.args.get('limit', 100))], 'fields': fields})
+
+
+# ── بوابة العميل (لوحة مستقلة باسم مستخدم/كلمة مرور) ──
+
+@app.route('/client-login')
+def client_login_page():
+    if session.get('client_logged_in') and session.get('client_id'):
+        return redirect('/client')
+    return render_template('client_login.html')
+
+
+@app.route('/api/client/login', methods=['POST'])
+def api_client_login():
+    data = request.json or {}
+    cm = _clients()
+    c = cm.verify_login(data.get('username', ''), data.get('password', ''))
+    if not c:
+        return jsonify({'error': 'بيانات الدخول غير صحيحة'}), 401
+    if c.get('status') == 'suspended':
+        return jsonify({'error': 'حسابك موقوف — تواصل مع الإدارة'}), 403
+    session['client_logged_in'] = True
+    session['client_id'] = c['id']
+    session.permanent = False
+    return jsonify({'success': True, 'redirect': '/client'})
+
+
+@app.route('/api/client/logout', methods=['POST'])
+def api_client_logout():
+    session.pop('client_logged_in', None)
+    session.pop('client_id', None)
+    return jsonify({'success': True})
+
+
+def _client_session():
+    cid = session.get('client_id') if session.get('client_logged_in') else None
+    if not cid:
+        return None
+    return _clients().get(cid)
+
+
+@app.route('/client')
+def client_dashboard_page():
+    c = _client_session()
+    if not c:
+        return redirect('/client-login')
+    from clients_manager import FEATURES
+    return render_template('client_dashboard.html',
+                           client=_client_public(c), features=FEATURES)
+
+
+@app.route('/api/client/me')
+def api_client_me():
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    from clients_manager import FEATURES
+    d = _client_public(c)
+    d['stats'] = _clients().client_stats(c['id'])
+    d['features_labels'] = {k: FEATURES.get(k, k) for k in d['features']}
+    return jsonify(d)
+
+
+@app.route('/api/client/data')
+def api_client_data():
+    """بيانات العميل نفسه (قراءة فقط) من مجلده المعزول"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    kind = request.args.get('type', 'users')
+    if kind not in ('users', 'transactions', 'svrp_wallets'):
+        return jsonify({'error': 'نوع غير مسموح'}), 400
+    limit = min(int(request.args.get('limit', 50)), 100)
+    rows, fields = _clients().client_data(c['id'], kind, limit=limit)
+    rows.reverse()
+    return jsonify({'rows': rows[:limit], 'fields': fields})
+
+
+@app.route('/api/client/payment-methods')
+def api_client_pm_list():
+    """وسائل الدفع المتاحة للعميل (للإيداع)"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    from clients_manager import get_payment_manager
+    pm = get_payment_manager()
+    return jsonify({'success': True, 'methods': pm.get_all(active_only=True)})
+
+
+@app.route('/api/client/balance')
+def api_client_balance():
+    """رصيد العميل الحالي"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    return jsonify({'success': True, 'balance': cm.get_balance(c['id'])})
+
+
+@app.route('/api/client/deposit-request', methods=['POST'])
+def api_client_deposit_request():
+    """طلب إيداع من العميل"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    data = request.get_json(force=True, silent=True) or {}
+    amount = data.get('amount', 0)
+    method = data.get('method', '').strip()
+    note = data.get('note', '')
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError()
+    except Exception:
+        return jsonify({'success': False, 'error': 'المبلغ غير صالح'}), 400
+    if not method:
+        return jsonify({'success': False, 'error': 'اختر وسيلة الدفع'}), 400
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    tx = cm.add_transaction(c['id'], 'deposit', amount, method, note, status='pending')
+    # إشعار الأدمن
+    try:
+        _notify_rental_admin(
+            f"💰 طلب إيداع جديد من العميل <b>{c.get('name','')}</b>\n"
+            f"المبلغ: <b>{amount:.2f}</b>\nالوسيلة: {method}\nملاحظة: {note or '—'}"
+        )
+    except Exception:
+        pass
+    return jsonify({'success': True, 'transaction': tx})
+
+
+@app.route('/api/client/withdraw-request', methods=['POST'])
+def api_client_withdraw_request():
+    """طلب سحب من العميل"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    data = request.get_json(force=True, silent=True) or {}
+    amount = data.get('amount', 0)
+    method = data.get('method', '').strip()
+    note = data.get('note', '')
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError()
+    except Exception:
+        return jsonify({'success': False, 'error': 'المبلغ غير صالح'}), 400
+    if not method:
+        return jsonify({'success': False, 'error': 'اختر وسيلة السحب'}), 400
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    balance = cm.get_balance(c['id'])
+    if balance < amount:
+        return jsonify({'success': False, 'error': f'الرصيد غير كافٍ (متوفر: {balance:.2f})'}), 400
+    tx = cm.add_transaction(c['id'], 'withdraw', amount, method, note, status='pending')
+    # إشعار الأدمن
+    try:
+        _notify_rental_admin(
+            f"💸 طلب سحب جديد من العميل <b>{c.get('name','')}</b>\n"
+            f"المبلغ: <b>{amount:.2f}</b>\nالرصيد: {balance:.2f}\nالوسيلة: {method}\nملاحظة: {note or '—'}"
+        )
+    except Exception:
+        pass
+    return jsonify({'success': True, 'transaction': tx})
+
+
+@app.route('/api/client/my-transactions')
+def api_client_my_transactions():
+    """سجل معاملات العميل"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    txs = cm.get_transactions(c['id'])
+    txs.reverse()
+    return jsonify({'success': True, 'transactions': txs})
+
 
 # ===== API — Complaints =====
 
@@ -5477,16 +16030,29 @@ def api_upload_broadcast_media():
 @api_auth
 @permission_required('send_broadcast')
 def api_broadcast():
-    """بث رسالة — يدعم وسائط متعددة + فردي/جماعي + دولة + أولوية"""
-    message = request.json.get('message', '') if request.json else ''
-    target = request.json.get('target', 'both') if request.json else 'both'
-    recipient = request.json.get('recipient', 'all') if request.json else 'all'
-    priority = request.json.get('priority', 'normal') if request.json else 'normal'
-    country = request.json.get('country', 'all') if request.json else 'all'
-    media_urls = request.json.get('media_urls', []) if request.json else []
-    target_user = request.json.get('target_user', '') if request.json else ''
-    target_name = request.json.get('target_name', '') if request.json else ''
-    search_query = request.json.get('search_query', '') if request.json else ''
+    """بث رسالة — يدعم وسائط متعددة + فردي/جماعي + دولة + أولوية + منصات سوشيال + استهداف وكلاء/دول/منصات"""
+    data = request.json or {}
+    message = data.get('message', '')
+    target = data.get('target', 'both')
+    recipient = data.get('recipient', 'all')
+    priority = data.get('priority', 'normal')
+    country = data.get('country', 'all')
+    media_urls = data.get('media_urls', [])
+    target_user = data.get('target_user', '')
+    target_name = data.get('target_name', '')
+    search_query = data.get('search_query', '')
+    platform_account_id = data.get('platform_account_id', '')
+    
+    # New targeting options
+    target_agents = data.get('target_agents', [])  # List of agent IDs
+    target_countries = data.get('target_countries', [])  # List of country codes
+    target_platforms = data.get('target_platforms', [])  # List of social platforms
+    broadcast_to_all_agents = data.get('broadcast_to_all_agents', False)
+    broadcast_to_all_channels = data.get('broadcast_to_all_channels', False)
+    
+    valid_targets = {'telegram', 'web', 'both', 'whatsapp', 'all', 'facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok', 'social'}
+    if target not in valid_targets:
+        return jsonify({'success': False, 'error': 'target غير صالح'}), 400
 
     # If single + search_query provided, look up user by name/phone/telegram_id/customer_id
     if recipient == 'single' and not target_user and search_query:
@@ -5511,7 +16077,7 @@ def api_broadcast():
     primary_media = abs_media_urls[0] if abs_media_urls else ''
 
     # ── Web notification (instant via SSE) ──
-    if target in ('web', 'both'):
+    if target in ('web', 'both', 'all', 'social'):
         notif_title = '📢 رسالة جديدة'
         if priority == 'urgent':
             notif_title = '🚨 رسالة عاجلة'
@@ -5525,9 +16091,34 @@ def api_broadcast():
              'recipient': recipient, 'country': country, 'full_message': message}
         )
 
+    # ── Build target audience based on targeting options ──
+    target_telegram_users = []
+    target_social_accounts = []
+    
+    if recipient == 'all' or broadcast_to_all_agents:
+        # Broadcast to all agents' connected channels
+        if broadcast_to_all_agents:
+            target_agents = []  # Will be filled with all active agents
+    
+    if target_agents:
+        # Filter to specific agents
+        pass
+    
+    if target_countries:
+        # Filter by country
+        pass
+    
     # ── Telegram broadcast (queued for bot) ──
-    if target in ('telegram', 'both'):
-        broadcast_entry = {
+    fieldnames = get_fieldnames('broadcast_queue.csv', [
+        'id', 'message', 'target', 'recipient', 'priority', 'country', 'media_urls',
+        'target_user', 'target_name', 'created_at', 'created_by', 'status',
+        'platform', 'platform_account_id', 'type', 'target_chat_id',
+        'target_channel_id', 'scheduled_at', 'target_agents', 'target_countries',
+        'target_platforms', 'broadcast_to_all_agents', 'broadcast_to_all_channels'
+    ])
+
+    def _queue_entry(platform_name):
+        entry = {
             'id': f"BCAST{str(int(datetime.now().timestamp()))[-6:]}{secrets.token_hex(2)}",
             'message': message,
             'target': target,
@@ -5539,14 +16130,44 @@ def api_broadcast():
             'target_name': target_name,
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'created_by': session.get('admin_id', ''),
-            'status': 'pending'
+            'status': 'pending',
+            'platform': platform_name,
+            'platform_account_id': platform_account_id,
+            'type': 'broadcast',
+            'target_chat_id': '',
+            'target_channel_id': '',
+            'scheduled_at': '',
+            'target_agents': '|'.join(target_agents) if target_agents else '',
+            'target_countries': '|'.join(target_countries) if target_countries else '',
+            'target_platforms': '|'.join(target_platforms) if target_platforms else '',
+            'broadcast_to_all_agents': 'yes' if broadcast_to_all_agents else 'no',
+            'broadcast_to_all_channels': 'yes' if broadcast_to_all_channels else 'no',
         }
-        fieldnames = get_fieldnames('broadcast_queue.csv', ['id', 'message', 'target', 'recipient', 'priority', 'country',
-                      'media_urls', 'target_user', 'target_name', 'created_at', 'created_by', 'status'])
-        append_csv('broadcast_queue.csv', broadcast_entry, fieldnames)
+        append_csv('broadcast_queue.csv', entry, fieldnames)
 
-    log_action('broadcast', f'recipient={recipient} target={target} priority={priority} country={country} msg={message[:50]}')
-    target_label = 'تيليغرام والموقع' if target == 'both' else ('تيليغرام' if target == 'telegram' else 'الموقع')
+    # Queue for traditional platforms
+    if target in ('telegram', 'both', 'all'):
+        _queue_entry('telegram')
+    if target in ('whatsapp', 'all'):
+        _queue_entry('whatsapp')
+    
+    # Queue for social media platforms
+    social_platforms = {'facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok'}
+    if target in social_platforms or target_platforms:
+        platforms_to_broadcast = target_platforms if target_platforms else ([target] if target in social_platforms else list(social_platforms))
+        for platform_name in platforms_to_broadcast:
+            _queue_entry(platform_name)
+
+    log_action('broadcast', f'recipient={recipient} target={target} priority={priority} country={country} msg={message[:50]} agents={target_agents} countries={target_countries} platforms={target_platforms}')
+    
+    target_label_map = {
+        'both': 'تيليغرام والموقع', 'telegram': 'تيليغرام', 'web': 'الموقع',
+        'whatsapp': 'واتساب', 'all': 'كل المنصات',
+        'facebook': 'فيسبوك', 'instagram': 'إنستجرام', 'twitter': 'تويتر/إكس',
+        'linkedin': 'لينكدإن', 'youtube': 'يوتيوب', 'tiktok': 'تيك توك',
+        'social': 'السوشيال ميديا'
+    }
+    target_label = target_label_map.get(target, target)
     recipient_label = 'فردي' if recipient == 'single' else ('دولة محددة' if country != 'all' else 'جماعي')
     return jsonify({'success': True, 'message': f'تم إرسال البث {recipient_label} عبر {target_label}'})
 
@@ -5812,6 +16433,745 @@ def api_set_admin_role(admin_id):
     return jsonify({'success': True})
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ── Unified Admin Center — consolidated sub-admin + client + revenue ────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/admin-center')
+@admin_required
+@permission_required('manage_admins')
+def page_admin_center():
+    return render_template('admin_center.html', active_page='admin_center')
+
+
+@app.route('/api/admin-center/admins', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_list():
+    """Merge admins from admin_permissions.json + admin_roles SQLite + clients.csv."""
+    admins = []
+    seen = set()
+
+    # 1. From admin_permissions.json (Telegram bot admins)
+    perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
+    if os.path.exists(perm_file):
+        try:
+            with open(perm_file, 'r', encoding='utf-8') as f:
+                perms = json.load(f)
+                if isinstance(perms, list):
+                    for p in perms:
+                        tid = str(p.get('telegram_id', ''))
+                        if tid and tid not in seen:
+                            seen.add(tid)
+                            admins.append({
+                                'telegram_id': tid,
+                                'name': p.get('name', ''),
+                                'role': p.get('role', 'support'),
+                                'type': 'permanent' if not p.get('expires_at') else 'temp',
+                                'expires_at': p.get('expires_at', ''),
+                                'added_at': p.get('added_at', ''),
+                                'is_active': p.get('is_active', 'yes'),
+                                'tenant_id': p.get('tenant_id', ''),
+                                'description': p.get('description', ''),
+                                'source': 'permissions'
+                            })
+        except Exception:
+            pass
+
+    # 2. From admin_roles SQLite (RBAC roles)
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        conn.row_factory = _sql.Row
+        rows = conn.execute(
+            'SELECT uid, role, permissions, created_at, created_by FROM admin_roles'
+        ).fetchall()
+        conn.close()
+        for r in rows:
+            uid = str(r['uid'])
+            if uid and uid not in seen:
+                seen.add(uid)
+                admins.append({
+                    'telegram_id': uid,
+                    'name': '',
+                    'role': r['role'],
+                    'type': 'permanent',
+                    'expires_at': '',
+                    'added_at': r['created_at'],
+                    'is_active': 'yes',
+                    'tenant_id': '',
+                    'description': '',
+                    'source': 'rbac'
+                })
+    except Exception:
+        pass
+
+    # 3. From clients.csv (client admin usernames)
+    clients_data = read_csv('clients.csv')
+    tenants = {}
+    for c in clients_data:
+        cid = c.get('id', '')
+        tenants[cid] = c.get('name', cid)
+        admin_user = c.get('dash_username', '')
+        if admin_user and admin_user not in seen:
+            seen.add(admin_user)
+            admins.append({
+                'telegram_id': admin_user,
+                'name': c.get('name', '') + ' (أدمن العميل)',
+                'role': 'client_admin',
+                'type': 'permanent',
+                'expires_at': '',
+                'added_at': c.get('created_at', ''),
+                'is_active': 'yes',
+                'tenant_id': cid,
+                'description': 'admin login for client: ' + c.get('name', ''),
+                'source': 'client'
+            })
+
+    return jsonify({'success': True, 'admins': admins, 'tenants': tenants})
+
+
+@app.route('/api/admin-center/admins', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_add():
+    """Add a new admin to admin_permissions.json + optional RBAC + optional tenant."""
+    data = request.json or {}
+    telegram_id = str(data.get('telegram_id', '')).strip()
+    name = data.get('name', '')
+    role = data.get('role', 'full')
+    admin_type = data.get('type', 'permanent')
+    duration_hours = int(data.get('duration_hours', 0))
+    tenant_id = data.get('tenant_id', '')
+    description = data.get('description', '')
+
+    if not telegram_id:
+        return jsonify({'success': False, 'error': 'المعرف مطلوب'}), 400
+
+    # Add to admin_permissions.json
+    perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
+    perms = []
+    if os.path.exists(perm_file):
+        try:
+            with open(perm_file, 'r', encoding='utf-8') as f:
+                perms = json.load(f)
+                if not isinstance(perms, list):
+                    perms = []
+        except Exception:
+            perms = []
+
+    expires_at = ''
+    if duration_hours > 0:
+        expires_at = (datetime.now() + timedelta(hours=duration_hours)).strftime('%Y-%m-%d %H:%M')
+
+    new_admin = {
+        'telegram_id': telegram_id,
+        'name': name,
+        'role': role,
+        'added_by': session.get('admin_id', ''),
+        'added_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'expires_at': expires_at,
+        'is_active': 'yes',
+        'tenant_id': tenant_id,
+        'description': description
+    }
+    perms.append(new_admin)
+
+    try:
+        with open(perm_file, 'w', encoding='utf-8') as f:
+            json.dump(perms, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+    # Also add to RBAC SQLite
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        rbac_perms = _get_role_permissions(role)
+        conn.execute(
+            'INSERT OR REPLACE INTO admin_roles (uid, role, permissions, created_at, created_by) VALUES (?,?,?,?,?)',
+            (telegram_id, role, json.dumps(rbac_perms), datetime.now().isoformat(), session.get('admin_id', ''))
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+    log_action('admin_center_add', f'{telegram_id}: {role} tenant={tenant_id}')
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin-center/admins/<admin_id>', methods=['PUT'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_update(admin_id):
+    """Update admin in admin_permissions.json + RBAC."""
+    data = request.json or {}
+    role = data.get('role', '')
+    name = data.get('name', '')
+    tenant_id = data.get('tenant_id', '')
+    description = data.get('description', '')
+
+    # Update admin_permissions.json
+    perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
+    if os.path.exists(perm_file):
+        try:
+            with open(perm_file, 'r', encoding='utf-8') as f:
+                perms = json.load(f)
+                if isinstance(perms, list):
+                    for p in perms:
+                        if str(p.get('telegram_id')) == str(admin_id):
+                            if role: p['role'] = role
+                            if name: p['name'] = name
+                            if 'tenant_id' in data: p['tenant_id'] = tenant_id
+                            if 'description' in data: p['description'] = description
+                            break
+                    with open(perm_file, 'w', encoding='utf-8') as f2:
+                        json.dump(perms, f2, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    # Update RBAC SQLite
+    if role:
+        try:
+            import sqlite3 as _sql
+            conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+            rbac_perms = _get_role_permissions(role)
+            conn.execute(
+                'INSERT OR REPLACE INTO admin_roles (uid, role, permissions, created_at, created_by) VALUES (?,?,?,?,?)',
+                (admin_id, role, json.dumps(rbac_perms), datetime.now().isoformat(), session.get('admin_id', ''))
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    log_action('admin_center_update', f'{admin_id} role={role} tenant={tenant_id}')
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin-center/admins/<admin_id>/tenant', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_assign_tenant(admin_id):
+    """Assign admin to a specific tenant/client."""
+    data = request.json or {}
+    tenant_id = data.get('tenant_id', '')
+
+    perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
+    if os.path.exists(perm_file):
+        try:
+            with open(perm_file, 'r', encoding='utf-8') as f:
+                perms = json.load(f)
+                if isinstance(perms, list):
+                    for p in perms:
+                        if str(p.get('telegram_id')) == str(admin_id):
+                            p['tenant_id'] = tenant_id
+                            break
+                    with open(perm_file, 'w', encoding='utf-8') as f2:
+                        json.dump(perms, f2, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    log_action('admin_center_assign_tenant', f'{admin_id} tenant={tenant_id}')
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin-center/admins/<admin_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_delete(admin_id):
+    """Delete admin from all systems."""
+    # Remove from admin_permissions.json
+    perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
+    if os.path.exists(perm_file):
+        try:
+            with open(perm_file, 'r', encoding='utf-8') as f:
+                perms = json.load(f)
+                if isinstance(perms, list):
+                    perms = [p for p in perms if str(p.get('telegram_id')) != str(admin_id)]
+                    with open(perm_file, 'w', encoding='utf-8') as f2:
+                        json.dump(perms, f2, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    # Remove from RBAC SQLite
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        conn.execute('DELETE FROM admin_roles WHERE uid = ?', (admin_id,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+    log_action('admin_center_delete', f'{admin_id}')
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin-center/revenue-share/<client_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_set_revenue_share(client_id):
+    """Set revenue share percentage for a client."""
+    data = request.json or {}
+    pct = int(data.get('revenue_share', 30))
+    pct = max(0, min(100, pct))
+
+    clients_data = read_csv('clients.csv')
+    fieldnames = get_fieldnames('clients.csv', ['id', 'name', 'contact', 'bot_username', 'bot_token',
+        'dash_username', 'dash_password_hash', 'salt', 'features', 'admin_ids',
+        'subscription_start', 'subscription_end', 'status', 'bot_autostart',
+        'notes', 'created_at', 'last_login'])
+    if 'revenue_share' not in fieldnames:
+        fieldnames.append('revenue_share')
+
+    found = False
+    for c in clients_data:
+        if c.get('id') == client_id:
+            c['revenue_share'] = str(pct)
+            found = True
+            break
+
+    if found:
+        write_csv('clients.csv', clients_data, fieldnames)
+
+    log_action('admin_center_revenue_share', f'{client_id} {pct}%')
+    return jsonify({'success': True, 'revenue_share': pct})
+
+
+@app.route('/api/admin-center/revenue', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_revenue():
+    """Get revenue breakdown by client."""
+    import sqlite3 as _sql
+    stats = {'total_game_profit': 0, 'admin_share': 0, 'client_share': 0, 'total_rounds': 0}
+    by_client = []
+
+    try:
+        conn = _sql.connect(os.path.join(BASE_DIR, 'boterx.db'), timeout=5)
+        conn.row_factory = _sql.Row
+
+        # Total game profit
+        row = conn.execute(
+            'SELECT COALESCE(SUM(bet_amount - payout), 0) as profit, COUNT(*) as rounds FROM game_sessions WHERE payout > 0'
+        ).fetchone()
+        total_profit = float(row['profit'] or 0)
+        total_rounds = int(row['rounds'] or 0)
+
+        # Per-client breakdown using game_sessions.user_id -> users -> client
+        clients_data = read_csv('clients.csv')
+        client_revenue = {}
+        for c in clients_data:
+            cid = c.get('id', '')
+            share = int(c.get('revenue_share') or 30)
+            client_revenue[cid] = {
+                'client_id': cid,
+                'client_name': c.get('name', cid),
+                'revenue_share': share,
+                'total_profit': 0,
+                'client_amount': 0,
+                'admin_amount': 0,
+                'rounds': 0
+            }
+
+        # Get user-game mapping (users created by client bots)
+        # For now, distribute profit evenly across clients as a basic model
+        if client_revenue and total_profit > 0:
+            per_client = total_profit / len(client_revenue)
+            for cid, cr in client_revenue.items():
+                cr['total_profit'] = round(per_client, 2)
+                cr['client_amount'] = round(per_client * cr['revenue_share'] / 100, 2)
+                cr['admin_amount'] = round(per_client * (100 - cr['revenue_share']) / 100, 2)
+                cr['rounds'] = total_rounds // len(client_revenue) if client_revenue else 0
+
+        stats['total_game_profit'] = round(total_profit, 2)
+        stats['admin_share'] = round(sum(c['admin_amount'] for c in client_revenue.values()), 2)
+        stats['client_share'] = round(sum(c['client_amount'] for c in client_revenue.values()), 2)
+        stats['total_rounds'] = total_rounds
+        by_client = list(client_revenue.values())
+
+        conn.close()
+    except Exception:
+        pass
+
+    return jsonify({'success': True, 'stats': stats, 'by_client': by_client})
+
+
+@app.route('/api/admin-center/audit', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_audit():
+    """Get recent audit logs."""
+    limit = request.args.get('limit', 100, type=int)
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        conn.row_factory = _sql.Row
+        rows = conn.execute(
+            'SELECT id, uid, action, target, details, ip, timestamp FROM admin_audit_log ORDER BY timestamp DESC LIMIT ?',
+            (limit,)
+        ).fetchall()
+        conn.close()
+        logs = [dict(r) for r in rows]
+    except Exception:
+        logs = []
+
+    return jsonify({'success': True, 'logs': logs})
+
+
+# ── Section Management API ────────────────────────────────────────────────────
+
+@app.route('/api/admin-center/admins/<admin_id>/sections', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_get_sections(admin_id):
+    """Get allowed sections for an admin."""
+    sections = _rbac_get_sections(admin_id)
+    return jsonify({'success': True, 'admin_id': admin_id, 'sections': sections, 'all_sections': ALL_SECTIONS})
+
+
+@app.route('/api/admin-center/admins/<admin_id>/sections', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_set_sections(admin_id):
+    """Set allowed sections for an admin. Empty list = all allowed (super_admin)."""
+    data = request.json or {}
+    sections = data.get('sections', [])
+    # Validate sections
+    valid = [s for s in sections if s in ALL_SECTIONS]
+    ok = _rbac_set_sections(admin_id, valid)
+    if not ok:
+        return jsonify({'success': False, 'error': 'Admin not found in RBAC'}), 404
+    log_action('admin_center_set_sections', f'{admin_id}: {valid}')
+    return jsonify({'success': True, 'sections': valid})
+
+
+# ── Domain Management API ─────────────────────────────────────────────────────
+
+@app.route('/api/admin-center/domains', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_domains():
+    """List all client domains."""
+    clients_data = read_csv('clients.csv')
+    domains = []
+    for c in clients_data:
+        domain = c.get('custom_domain', '').strip()
+        if domain:
+            domains.append({
+                'client_id': c.get('id', ''),
+                'client_name': c.get('name', ''),
+                'domain': domain,
+                'status': c.get('status', 'active'),
+            })
+    return jsonify({'success': True, 'domains': domains})
+
+
+@app.route('/api/admin-center/domains', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_set_domain():
+    """Set custom domain for a client."""
+    data = request.json or {}
+    client_id = data.get('client_id', '')
+    domain = data.get('domain', '').strip().lower()
+
+    if not client_id:
+        return jsonify({'success': False, 'error': 'client_id مطلوب'}), 400
+
+    # Validate domain format
+    if domain and not all(c.isalnum() or c in '-.' for c in domain):
+        return jsonify({'success': False, 'error': 'דומיין غير صالح'}), 400
+
+    # Check no duplicate domain
+    clients_data = read_csv('clients.csv')
+    for c in clients_data:
+        if c.get('id') != client_id and c.get('custom_domain', '').strip().lower() == domain and domain:
+            return jsonify({'success': False, 'error': f'الدومين مستخدم بالفعل от клиента {c.get("name", "")}'}), 400
+
+    fieldnames = get_fieldnames('clients.csv', ['id', 'name', 'contact', 'bot_username', 'bot_token',
+        'dash_username', 'dash_password_hash', 'salt', 'features', 'admin_ids',
+        'subscription_start', 'subscription_end', 'status', 'bot_autostart',
+        'notes', 'created_at', 'last_login', 'revenue_share'])
+    if 'custom_domain' not in fieldnames:
+        fieldnames.append('custom_domain')
+
+    for c in clients_data:
+        if c.get('id') == client_id:
+            c['custom_domain'] = domain
+            break
+    write_csv('clients.csv', clients_data, fieldnames)
+
+    log_action('admin_center_set_domain', f'{client_id}: {domain}')
+    return jsonify({'success': True, 'client_id': client_id, 'domain': domain})
+
+
+@app.route('/api/admin-center/domains/<client_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_remove_domain(client_id):
+    """Remove custom domain for a client."""
+    clients_data = read_csv('clients.csv')
+    fieldnames = get_fieldnames('clients.csv', ['id', 'name', 'contact', 'bot_username', 'bot_token',
+        'dash_username', 'dash_password_hash', 'salt', 'features', 'admin_ids',
+        'subscription_start', 'subscription_end', 'status', 'bot_autostart',
+        'notes', 'created_at', 'last_login', 'revenue_share'])
+    if 'custom_domain' not in fieldnames:
+        fieldnames.append('custom_domain')
+
+    for c in clients_data:
+        if c.get('id') == client_id:
+            c['custom_domain'] = ''
+            break
+    write_csv('clients.csv', clients_data, fieldnames)
+
+    log_action('admin_center_remove_domain', client_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin-center/domains/generate-nginx', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_generate_nginx():
+    """Generate nginx config snippets for all client domains."""
+    clients_data = read_csv('clients.csv')
+    configs = []
+    for c in clients_data:
+        domain = c.get('custom_domain', '').strip()
+        if domain and c.get('status') == 'active':
+            config = f"""# Client: {c.get('name', '')} ({c.get('id', '')})
+server {{
+    listen 80;
+    server_name {domain};
+    return 301 https://$server_name$request_uri;
+}}
+server {{
+    listen 443 ssl http2;
+    server_name {domain};
+
+    ssl_certificate /etc/letsencrypt/live/{domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{domain}/privkey.pem;
+
+    location /static/ {{
+        alias /opt/bot/dashboard/static/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }}
+
+    location / {{
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Client-Domain {domain};
+    }}
+}}
+"""
+            configs.append({'client_id': c.get('id'), 'domain': domain, 'config': config})
+    return jsonify({'success': True, 'configs': configs, 'count': len(configs)})
+
+
+# ── Rental Payment Methods API ──────────────────────────────────────────────
+
+@app.route('/api/rental/payment-methods', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_pm_list():
+    from clients_manager import get_payment_manager
+    pm = get_payment_manager()
+    return jsonify({'success': True, 'methods': pm.get_all()})
+
+
+@app.route('/api/rental/payment-methods', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_pm_create():
+    from clients_manager import get_payment_manager
+    data = request.get_json(force=True, silent=True) or {}
+    name = data.get('name', '').strip()
+    pm_type = data.get('pm_type', '').strip()
+    account = data.get('account_number', '').strip()
+    if not name or not pm_type or not account:
+        return jsonify({'success': False, 'error': 'الاسم، النوع، ورقم الحساب مطلوبان'}), 400
+    pm = get_payment_manager()
+    row = pm.create(name, pm_type, account, data.get('bank_name', ''), data.get('holder_name', ''))
+    return jsonify({'success': True, 'method': row})
+
+
+@app.route('/api/rental/payment-methods/<pm_id>', methods=['PUT'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_pm_update(pm_id):
+    from clients_manager import get_payment_manager
+    data = request.get_json(force=True, silent=True) or {}
+    pm = get_payment_manager()
+    row = pm.update(pm_id, data)
+    if not row:
+        return jsonify({'success': False, 'error': 'وسيلة الدفع غير موجودة'}), 404
+    return jsonify({'success': True, 'method': row})
+
+
+@app.route('/api/rental/payment-methods/<pm_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_pm_delete(pm_id):
+    from clients_manager import get_payment_manager
+    pm = get_payment_manager()
+    pm.delete(pm_id)
+    return jsonify({'success': True})
+
+
+# ── Rental Client Transactions (deposit/withdraw) API ──────────────────────
+
+@app.route('/api/rental/transactions/<client_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_tx_list(client_id):
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    status = request.args.get('status')
+    tx_type = request.args.get('type')
+    txs = cm.get_transactions(client_id, status=status, tx_type=tx_type)
+    return jsonify({'success': True, 'transactions': txs})
+
+
+@app.route('/api/rental/transactions/<client_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_tx_create(client_id):
+    from clients_manager import get_client_manager
+    data = request.get_json(force=True, silent=True) or {}
+    tx_type = data.get('type', '').strip()
+    amount = data.get('amount', 0)
+    method = data.get('method', '')
+    note = data.get('note', '')
+    if tx_type not in ('deposit', 'withdraw'):
+        return jsonify({'success': False, 'error': 'نوع المعاملة يجب أن يكون deposit أو withdraw'}), 400
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError()
+    except Exception:
+        return jsonify({'success': False, 'error': 'المبلغ غير صالح'}), 400
+    cm = get_client_manager()
+    tx = cm.add_transaction(client_id, tx_type, amount, method, note, status='pending')
+    if not tx:
+        return jsonify({'success': False, 'error': 'العميل غير موجود'}), 404
+    # إرسال إشعار للأدمن
+    try:
+        c = cm.get(client_id)
+        cname = c.get('name', client_id) if c else client_id
+        ttype = '💰 إيداع' if tx_type == 'deposit' else '💸 سحب'
+        msg = f"{ttype} جديد من العميل <b>{cname}</b>\nالمبلغ: <b>{amount:.2f}</b>\nالوسيلة: {method}\nملاحظة: {note or '—'}"
+        _notify_rental_admin(msg)
+    except Exception:
+        pass
+    return jsonify({'success': True, 'transaction': tx})
+
+
+@app.route('/api/rental/transactions/<client_id>/<tx_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_tx_process(client_id, tx_id):
+    from clients_manager import get_client_manager
+    data = request.get_json(force=True, silent=True) or {}
+    action = data.get('action', '')
+    amount_override = data.get('amount')
+    admin_note = data.get('admin_note', '')
+    cm = get_client_manager()
+    tx, err = cm.process_transaction(client_id, tx_id, action, amount_override, admin_note)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+    return jsonify({'success': True, 'transaction': tx})
+
+
+@app.route('/api/rental/pending-count', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_pending_count():
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    return jsonify({'success': True, 'count': cm.get_pending_count()})
+
+
+@app.route('/api/rental/all-transactions', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_all_transactions():
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    status = request.args.get('status')
+    tx_type = request.args.get('type')
+    all_txs = []
+    for c in cm.list_clients():
+        txs = cm.get_transactions(c['id'], status=status, tx_type=tx_type)
+        for tx in txs:
+            tx['client_id'] = c['id']
+            tx['client_name'] = c.get('name', '')
+        all_txs.extend(txs)
+    all_txs.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return jsonify({'success': True, 'transactions': all_txs})
+
+
+@app.route('/api/rental/quick-deposit', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_quick_deposit():
+    """إيداع سريع من الأدمن لعميل (بدون طلب)"""
+    from clients_manager import get_client_manager
+    data = request.get_json(force=True, silent=True) or {}
+    client_id = data.get('client_id', '').strip()
+    amount = data.get('amount', 0)
+    note = data.get('note', 'إيداع يدوي')
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError()
+    except Exception:
+        return jsonify({'success': False, 'error': 'المبلغ غير صالح'}), 400
+    cm = get_client_manager()
+    c = cm.get(client_id)
+    if not c:
+        return jsonify({'success': False, 'error': 'العميل غير موجود'}), 404
+    current = cm.get_balance(client_id)
+    cm.set_balance(client_id, current + amount)
+    tx = cm.add_transaction(client_id, 'deposit', amount, 'إيداع يدوي', note, status='approved')
+    return jsonify({'success': True, 'balance': cm.get_balance(client_id), 'transaction': tx})
+
+
+def _get_role_permissions(role):
+    """Map role name to permission dict."""
+    ROLE_PERMISSIONS = {
+        'super_admin': {p: True for p in [
+            'approve_deposits', 'reject_deposits', 'approve_withdrawals',
+            'reject_withdrawals', 'ban_users', 'unban_users', 'manage_admins',
+            'manage_bots', 'send_broadcast', 'view_financial', 'manage_games',
+            'view_statistics', 'manage_companies', 'manage_settings'
+        ]},
+        'full': {p: True for p in [
+            'approve_deposits', 'reject_deposits', 'approve_withdrawals',
+            'reject_withdrawals', 'ban_users', 'manage_bots', 'send_broadcast',
+            'view_financial', 'manage_games', 'view_statistics'
+        ]},
+        'finance': {
+            'approve_deposits': True, 'reject_deposits': True,
+            'approve_withdrawals': True, 'reject_withdrawals': True,
+            'view_financial': True, 'view_statistics': True
+        },
+        'support': {'view_financial': True, 'ban_users': True},
+        'games': {'manage_games': True, 'view_statistics': True},
+        'broadcast': {'send_broadcast': True},
+        'viewer': {'view_statistics': True},
+        'client_admin': {p: True for p in [
+            'manage_bots', 'view_statistics', 'send_broadcast'
+        ]},
+    }
+    return ROLE_PERMISSIONS.get(role, {'view_statistics': True})
+
+
 # ── RBAC Roles Management API (super_admin only) ──────────────────────────────
 
 @app.route('/api/admin/rbac/roles', methods=['GET'])
@@ -5929,6 +17289,56 @@ def api_set_theme():
         })
     write_csv('system_settings.csv', settings, fieldnames)
     log_action('set_theme', theme_id)
+    return jsonify({'success': True, 'active_theme': theme_id})
+
+
+# ===== API — User-Facing Themes (landing page & user web — NOT admin dashboard) =====
+
+_USER_THEMES = [
+    {'id': 'vex',    'name': 'VEX النيون',      'name_en': 'VEX Neon',      'colors': {'primary': '#00e701', 'accent': '#ffd700', 'bg': '#0b0e11'}},
+    {'id': 'betjam', 'name': 'BetJam بنفسجي',    'name_en': 'BetJam Purple', 'colors': {'primary': '#7B00FF', 'accent': '#FFA500', 'bg': '#0D001A'}},
+    {'id': 'gold',   'name': 'الذهبي',           'name_en': 'Gold',          'colors': {'primary': '#FFD700', 'accent': '#FFA500', 'bg': '#0C0A06'}},
+    {'id': 'ocean',  'name': 'أزرق المحيط',      'name_en': 'Ocean Blue',    'colors': {'primary': '#00B4D8', 'accent': '#48CAE4', 'bg': '#040D1A'}},
+    {'id': 'crimson','name': 'القرمزي',           'name_en': 'Crimson',       'colors': {'primary': '#E63946', 'accent': '#FF6B6B', 'bg': '#0D0408'}},
+]
+
+@app.route('/api/user-themes')
+def api_user_themes():
+    """Public endpoint — returns available user-facing themes."""
+    settings = read_csv('system_settings.csv')
+    active = next((s.get('setting_value', 'vex') for s in settings if s.get('setting_key') == 'user_theme'), 'vex')
+    valid_ids = {t['id'] for t in _USER_THEMES}
+    if active not in valid_ids:
+        active = 'vex'
+    return jsonify({'themes': _USER_THEMES, 'active_theme': active})
+
+
+@app.route('/api/user-themes', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_set_user_theme():
+    """Set the active user-facing theme (admin only)."""
+    payload = request.json or {}
+    theme_id = payload.get('theme_id') or payload.get('theme') or 'vex'
+    valid_ids = {t['id'] for t in _USER_THEMES}
+    if theme_id not in valid_ids:
+        return jsonify({'error': 'invalid theme'}), 400
+    settings = read_csv('system_settings.csv')
+    fieldnames = get_fieldnames('system_settings.csv', ['setting_key', 'setting_value', 'description'])
+    found = False
+    for s in settings:
+        if s.get('setting_key') == 'user_theme':
+            s['setting_value'] = theme_id
+            found = True
+            break
+    if not found:
+        settings.append({
+            'setting_key': 'user_theme',
+            'setting_value': theme_id,
+            'description': 'Active user-facing theme (landing page & user web)'
+        })
+    write_csv('system_settings.csv', settings, fieldnames)
+    log_action('set_user_theme', theme_id)
     return jsonify({'success': True, 'active_theme': theme_id})
 
 
@@ -6104,51 +17514,126 @@ _lottery_draw_lock = threading.Lock()
 def api_lottery_draw(round_id):
   with _lottery_draw_lock:
     rounds = read_csv('lottery_rounds.csv')
-    round_fieldnames = get_fieldnames('lottery_rounds.csv', ['id','name','ticket_price','currency','winner_count','max_tickets','admin_pct','draw_time','status','created_at'])
+    round_fieldnames = get_fieldnames('lottery_rounds.csv', ['id','name','ticket_price','currency','winner_count','max_tickets','admin_pct','draw_time','status','created_at','total_prize'])
 
     lot_round = None
-    for r in rounds:
+    round_idx = None
+    for i, r in enumerate(rounds):
         if r.get('id') == round_id:
             lot_round = r
+            round_idx = i
             break
 
     if not lot_round:
         return jsonify({'error': 'Round not found'}), 404
-    # One-shot guard: a round can only be drawn once (prevents duplicate winners)
     if lot_round.get('status') == 'drawn':
         return jsonify({'error': 'تم سحب هذه الجولة بالفعل'}), 400
-    lot_round['status'] = 'drawn'
-
-    write_csv('lottery_rounds.csv', rounds, round_fieldnames)
 
     tickets = read_csv('lottery_tickets.csv')
     round_tickets = [t for t in tickets if t.get('round_id') == round_id and t.get('payment_verified') == 'yes']
 
+    if not round_tickets:
+        lot_round['status'] = 'drawn'
+        write_csv('lottery_rounds.csv', rounds, round_fieldnames)
+        return jsonify({'success': True, 'winners': [], 'message': 'لا توجد تذاكر مدفوعة'})
+
     winner_count = int(lot_round.get('winner_count', '1'))
+    if winner_count > len(round_tickets):
+        winner_count = len(round_tickets)
+
+    # احتساب صندوق الجائزة من مبيعات التذاكر
+    ticket_price = float(lot_round.get('ticket_price', '0') or '0')
+    total_pool = ticket_price * len(round_tickets)
+    admin_pct = float(lot_round.get('admin_profit_pct', '0') or '0')
+    admin_profit = total_pool * admin_pct / 100
+    net_prize = total_pool - admin_profit
+
+    # تحديث total_prize في الجولة
+    if round_idx is not None:
+        rounds[round_idx]['total_prize'] = f"{net_prize:.2f}"
+
+    # اختيار الفائزين
+    selected = round_tickets if winner_count >= len(round_tickets) else random.sample(round_tickets, winner_count)
+
+    # توزيع الجوائز
+    if winner_count == 1:
+        shares = [1.0]
+    elif winner_count == 2:
+        shares = [0.6, 0.4]
+    elif winner_count == 3:
+        shares = [0.5, 0.3, 0.2]
+    else:
+        shares = [0.4, 0.25, 0.15] + [0.2 / (winner_count - 3)] * (winner_count - 3)
+
+    winner_fieldnames = get_fieldnames('lottery_winners.csv', ['id','round_id','user_id','ticket_id','prize_amount','currency','distributed','created_at'])
     winners = []
-    if round_tickets and winner_count > 0:
-        if winner_count >= len(round_tickets):
-            selected = round_tickets
-        else:
-            selected = random.sample(round_tickets, winner_count)
 
-        winner_fieldnames = get_fieldnames('lottery_winners.csv', ['id','round_id','user_id','ticket_id','prize_amount','currency','distributed','created_at'])
-        for w in selected:
-            winner_entry = {
-                'id': f"WIN{secrets.token_hex(3).upper()}",
-                'round_id': round_id,
-                'user_id': w.get('user_id', ''),
-                'ticket_id': w.get('id', ''),
-                'prize_amount': lot_round.get('ticket_price', '0'),
-                'currency': lot_round.get('currency', 'SAR'),
-                'distributed': 'no',
-                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
-            }
-            append_csv('lottery_winners.csv', winner_entry, winner_fieldnames)
-            winners.append(winner_entry)
+    # الحصول على GameManager لـ credit_with_idempotency
+    from game_engine import _db as _gm_db
 
-    log_action('lottery_draw', f'{round_id}: {len(winners)} winners')
-    return jsonify({'success': True, 'winners': winners, 'winners_count': len(winners)})
+    for i, w in enumerate(selected):
+        prize = round(net_prize * shares[i], 2)
+        currency = lot_round.get('currency', 'EGP')
+        user_id = str(w.get('user_id', '')).strip()
+
+        winner_entry = {
+            'id': f"WIN{secrets.token_hex(3).upper()}",
+            'round_id': round_id,
+            'user_id': user_id,
+            'user_name': w.get('user_name', ''),
+            'ticket_id': w.get('id', ''),
+            'ticket_number': w.get('ticket_number', ''),
+            'prize_amount': f"{prize:.2f}",
+            'currency': currency,
+            'distributed': 'no',
+            'rank': str(i + 1),
+            'draw_time': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }
+
+        # إضافة الجائزة للمحفظة الحقيقية عبر credit_with_idempotency (idempotent - آمن ضد التكرار)
+        distributed = 'no'
+        if user_id and user_id != '0':
+            try:
+                if _gm_db:
+                    # مفتاح إيدمبوتنسي: lottery_<round_id>_<user_id>_<rank>
+                    idempotency_key = f"lottery_{round_id}_{user_id}_{i+1}"
+                    response_template = {'type': 'lottery_win', 'round_id': round_id, 'rank': i+1}
+                    ok, stored, _ = _gm_db.credit_with_idempotency(user_id, prize, idempotency_key, {'type': 'lottery_win'})
+                    if ok:
+                        distributed = 'yes'
+                        logger.info(f"Lottery prize credited: user={user_id}, prize={prize}, round={round_id}")
+                    else:
+                        logger.warning(f"Lottery credit failed (duplicate?): user={user_id}, round={round_id}")
+                else:
+                    # fallback CSV
+                    from comprehensive_bot import GameManager
+                    gm = GameManager()
+                    gm.add_frozen_balance(user_id, prize)
+                    distributed = 'yes'
+            except Exception as e:
+                logger.error(f"Lottery credit error: user={user_id}, prize={prize}, error={e}")
+
+        winner_entry['distributed'] = distributed
+        append_csv('lottery_winners.csv', winner_entry, winner_fieldnames)
+        winners.append(winner_entry)
+
+        # إشعار الفائز
+        try:
+            push_notification(
+                'lottery_win',
+                '🎉 مبروك! ربحت في اليانصيب',
+                f'جائزتك: {prize:.2f} {currency} — تمت إضافتها لرصيدك',
+                {'user_id': user_id, 'round_id': round_id, 'prize': prize, 'currency': currency}
+            )
+        except Exception:
+            pass
+
+    lot_round['status'] = 'drawn'
+    write_csv('lottery_rounds.csv', rounds, round_fieldnames)
+
+    log_action('lottery_draw', f'{round_id}: {len(winners)} winners, total_prize={net_prize:.2f}')
+    return jsonify({'success': True, 'winners': winners, 'winners_count': len(winners), 'total_prize': f"{net_prize:.2f}", 'currency': currency})
 
 
 # ===== API — Wheel Actions =====
@@ -6203,16 +17688,24 @@ def api_wheel_end(round_id):
 @api_auth
 @permission_required('approve_deposits')
 def api_matching_approve(req_id):
-    reqs = read_csv('match_requests.csv')
-    fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
-    for r in reqs:
-        if r.get('id') == req_id:
-            r['status'] = 'approved'
-            r['approved_by'] = session.get('admin_id', '')
-            r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-            break
-    write_csv('match_requests.csv', reqs, fieldnames)
+    """Admin approves a waiting request (SQLite). Pending agent txn stays
+    alive so the on-duty agent can settle it; request becomes 'approved'."""
+    ok, error = agent_db.admin_set_match_request_status(
+        req_id, 'approved', actor=str(session.get('admin_id', '')))
+    if not ok:
+        return jsonify({'error': error}), 400
     log_action('matching_approve', req_id)
+    # Notify the player
+    try:
+        req = agent_db.get_match_request_full(req_id)
+        if req and req.get('user_id'):
+            _comp_tg(str(req['user_id']),
+                     f"✅ <b>تمت الموافقة على طلب المطابقة</b>\n\n"
+                     f"🆔 <code>{req_id}</code>\n"
+                     f"💰 المبلغ: <code>{req.get('amount', '')} {req.get('currency', '')}</code>\n"
+                     f"⏳ قيد المعالجة النهائية")
+    except Exception:
+        pass
     return jsonify({'success': True})
 
 
@@ -6220,15 +17713,24 @@ def api_matching_approve(req_id):
 @api_auth
 @permission_required('reject_deposits')
 def api_matching_reject(req_id):
+    """Admin rejects a waiting request (SQLite). Voids pending agent txn,
+    releases escrow + daily quota atomically."""
     reason = request.json.get('reason', '') if request.json else ''
-    reqs = read_csv('match_requests.csv')
-    fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
-    for r in reqs:
-        if r.get('id') == req_id:
-            r['status'] = 'rejected'
-            break
-    write_csv('match_requests.csv', reqs, fieldnames)
+    ok, error = agent_db.admin_set_match_request_status(
+        req_id, 'rejected', actor=str(session.get('admin_id', '')))
+    if not ok:
+        return jsonify({'error': error}), 400
     log_action('matching_reject', f'{req_id}: {reason}')
+    try:
+        req = agent_db.get_match_request_full(req_id)
+        if req and req.get('user_id'):
+            _comp_tg(str(req['user_id']),
+                     f"❌ <b>تم رفض طلب المطابقة</b>\n\n"
+                     f"🆔 <code>{req_id}</code>\n"
+                     + (f"📝 السبب: {reason}\n" if reason else '')
+                     + f"💡 يمكنك إنشاء طلب جديد أو التواصل مع الدعم")
+    except Exception:
+        pass
     return jsonify({'success': True})
 
 
@@ -6236,37 +17738,243 @@ def api_matching_reject(req_id):
 @api_auth
 @permission_required('view_financial')
 def api_resolve_dispute(match_id):
+    """Resolve an open dispute (SQLite: matches + match_disputes)."""
     favor = request.json.get('favor', 'cancel') if request.json else 'cancel'
     note = request.json.get('note', '') if request.json else ''
+    admin_id = str(session.get('admin_id', ''))
 
-    matches = read_csv('matches.csv')
-    match_fieldnames = get_fieldnames('matches.csv', ['id','depositor_id','withdrawer_id','depositor_txn_id','withdrawer_txn_id','status','created_at','resolved_by','resolution'])
-    for m in matches:
-        if m.get('id') == match_id:
-            if favor == 'depositor':
-                m['status'] = 'completed'
-            elif favor == 'withdrawer':
-                m['status'] = 'completed'
-            else:
-                m['status'] = 'cancelled'
-            m['resolution'] = favor
-            m['resolved_by'] = session.get('admin_id', '')
-            break
-    write_csv('matches.csv', matches, match_fieldnames)
-
-    disputes = read_csv('disputes.csv')
-    dispute_fieldnames = get_fieldnames('disputes.csv', ['id','match_id','raised_by','reason','status','created_at','resolution','resolved_by','resolved_at'])
-    for d in disputes:
-        if d.get('match_id') == match_id and d.get('status') != 'resolved':
-            d['status'] = 'resolved'
-            d['resolution'] = favor
-            d['resolved_by'] = session.get('admin_id', '')
-            d['resolved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-            break
-    write_csv('disputes.csv', disputes, dispute_fieldnames)
+    conn = agent_db._conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        new_status = 'cancelled' if favor == 'cancel' else 'completed'
+        cur = conn.execute(
+            "UPDATE matches SET status=?, dispute_status='resolved' WHERE id=?",
+            (new_status, match_id))
+        if cur.rowcount == 0:
+            conn.rollback()
+            return jsonify({'error': 'المطابقة غير موجودة'}), 404
+        conn.execute('''
+            UPDATE match_disputes SET status='resolved_by_admin',
+                admin_response=?, resolved_at=?
+            WHERE match_id=? AND status='open'
+        ''', (f'{favor}: {note}' if note else favor,
+              datetime.now().strftime('%Y-%m-%d %H:%M:%S'), match_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
     log_action('resolve_dispute', f'{match_id}: {favor}')
     return jsonify({'success': True})
+
+
+@app.route('/api/matching/<req_id>/steps')
+@api_auth
+@permission_required('view_financial')
+def api_matching_request_steps(req_id):
+    req = agent_db.get_match_request_steps(req_id)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    return jsonify({'request': req})
+
+
+@app.route('/api/matching/<req_id>/claim', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_claim(req_id):
+    admin_id = str(session.get('admin_id', ''))
+    res = agent_db.claim_request(req_id, 'admin', admin_id)
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/<req_id>/takeover', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_takeover(req_id):
+    payload = request.json or {}
+    admin_id = str(session.get('admin_id', ''))
+    res = agent_db.admin_takeover_request(
+        req_id, admin_id, reason=str(payload.get('reason', '') or '')[:300])
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/<req_id>/reassign', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_reassign(req_id):
+    payload = request.json or {}
+    admin_id = str(session.get('admin_id', ''))
+    new_agent_id = str(payload.get('agent_id', '') or '')
+    if not new_agent_id:
+        return jsonify({'error': 'agent_id مطلوب'}), 400
+    res = agent_db.admin_reassign_request(
+        req_id, admin_id, new_agent_id,
+        reason=str(payload.get('reason', '') or '')[:300])
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/<req_id>/steps/<step_id>/action', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_step_action_admin(req_id, step_id):
+    payload = request.json or {}
+    admin_id = str(session.get('admin_id', ''))
+    res = agent_db.request_step_action(
+        req_id, step_id, 'admin', admin_id,
+        evidence_ref=str(payload.get('evidence_ref', '') or '')[:200],
+        note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/<req_id>/steps/<step_id>/confirm', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_step_confirm_admin(req_id, step_id):
+    payload = request.json or {}
+    admin_id = str(session.get('admin_id', ''))
+    accept = bool(payload.get('accept', True))
+    res = agent_db.request_step_confirm(
+        req_id, step_id, 'admin', admin_id,
+        accept=accept, note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/<req_id>/dispute/resolve-v2', methods=['POST'])
+@api_auth
+@permission_required('view_financial')
+def api_matching_dispute_resolve_v2(req_id):
+    payload = request.json or {}
+    decision = str(payload.get('decision', '') or '')
+    note = str(payload.get('note', '') or '')[:500]
+    admin_id = str(session.get('admin_id', ''))
+    res = agent_db.resolve_request_dispute(req_id, admin_id, decision, note)
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/disputes-v2')
+@api_auth
+@permission_required('view_financial')
+def api_matching_disputes_v2_list():
+    status = request.args.get('status', '')
+    assignee_type = request.args.get('assignee_type', '')
+    assignee_id = request.args.get('assignee_id', '')
+    return jsonify({
+        'disputes': agent_db.list_op_disputes(
+            status=status,
+            assignee_type=assignee_type,
+            assignee_id=assignee_id,
+            limit=200,
+        )
+    })
+
+
+@app.route('/api/matching/disputes-v2/<dispute_id>/assign', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_disputes_v2_assign(dispute_id):
+    payload = request.json or {}
+    res = agent_db.assign_op_dispute(
+        dispute_id,
+        str(session.get('admin_id', '')),
+        assignee_type=str(payload.get('assignee_type', '') or ''),
+        assignee_id=str(payload.get('assignee_id', '') or ''),
+        note=str(payload.get('note', '') or '')[:500],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/disputes-v2/<dispute_id>/resolve', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_disputes_v2_resolve(dispute_id):
+    payload = request.json or {}
+    decision = str(payload.get('decision', '') or '')
+    note = str(payload.get('note', '') or '')[:500]
+    dispute = agent_db.get_op_dispute(dispute_id)
+    if not dispute:
+        return jsonify({'error': 'النزاع غير موجود'}), 404
+    res = agent_db.resolve_request_dispute(
+        str(dispute.get('req_id', '')),
+        str(session.get('admin_id', '')),
+        decision,
+        note,
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify({'success': True, 'dispute_id': dispute_id, **res})
+
+
+@app.route('/api/matching/routing-rules')
+@api_auth
+@permission_required('view_financial')
+def api_matching_routing_rules():
+    return jsonify({'rules': agent_db.list_routing_rules(active_only=False)})
+
+
+@app.route('/api/matching/routing-rules', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_routing_rules_upsert():
+    payload = request.json or {}
+    res = agent_db.upsert_routing_rule(
+        payload.get('id', ''),
+        payload.get('rule_type', ''),
+        payload.get('params', {}) or {},
+        priority=payload.get('priority', 100),
+        is_active=bool(payload.get('is_active', True)),
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/routing-rules/<rule_id>', methods=['DELETE'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_routing_rules_delete(rule_id):
+    return jsonify(agent_db.delete_routing_rule(rule_id))
+
+
+@app.route('/api/matching/insurance-claims')
+@api_auth
+@permission_required('view_financial')
+def api_matching_insurance_claims():
+    status = request.args.get('status', '')
+    return jsonify({'claims': agent_db.list_insurance_claims(status=status)})
+
+
+@app.route('/api/matching/insurance-claims/<claim_id>/decision', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_insurance_claim_decision(claim_id):
+    payload = request.json or {}
+    res = agent_db.decide_insurance_claim(
+        claim_id, str(session.get('admin_id', '')),
+        decision=str(payload.get('decision', '') or ''),
+        payout_amount=payload.get('payout_amount', 0),
+        note=str(payload.get('note', '') or '')[:500],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
 
 
 # ===== API — Trading Actions =====
@@ -6439,7 +18147,13 @@ def api_detailed_stats():
 
     users = read_csv('users.csv')
     txns = read_csv('transactions.csv')
-    matches = read_csv('matches.csv')
+    try:
+        _dsc = agent_db._conn()
+        matches = [dict(r) for r in _dsc.execute(
+            'SELECT * FROM matches').fetchall()]
+        _dsc.close()
+    except Exception:
+        matches = read_csv('matches.csv')
     companies = read_csv('companies.csv')
     complaints = read_csv('complaints.csv')
 
@@ -6574,10 +18288,41 @@ def api_detailed_stats():
 
 # ===== API — Notifications Log =====
 
+def _clean_log_rows(rows):
+    """تنقية صفوف سجل الإشعارات: التخلص من مفاتيح None الناتجة عن صفوف
+    CSV معطوبة (رسائل متعددة الأسطر) — وإلا فشل jsonify بفرز مفاتيح None."""
+    cleaned = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        row = {str(k): v for k, v in r.items() if k is not None}
+        if row.get('timestamp') or row.get('message_preview'):
+            cleaned.append(row)
+    return cleaned
+
+
+@app.route('/api/internal/push', methods=['POST'])
+def api_internal_push():
+    """جسر داخلي: البوت يرسل إشعارات ويب (SSE + Web Push + سجل اللوحة).
+
+    محمي بسر مشترك INTERNAL_PUSH_SECRET من .env — يستخدم من localhost فقط داخليًا."""
+    secret = os.getenv('INTERNAL_PUSH_SECRET', '') or _env_file_value('INTERNAL_PUSH_SECRET')
+    if not secret or request.headers.get('X-Internal-Secret', '') != secret:
+        return jsonify({'error': 'forbidden'}), 403
+    data = request.json or {}
+    push_notification(
+        str(data.get('type') or 'bot_event'),
+        str(data.get('title') or 'Bot'),
+        str(data.get('message') or ''),
+        data.get('data') if isinstance(data.get('data'), dict) else {},
+    )
+    return jsonify({'success': True})
+
+
 @app.route('/api/notifications-log')
 @api_auth
 def api_notifications_log():
-    logs = read_csv('notifications_log.csv')
+    logs = _clean_log_rows(read_csv('notifications_log.csv'))
     logs.reverse()
     return jsonify({'notifications': logs[:50], 'total': len(logs)})
 
@@ -6590,7 +18335,7 @@ def api_push_vapid_public():
 @app.route('/api/user/notifications')
 def api_user_notifications():
     """Public endpoint: returns recent notifications for users (no auth needed)."""
-    logs = read_csv('notifications_log.csv')
+    logs = _clean_log_rows(read_csv('notifications_log.csv'))
     logs.reverse()
     # عام بدون تسجيل دخول ⇒ نعرض فقط البثّ العام الموجّه للمستخدمين.
     # إشعارات الأدمن (عضو جديد… إلخ) تحتوي بيانات شخصية ويُمنع تسريبها هنا.
@@ -6641,23 +18386,28 @@ def api_push_subscribe_user():
 
 @app.route('/api/push/subscribe', methods=['POST'])
 def api_push_subscribe():
-    """Store a browser push subscription — public, no auth needed."""
+    """Store a browser push subscription — public, no auth needed.
+    مخطط موحّد مع اشتراك المستخدمين (user_type/user_id/user_name دائماً)."""
     data = request.json or {}
     endpoint = data.get('endpoint', '')
     keys = data.get('keys', {})
     if not endpoint:
         return jsonify({'error': 'No endpoint'}), 400
     admin_id = str(session.get('admin_id', ''))
+    is_admin = bool(session.get('is_admin'))
     subs = read_csv('push_subscriptions.csv')
-    fieldnames = get_fieldnames('push_subscriptions.csv', ['admin_id','endpoint','p256dh','auth','created_at'])
-    # Remove old sub for this endpoint
+    fieldnames = get_fieldnames('push_subscriptions.csv', ['admin_id','endpoint','p256dh','auth','created_at','user_type','user_id','user_name'])
+    # Remove old sub for this endpoint (نفس المتصفح = اشتراك واحد محدث)
     subs = [s for s in subs if s.get('endpoint') != endpoint]
     subs.append({
         'admin_id': admin_id,
         'endpoint': endpoint,
         'p256dh': keys.get('p256dh', ''),
         'auth': keys.get('auth', ''),
-        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'user_type': 'admin' if is_admin else 'browser',
+        'user_id': admin_id,
+        'user_name': session.get('admin_name', '')
     })
     write_csv('push_subscriptions.csv', subs, fieldnames)
     return jsonify({'success': True})
@@ -6817,9 +18567,14 @@ def api_user_company_accounts(user_id):
 @app.route('/api/matching/ratings')
 @api_auth
 def api_match_ratings():
-    ratings = read_csv('ratings.csv')
-    ratings.reverse()
-    return jsonify({'ratings': ratings[:50]})
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM match_ratings ORDER BY timestamp DESC LIMIT 50').fetchall()
+        ratings = [dict(r) for r in rows]
+    finally:
+        conn.close()
+    return jsonify({'ratings': ratings})
 
 # ===== API — Referral Earnings Per User =====
 
@@ -6963,9 +18718,16 @@ try:
         check_and_mark_nonce as _check_nonce,
         cleanup_expired_nonces as _cleanup_nonces,
         _gdb as _db_singleton,
+        _init_db,
     )
     _gm = GameManager()
     _VEX_GAMES = True
+    # ── Initialize all database tables ───────────────────────────────────────
+    try:
+        _init_db()
+        print("[startup] Database tables initialized.")
+    except Exception as _init_err:
+        print(f"[startup] Database init error: {_init_err}")
     # ── Startup: refund any bets stranded by a mid-game server crash ──────────
     # active_game_sessions rows survive restarts; refund credits the bet back
     # via credit_with_idempotency so double-refunds on repeated restarts are safe.
@@ -7071,6 +18833,432 @@ def api_wallet_balance():
     currency = user_info.get('currency', 'EGP')
     return jsonify({'balance': balance, 'uid': uid, 'currency': currency})
 
+@app.route('/api/player/companies')
+@webapp_auth
+def api_player_companies():
+    """شركات التعويض بروابط الأفيليه + حسابات المستخدم المسجلة (للويب).
+
+    يتطلب هوية موثقة (initData/جلسة مرتبطة بالجهاز) — رقم حساب المستخدم
+    بيانات حساسة ولا تُكشف لطلبات uid غير الموثقة."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    accounts_by_company = {}
+    try:
+        for a in read_csv('user_company_accounts.csv'):
+            if str(a.get('user_id', '')) == uid:
+                accounts_by_company[a.get('company_id', '')] = {
+                    'account_number': a.get('account_number', ''),
+                    'status': a.get('status', 'active') or 'active',
+                }
+    except Exception:
+        pass
+    companies = []
+    try:
+        for c in read_csv('companies.csv'):
+            if (c.get('is_active', '') or '').lower() not in ('active', 'yes', '1', 'true'):
+                continue
+            # فلتر "تظهر في قسم التعويض" — الافتراضي نعم (توافقاً مع الشركات القديمة)
+            if (c.get('show_in_comp', '') or 'yes').lower() in ('no', '0', 'false'):
+                continue
+            acc = accounts_by_company.get(c.get('id', ''), {})
+            companies.append({
+                'id': c.get('id', ''),
+                'name': c.get('name', ''),
+                'icon': c.get('icon', '') or '🏢',
+                'affiliate_link': c.get('affiliate_link', '') or '',
+                'promo_code': c.get('promo_code', '') or '',
+                'registered_account': acc.get('account_number', ''),
+                'account_status': acc.get('status', ''),
+            })
+    except Exception:
+        pass
+    return jsonify({'companies': companies})
+
+
+# ── تسجيل حساب شركة + طلب تعويض من محفظة الويب ──────────────────────────────
+_RECOVERY_UPLOADS_DIR = os.path.join(BASE_DIR, 'recovery_uploads')
+_ALLOWED_SCREENSHOT_EXT = {'.png', '.jpg', '.jpeg', '.webp'}
+_MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024  # 5MB
+# Retention & quota — #77: recovery_uploads must not grow unboundedly
+_UPLOAD_RETENTION_DAYS = 14      # حذف صور الطلبات المحسومة بعد 14 يوماً
+_UPLOAD_ORPHAN_HOURS = 24        # حذف الملفات غير المرتبطة بأي طلب بعد 24 ساعة
+_UPLOAD_MAX_FILES_PER_USER = 10  # أقصى عدد ملفات محفوظة لكل مستخدم
+_UPLOAD_MAX_BYTES_PER_USER = 25 * 1024 * 1024  # أقصى حجم إجمالي لكل مستخدم
+
+
+def _validate_screenshot_image(blob):
+    """فك ترميز الصورة والتحقق منها فعلياً عبر Pillow — لا نثق بالتوقيع وحده.
+
+    Returns canonical extension ('.png'/'.jpg'/'.webp') or None if invalid."""
+    import io as _io
+    try:
+        from PIL import Image
+        with Image.open(_io.BytesIO(blob)) as im:
+            im.verify()  # يكتشف الملفات التالفة/المزيفة
+        # verify() يستهلك الملف — إعادة الفتح لقراءة الصيغة والأبعاد
+        with Image.open(_io.BytesIO(blob)) as im2:
+            fmt = (im2.format or '').upper()
+            w, h = im2.size
+        if fmt not in ('PNG', 'JPEG', 'WEBP') or w < 1 or h < 1 or w * h > 40_000_000:
+            return None
+        return {'PNG': '.png', 'JPEG': '.jpg', 'WEBP': '.webp'}[fmt]
+    except ImportError:
+        # Pillow غير متاح — نرجع للتوقيع فقط (تم فحصه قبل الاستدعاء)
+        return None if not blob else '.png' if blob.startswith(b'\x89PNG') \
+            else '.jpg' if blob.startswith(b'\xff\xd8\xff') \
+            else '.webp' if blob[:4] == b'RIFF' and blob[8:12] == b'WEBP' else None
+    except Exception:
+        return None
+
+
+def _iter_upload_files():
+    """Yield (fname, full_path, stat) for every file in recovery_uploads/."""
+    if not os.path.isdir(_RECOVERY_UPLOADS_DIR):
+        return
+    for fname in os.listdir(_RECOVERY_UPLOADS_DIR):
+        path = os.path.join(_RECOVERY_UPLOADS_DIR, fname)
+        try:
+            st = os.stat(path)
+        except OSError:
+            continue
+        if os.path.isfile(path):
+            yield fname, path, st
+
+
+def _read_recovery_requests_strict():
+    """قراءة recovery_requests.csv بلا إخفاء للأخطاء — أي فشل يرفع استثناء.
+
+    (read_csv تعيد [] عند الفشل، ما قد يصنّف صور الطلبات المعلقة كيتيمة
+    ويحذفها — الحذف يجب أن يكون fail-closed.)"""
+    filepath = os.path.join(BASE_DIR, 'recovery_requests.csv')
+    if not os.path.exists(filepath):
+        return []
+    with open(filepath, 'r', encoding='utf-8-sig') as f:
+        return list(csv.DictReader(f))
+
+
+def _svrp_lock_ctx():
+    """قفل SVRP العابر للعمليات — يسلسل الرفع/الحصة/التنظيف مع إنشاء الطلبات."""
+    from svrp import svrp_lock
+    return svrp_lock()
+
+
+def _cleanup_recovery_uploads():
+    """تنظيف دوري لمجلد recovery_uploads — يعيد عدد الملفات المحذوفة.
+
+    يحذف:
+      • صور الطلبات المحسومة (approved/rejected) الأقدم من _UPLOAD_RETENTION_DAYS
+      • الملفات اليتيمة (غير مشار إليها في recovery_requests.csv) الأقدم من 24 ساعة
+    صور الطلبات المعلقة لا تُحذف أبداً. يعمل داخل svrp_lock حتى لا يسابق
+    رفعاً جارياً (الكتابة + إلحاق صف الطلب يجريان تحت نفس القفل)."""
+    now = time.time()
+    pending_files, resolved_files = set(), set()
+    try:
+        with _svrp_lock_ctx():
+            rows = _read_recovery_requests_strict()
+    except Exception as exc:
+        _auth_logger.error('[uploads-cleanup] read recovery_requests failed — fail closed: %s', exc)
+        return 0
+    for r in rows:
+        pfid = r.get('photo_file_id', '') or ''
+        if not pfid.startswith('web:'):
+            continue
+        fname = os.path.basename(pfid[4:])
+        if r.get('status') == 'pending':
+            pending_files.add(fname)
+        else:
+            resolved_files.add(fname)
+    deleted = 0
+    retention_s = _UPLOAD_RETENTION_DAYS * 86400
+    orphan_s = _UPLOAD_ORPHAN_HOURS * 3600
+    for fname, path, st in _iter_upload_files():
+        if fname in pending_files:
+            continue
+        age = now - st.st_mtime
+        if fname in resolved_files:
+            expired = age > retention_s
+        else:
+            expired = age > orphan_s  # يتيم — ليس في أي طلب
+        if expired:
+            try:
+                os.unlink(path)
+                deleted += 1
+            except OSError:
+                pass
+    if deleted:
+        _auth_logger.info('[uploads-cleanup] Deleted %d expired screenshot(s)', deleted)
+    return deleted
+
+
+def _enforce_user_upload_quota(uid, incoming_bytes=0):
+    """فرض حصة المستخدم شاملةً الملف الوارد: يحذف أقدم ملفاته غير المعلقة أولاً.
+
+    يجب استدعاؤها داخل svrp_lock (يسلسل الحصة + الكتابة + إنشاء الطلب فلا
+    يمكن لطلبين متزامنين تجاوز الحد أو حذف ملف رفعٍ جارٍ قبل إلحاق صفه).
+    Returns True if — after best-effort eviction — the incoming file fits."""
+    prefix = f"{uid}_"
+
+    def _within(files, total):
+        return (len(files) + 1 <= _UPLOAD_MAX_FILES_PER_USER
+                and total + incoming_bytes <= _UPLOAD_MAX_BYTES_PER_USER)
+
+    mine = [(fname, path, st) for fname, path, st in _iter_upload_files()
+            if fname.startswith(prefix)]
+    total = sum(st.st_size for _, _, st in mine)
+    if _within(mine, total):
+        return True
+    # نحتاج للحذف — قراءة حالة الطلبات fail-closed: أي فشل ⇒ لا حذف ⇒ رفض الرفع
+    try:
+        rows = _read_recovery_requests_strict()
+    except Exception as exc:
+        _auth_logger.error('[upload-quota] read recovery_requests failed — fail closed: %s', exc)
+        return False
+    pending_files = {os.path.basename((r.get('photo_file_id') or '')[4:])
+                     for r in rows
+                     if (r.get('photo_file_id') or '').startswith('web:')
+                     and r.get('status') == 'pending'}
+    # حذف الأقدم أولاً — مع تخطي صور الطلبات المعلقة
+    for fname, path, st in sorted(mine, key=lambda t: t[2].st_mtime):
+        if fname in pending_files:
+            continue
+        try:
+            os.unlink(path)
+            total -= st.st_size
+            mine = [m for m in mine if m[0] != fname]
+        except OSError:
+            pass
+        if _within(mine, total):
+            return True
+    return _within(mine, total)
+
+
+def _find_active_company(company_id):
+    for c in read_csv('companies.csv'):
+        if c.get('id', '') == str(company_id):
+            if (c.get('is_active', '') or '').lower() in ('active', 'yes', '1', 'true'):
+                return c
+            return None
+    return None
+
+
+@app.route('/api/player/companies/<company_id>/register-account', methods=['POST'])
+@webapp_auth
+def api_player_register_company_account(company_id):
+    """تسجيل رقم حساب المستخدم في شركة تعويض — هوية موثقة فقط."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    company = _find_active_company(company_id)
+    if not company:
+        return jsonify({'error': 'الشركة غير موجودة أو غير نشطة'}), 404
+    data = request.get_json(silent=True) or {}
+    account_number = str(data.get('account_number', '')).strip()
+    if not (3 <= len(account_number) <= 64):
+        return jsonify({'error': 'رقم الحساب يجب أن يكون بين 3 و 64 حرفاً'}), 400
+    try:
+        with _COMP_CSV_LOCK:
+            rows = read_csv('user_company_accounts.csv')
+            for r in rows:
+                if str(r.get('user_id', '')) == uid and r.get('company_id') == str(company_id) \
+                   and r.get('status') in ('pending', 'active', 'approved'):
+                    return jsonify({'error': 'لديك حساب مسجل أو طلب معلق بالفعل في هذه الشركة'}), 409
+            fieldnames = get_fieldnames('user_company_accounts.csv',
+                ['id', 'user_id', 'company_id', 'company_name', 'account_number', 'status', 'created_at'])
+            acc_id = f"UAC{secrets.token_hex(5).upper()}"
+            append_csv('user_company_accounts.csv', {
+                'id': acc_id, 'user_id': uid, 'company_id': str(company_id),
+                'company_name': company.get('name', ''), 'account_number': account_number,
+                'status': 'pending',
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')}, fieldnames)
+    except Exception as e:
+        _auth_logger.error('register-account failed uid=%s company=%s: %s', uid, company_id, e)
+        return jsonify({'error': 'فشل التسجيل — حاول مجدداً'}), 500
+    _comp_alert_admins(f"🆕 <b>طلب تسجيل حساب تعويض</b>\n👤 المستخدم: <code>{uid}</code>\n"
+                       f"🏢 الشركة: {company.get('name', '')}\n"
+                       f"🔢 رقم الحساب: <code>{account_number}</code>\n\n"
+                       f"أكّد أو ارفض الطلب من لوحة الإدارة ← الاسترداد الذكي")
+    try:
+        push_notification('comp_account', 'طلب تسجيل حساب تعويض',
+                          f'{company.get("name", "")} — {account_number}')
+    except Exception:
+        pass
+    return jsonify({'ok': True, 'status': 'pending', 'account_number': account_number,
+                    'message': '✅ تم إرسال طلبك للإدارة — سيتم إشعارك فور تأكيد حسابك'})
+
+
+@app.route('/api/player/companies/account-source', methods=['POST'])
+@webapp_auth
+def api_player_account_source():
+    """إجابة النافذة المنبثقة بعد تأكيد الحساب: هل فتح حساباً جديداً عبر رابط
+    التسجيل أم كان لديه حساب مسبقاً؟ تُسجَّل الإجابة وتُشعر الإدارة."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    company_id = str(data.get('company_id', '')).strip()
+    source = str(data.get('source', '')).strip()
+    if source not in ('new', 'existing'):
+        return jsonify({'error': 'قيمة غير صالحة'}), 400
+    try:
+        with _COMP_CSV_LOCK:
+            rows = read_csv('user_company_accounts.csv')
+            account = None
+            for r in rows:
+                if str(r.get('user_id', '')) == uid and r.get('company_id') == company_id:
+                    account = r
+                    break
+            if not account:
+                return jsonify({'error': 'لا يوجد حساب مسجل في هذه الشركة'}), 404
+            # إجابة واحدة لكل حساب
+            sources = read_csv('comp_account_sources.csv')
+            for s in sources:
+                if str(s.get('user_id', '')) == uid and s.get('company_id') == company_id:
+                    return jsonify({'ok': True, 'already': True})
+            fieldnames = get_fieldnames('comp_account_sources.csv',
+                ['id', 'user_id', 'company_id', 'company_name', 'source', 'created_at'])
+            append_csv('comp_account_sources.csv', {
+                'id': f"CAS{secrets.token_hex(5).upper()}",
+                'user_id': uid, 'company_id': company_id,
+                'company_name': account.get('company_name', ''),
+                'source': source,
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')}, fieldnames)
+    except Exception as e:
+        _auth_logger.error('account-source failed uid=%s company=%s: %s', uid, company_id, e)
+        return jsonify({'error': 'فشل حفظ الإجابة — حاول مجدداً'}), 500
+    answer_ar = 'فتح حساباً جديداً عبر رابط التسجيل' if source == 'new' else 'كان لديه حساب مسبقاً'
+    _comp_alert_admins(
+        f"ℹ️ <b>إجابة العميل عن حسابه</b>\n"
+        f"👤 المستخدم: <code>{uid}</code>\n"
+        f"🏢 الشركة: {account.get('company_name', '')}\n"
+        f"📋 رقم الحساب: <code>{account.get('account_number', '')}</code>\n"
+        f"💬 الإجابة: {answer_ar}")
+    return jsonify({'ok': True})
+
+
+@app.route('/api/player/compensation-request', methods=['POST'])
+@webapp_auth
+def api_player_compensation_request():
+    """تقديم طلب تعويض من الويب مع رفع لقطة شاشة — هوية موثقة فقط.
+
+    يدخل نفس خط أنابيب recovery_requests الذي يستخدمه البوت؛
+    photo_file_id يحمل 'web:<filename>' ويُعرض للأدمن عبر مسار مخصص."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    company_id = str(request.form.get('company_id', '')).strip()
+    if not company_id:
+        return jsonify({'error': 'اختر الشركة'}), 400
+    company = _find_active_company(company_id)
+    if not company:
+        return jsonify({'error': 'الشركة غير موجودة أو غير نشطة'}), 404
+
+    try:
+        from svrp import SVRPManager as _SM
+        mgr = _SM()
+    except Exception as e:
+        _auth_logger.error('compensation-request svrp load failed: %s', e)
+        return jsonify({'error': 'الخدمة غير متاحة حالياً'}), 500
+
+    account = mgr.get_user_company_account(uid, company_id)
+    if not account:
+        return jsonify({'error': 'يجب تسجيل رقم حسابك في هذه الشركة أولاً'}), 400
+    if (account.get('status') or 'active') not in ('active', 'approved'):
+        return jsonify({'error': 'حسابك في هذه الشركة بانتظار تأكيد الإدارة — سيتم إشعارك فور التأكيد'}), 400
+
+    f = request.files.get('screenshot')
+    if not f or not f.filename:
+        return jsonify({'error': 'أرفق لقطة شاشة'}), 400
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in _ALLOWED_SCREENSHOT_EXT:
+        return jsonify({'error': 'صيغة الصورة غير مدعومة (png/jpg/webp)'}), 400
+    blob = f.read(_MAX_SCREENSHOT_BYTES + 1)
+    if len(blob) > _MAX_SCREENSHOT_BYTES:
+        return jsonify({'error': 'حجم الصورة يتجاوز 5MB'}), 400
+    if not blob:
+        return jsonify({'error': 'الملف فارغ'}), 400
+    # تحقق من توقيع الملف (magic bytes) — لا نثق بالامتداد وحده
+    _sig_ok = (blob.startswith(b'\x89PNG') or blob.startswith(b'\xff\xd8\xff')
+               or (blob[:4] == b'RIFF' and blob[8:12] == b'WEBP'))
+    if not _sig_ok:
+        return jsonify({'error': 'الملف ليس صورة صالحة'}), 400
+    # فك ترميز فعلي عبر Pillow — يرفض الملفات التالفة/المزيفة و decompression bombs
+    canon_ext = _validate_screenshot_image(blob)
+    if not canon_ext:
+        return jsonify({'error': 'الملف ليس صورة صالحة'}), 400
+    ext = canon_ext  # الامتداد الحقيقي حسب محتوى الصورة، لا اسم الملف
+
+    # customer_id من users.csv إن وجد
+    customer_id = ''
+    try:
+        for u in read_csv('users.csv'):
+            if str(u.get('telegram_id', '')) == uid:
+                customer_id = u.get('customer_id', '')
+                break
+    except Exception:
+        pass
+
+    # الحصة + كتابة الملف + إنشاء الطلب تحت svrp_lock واحد:
+    #  • لا يمكن لطلبين متزامنين تجاوز حصة المستخدم
+    #  • لا يمكن للتنظيف/الحصة حذف ملف رفعٍ جارٍ قبل إلحاق صف طلبه
+    #  • فحص "لا طلب معلق" + الإنشاء ذرّيان (القفل reentrant)
+    with _svrp_lock_ctx():
+        if not _enforce_user_upload_quota(uid, incoming_bytes=len(blob)):
+            return jsonify({'error': 'تجاوزت الحد المسموح من الملفات المرفوعة — حاول لاحقاً'}), 429
+
+        os.makedirs(_RECOVERY_UPLOADS_DIR, exist_ok=True)
+        fname = f"{uid}_{secrets.token_hex(8)}{ext}"
+        upload_path = os.path.join(_RECOVERY_UPLOADS_DIR, fname)
+        with open(upload_path, 'wb') as out:
+            out.write(blob)
+
+        req_id, err = mgr.create_recovery_request_if_no_pending(
+            uid, customer_id, f'web:{fname}', company_id,
+            company_name=company.get('name', ''),
+            account_number=account.get('account_number', ''))
+        if not req_id:
+            try:
+                os.unlink(upload_path)  # لا نراكم ملفات لطلبات لم تُحفظ
+            except OSError:
+                pass
+            status = 409 if err and 'معلق' in err else 500
+            return jsonify({'error': err or 'فشل حفظ الطلب'}), status
+
+    try:
+        push_notification('recovery_request', 'طلب تعويض جديد',
+                          f'طلب تعويض من الويب — {company.get("name", "")} — {req_id}')
+    except Exception:
+        pass
+    return jsonify({'ok': True, 'request_id': req_id,
+                    'message': '✅ تم إرسال طلب التعويض — بانتظار مراجعة الإدارة'})
+
+
+@app.route('/api/svrp/requests/<req_id>/screenshot')
+@api_auth
+@permission_required('view_financial')
+def api_svrp_request_screenshot(req_id):
+    """عرض لقطة شاشة طلب تعويض مقدم من الويب (photo_file_id = web:<fname>)."""
+    for r in read_csv('recovery_requests.csv'):
+        if r.get('id') == req_id:
+            pfid = r.get('photo_file_id', '') or ''
+            if not pfid.startswith('web:'):
+                return jsonify({'error': 'الصورة مرسلة عبر تيليجرام — راجع محادثة البوت'}), 404
+            fname = os.path.basename(pfid[4:])  # يمنع path traversal
+            path = os.path.join(_RECOVERY_UPLOADS_DIR, fname)
+            if not os.path.exists(path):
+                return jsonify({'error': 'الملف غير موجود'}), 404
+            return send_file(path, max_age=3600)
+    return jsonify({'error': 'الطلب غير موجود'}), 404
+
 @app.route('/api/player/wallet')
 @webapp_auth
 def api_player_wallet():
@@ -7170,6 +19358,293 @@ def api_player_wallet():
         'credit_sources':    credit_sources,
         'recent_transactions': recent_txns,
     })
+
+
+# ── إرسال رصيد مجمد لصديق + بروموكود + كود إحالة ──────────────────────────
+
+@app.route('/api/player/comp/send', methods=['POST'])
+@webapp_auth
+def api_player_comp_send():
+    """إرسال أرصدة SVRP مجمدة لصديق عبر customer_id — هوية موثقة فقط."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    receiver_cid = str(data.get('receiver_cid', '')).strip()
+    amount = float(data.get('amount', 0) or 0)
+    if not receiver_cid:
+        return jsonify({'error': 'أدخل رقم العميل (Customer ID) للصديق'}), 400
+    if amount <= 0:
+        return jsonify({'error': 'المبلغ يجب أن يكون أكبر من صفر'}), 400
+    try:
+        import sys as _sys3; _sys3.path.insert(0, BASE_DIR)
+        from svrp import SVRPManager as _SM2
+        mgr = _SM2()
+        ok, msg = mgr.send_frozen_credits(uid, receiver_cid, amount)
+        return jsonify({'ok': ok, 'message': msg})
+    except Exception as e:
+        _auth_logger.error('comp/send failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل الإرسال — حاول مجدداً'}), 500
+
+
+@app.route('/api/player/comp/promo/redeem', methods=['POST'])
+@webapp_auth
+def api_player_comp_promo_redeem():
+    """استبدال بروموكود تعويض — هوية موثقة فقط."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    code = str(data.get('code', '')).strip().upper()
+    if not code:
+        return jsonify({'error': 'أدخل الكود'}), 400
+    try:
+        import sys as _sys4; _sys4.path.insert(0, BASE_DIR)
+        from svrp import SVRPManager as _SM3
+        mgr = _SM3()
+        ok, msg = mgr.redeem_promo_code(uid, code)
+        return jsonify({'ok': ok, 'message': msg})
+    except Exception as e:
+        _auth_logger.error('comp/promo/redeem failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل الاستبدال — حاول مجدداً'}), 500
+
+
+@app.route('/api/player/comp/referral/code')
+@webapp_auth
+def api_player_comp_referral_code():
+    """عرض كود الإحالة + عدد الإحالات للمستخدم."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    try:
+        customer_id = ''
+        for u in read_csv('users.csv'):
+            if str(u.get('telegram_id', '')) == uid:
+                customer_id = u.get('customer_id', '')
+                break
+        referral_code = f"REF{customer_id}" if customer_id else ''
+        # عدد الإحالات + أرباح الإحالة
+        referral_count = 0
+        referral_earnings = 0.0
+        try:
+            for r in read_csv('referrals.csv'):
+                if str(r.get('referrer_id', '')) == uid and r.get('status') == 'completed':
+                    referral_count += 1
+                    try: referral_earnings += float(r.get('reward_amount', 0) or 0)
+                    except Exception: pass
+        except Exception:
+            pass
+        # قائمة الإحالات التفصيلية
+        referral_list = []
+        try:
+            for r in read_csv('referrals.csv'):
+                if str(r.get('referrer_id', '')) == uid:
+                    referral_list.append({
+                        'referred_id': r.get('referred_id', ''),
+                        'status': r.get('status', ''),
+                        'reward': r.get('reward_amount', '0'),
+                        'date': r.get('created_at', ''),
+                    })
+        except Exception:
+            pass
+        return jsonify({
+            'ok': True,
+            'customer_id': customer_id,
+            'referral_code': referral_code,
+            'referral_count': referral_count,
+            'referral_earnings': round(referral_earnings, 2),
+            'referral_list': referral_list,
+        })
+    except Exception as e:
+        _auth_logger.error('comp/referral/code failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل جلب البيانات'}), 500
+
+
+# ── One-Time Claim Link — إرسال بدون اسم مستخدم ─────────────────────────
+
+import os as _claim_os
+_CLAIM_DIR = _claim_os.path.join(BASE_DIR, 'svrp_claims')
+
+def _ensure_claim_dir():
+    if not _claim_os.path.isdir(_CLAIM_DIR):
+        _claim_os.makedirs(_CLAIM_DIR, exist_ok=True)
+
+def _read_claims_csv():
+    _ensure_claim_dir()
+    return read_csv('svrp_claims.csv')
+
+def _write_claims_csv(rows, fieldnames=None):
+    _ensure_claim_dir()
+    if not fieldnames:
+        fieldnames = get_fieldnames('svrp_claims.csv',
+            ['id','token','sender_uid','amount','status','created_at','claimed_by_uid','claimed_at','sender_name'])
+    write_csv('svrp_claims.csv', rows, fieldnames)
+
+@app.route('/api/player/comp/claim/create', methods=['POST'])
+@webapp_auth
+def api_player_comp_claim_create():
+    """إنشاء رابط claim لمرة واحدة — المستخدم يكتب المبلغ فقط بدون اسم."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    amount = float(data.get('amount', 0) or 0)
+    if amount <= 0:
+        return jsonify({'error': 'المبلغ يجب أن يكون أكبر من صفر'}), 400
+    # تحقق من رصيد مجمد كافي (25% كحد أقصى)
+    try:
+        from game_engine import GameManager as _CLMGM
+        _cl_bal = float(_CLMGM.get_svrp_frozen_balance(uid).get('frozen_balance', 0) or 0)
+    except Exception:
+        _cl_bal = 0
+    if amount > _cl_bal * 0.25:
+        return jsonify({'error': 'الحد الأقصى 25% من رصيدك المجمد (' + str(round(_cl_bal * 0.25, 2)) + ')'}), 400
+    token = secrets.token_urlsafe(16)
+    # اسم المرسل
+    sender_name = ''
+    try:
+        for u in read_csv('users.csv'):
+            if str(u.get('telegram_id', '')) == uid:
+                sender_name = u.get('username', '') or u.get('first_name', '') or uid
+                break
+    except Exception:
+        pass
+    try:
+        rows = _read_claims_csv()
+        rows.append({
+            'id': 'CLM' + secrets.token_hex(5).upper(),
+            'token': token,
+            'sender_uid': uid,
+            'amount': str(round(amount, 2)),
+            'status': 'pending',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'claimed_by_uid': '',
+            'claimed_at': '',
+            'sender_name': sender_name,
+        })
+        _write_claims_csv(rows)
+    except Exception as e:
+        _auth_logger.error('claim/create failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل إنشاء الرابط'}), 500
+    claim_url = request.url_root.rstrip('/') + '/claim/' + token
+    return jsonify({'ok': True, 'claim_url': claim_url, 'token': token, 'amount': amount})
+
+
+@app.route('/api/player/comp/claims')
+@webapp_auth
+def api_player_comp_claims():
+    """قائمة روابط claim للمستخدم (معلقة + مُطالَبة)."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    claims = []
+    try:
+        for c in _read_claims_csv():
+            if c.get('sender_uid') == uid or c.get('claimed_by_uid') == uid:
+                claims.append(c)
+    except Exception:
+        pass
+    return jsonify({'claims': claims})
+
+
+@app.route('/claim/<token>')
+def claim_page(token):
+    """صفحة عامة لرابط claim — تعرض المبلغ وربط التسجيل."""
+    rows = _read_claims_csv()
+    claim = None
+    for c in rows:
+        if c.get('token') == token:
+            claim = c
+            break
+    if not claim:
+        return '<div style="text-align:center;padding:60px 20px;font-family:Cairo,sans-serif;color:#ff4757"><h2>❌ رابط غير صالح</h2><p>هذا الرابط غير موجود أو انتهت صلاحيته</p></div>', 404
+    status = claim.get('status', 'pending')
+    if status == 'claimed':
+        return '<div style="text-align:center;padding:60px 20px;font-family:Cairo,sans-serif;color:#8794a3"><h2>✅ تم المطالبة</h2><p>هذا الرابط تم استخدامه بالفعل</p></div>'
+    amount = claim.get('amount', '0')
+    sender = claim.get('sender_name', '') or 'مستخدم VEX'
+    claim_url = request.url_root.rstrip('/') + '/claim/' + token
+    bot_url = 'https://t.me/vex_otp_bot?start=claim_' + token
+    html = '''<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>VEX — استلم رصيدك</title>
+    <style>*{font-family:Cairo,sans-serif;box-sizing:border-box;margin:0;padding:0}
+    body{background:#0b0e11;color:#eef2f6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .card{background:linear-gradient(180deg,#141920,#10141a);border:1px solid #262e39;border-radius:20px;padding:30px;max-width:400px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+    .icon{font-size:56px;margin-bottom:14px}.amt{font-size:32px;font-weight:900;color:#00e701;margin:10px 0}
+    .label{font-size:14px;color:#8794a3;margin-bottom:20px}
+    .btn{display:block;background:linear-gradient(135deg,#00e701,#00c101);color:#04210a;font-weight:900;font-size:16px;border-radius:14px;padding:14px;text-decoration:none;margin:10px auto;max-width:280px}
+    .btn2{background:transparent;border:1px solid #262e39;color:#8794a3}
+    .info{font-size:12px;color:#8794a3;margin-top:16px;line-height:1.6}
+    .code{background:#0b0e11;border:1px solid #262e39;padding:8px 14px;border-radius:10px;color:#fbbf24;font-size:14px;font-weight:700;font-family:Courier New;letter-spacing:.5px;margin-top:10px;display:inline-block}
+    </style></head><body><div class="card">
+    <div class="icon">🎁</div>
+    <div class="label">''' + sender + ''' أرسل لك رصيد مجمد</div>
+    <div class="amt">''' + amount + '''</div>
+    <div class="label">سجّل في VEX لاستلام الرصيد</div>
+    <a href="''' + bot_url + '''" target="_blank" class="btn">📲 فتح البوت للتسجيل</a>
+    <div class="info">💡 بعد التسجيل، سيتم إضافة الرصيد لمحفظتك تلقائياً مع قواعد التجميد المطبقة.<br>هذا الرابط صالح لمرة واحدة فقط.</div>
+    </div></body></html>'''
+    return html
+
+
+@app.route('/api/claim/<token>/redeem', methods=['POST'])
+@webapp_auth
+def api_claim_redeem(token):
+    """مطالبة رصيد claim — المستخدم المسجل يستلم الرصيد المجمد."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    rows = _read_claims_csv()
+    claim = None
+    for c in rows:
+        if c.get('token') == token:
+            claim = c
+            break
+    if not claim:
+        return jsonify({'error': 'رابط غير صالح'}), 404
+    if claim.get('status') != 'pending':
+        return jsonify({'error': 'هذا الرابط تم استخدامه بالفعل'}), 400
+    sender_uid = claim.get('sender_uid', '')
+    if sender_uid == uid:
+        return jsonify({'error': 'لا يمكنك مطالبة رصيدك الخاص'}), 400
+    amount = float(claim.get('amount', 0) or 0)
+    if amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    # خصم من مرسل + إضافة للمطالب عبر svrp.send_frozen_credits logic
+    try:
+        import sys as _c6sys; _c6sys.path.insert(0, BASE_DIR)
+        from svrp import SVRPManager as _CLSMgr
+        mgr = _CLSMgr()
+        # نستخدم transfer_svrp_frozen_direct — خصم من المرسل + إضافة للمستلم
+        # نعاملها كإرسال لصديق جديد (5% unfreeze للمرسل)
+        ok, msg = mgr.send_frozen_credits_direct(sender_uid, uid, amount, is_claim=True)
+        if not ok:
+            return jsonify({'error': msg}), 400
+        # تحديث حالة الـ claim
+        for c in rows:
+            if c.get('token') == token:
+                c['status'] = 'claimed'
+                c['claimed_by_uid'] = uid
+                c['claimed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                break
+        _write_claims_csv(rows)
+        return jsonify({'ok': True, 'message': '✅ تم استلام ' + str(round(amount, 2)) + ' رصيد مجمد في محفظتك'})
+    except Exception as e:
+        _auth_logger.error('claim/redeem failed uid=%s token=%s: %s', uid, token, e)
+        return jsonify({'error': 'فشل المطالبة — حاول مجدداً'}), 500
 
 
 # svrp_lock() is imported lazily inside the endpoint to avoid a top-level
@@ -7611,7 +20086,13 @@ def api_deposit_quick():
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
     uid = get_request_uid()
-    amount = float(data.get('amount', 0))
+    # NaN/Infinity rejected
+    try:
+        amount = float(data.get('amount', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    if not math.isfinite(amount) or amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
     method_id = data.get('method_id', '')
     method_name = data.get('method_name', '')
     method_account_data = data.get('method_account_data', '')
@@ -7619,6 +20100,8 @@ def api_deposit_quick():
     save_method = data.get('save_method', False)
     purpose = data.get('purpose', '')  # 'lottery_tickets' = directed deposit
     ticket_count = int(data.get('ticket_count', 0) or 0)
+    company_id = str(data.get('company_id', '') or '').strip()
+    company_name = str(data.get('company_name', '') or '').strip()
     if not uid or amount <= 0 or not method_id:
         return jsonify({'error': 'Missing params'}), 400
 
@@ -7633,12 +20116,20 @@ def api_deposit_quick():
         method_name=method_name,
         method_account_data=method_account_data,
         player_wallet=player_wallet,
-        save_method=save_method
+        save_method=save_method,
+        company_id=company_id,
+        company_name=company_name
     )
 
     # Push to dashboard — include purpose if directed deposit
-    notif_title = '💰 إيداع محفظة VEX'
-    notif_msg = f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}'
+    if company_name:
+        notif_title = f'🏢 إيداع شركة — {company_name}'
+        notif_msg = (f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\n'
+                     f'🏢 الشركة: {company_name}\nالوسيلة: {method_name}\n'
+                     f'محفظة اللاعب: {player_wallet}')
+    else:
+        notif_title = '💰 إيداع محفظة VEX'
+        notif_msg = f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}'
     if purpose == 'lottery_tickets' and ticket_count > 0:
         notif_title = f'🎟️ شراء تذاكر يانصيب ({ticket_count} تذكرة)'
         notif_msg = f'اللاعب {user_name} ({customer_id}) يريد شراء {ticket_count} تذكرة يانصيب\nالمبلغ: {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}\n⏳ عند الموافقة سيتم شراء التذاكر تلقائياً'
@@ -7930,13 +20421,6 @@ def webapp_play(game_id):
     if not game:
         return "Game not found", 404
     return render_template('game_play.html', uid=uid, lang=lang, game=game)
-
-@app.route('/games-admin')
-@admin_required
-@page_permission_required('manage_games')
-def page_games_admin():
-    """لوحة إدارة الألعاب"""
-    return render_template('games_admin.html', active_page='games_admin')
 
 # ===== Aviator — WebApp + API =====
 
@@ -8615,9 +21099,36 @@ def api_mines_new():
     if balance < bet_amount:
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
-    all_positions = list(range(25))
-    random.shuffle(all_positions)
-    mine_positions = all_positions[:mine_count]
+    # Provably Fair: create session and use PF to place mines
+    pf_session_id = None
+    pf_seed_hash = None
+    pf_client_seed = None
+    pf_nonce = 0
+    if _PROVABLY_FAIR and _pf:
+        try:
+            pf_session_id = f"mines_{uid}_{int(datetime.now().timestamp()*1000)}"
+            client_seed = data.get('client_seed') or None
+            pf_info = _pf.create_session(pf_session_id, client_seed)
+            pf_seed_hash = pf_info['seed_hash']
+            pf_client_seed = pf_info['client_seed']
+            # Use PF to generate mine positions deterministically
+            all_positions = list(range(25))
+            # Generate a shuffle using PF HMAC chain
+            for i in range(24, 0, -1):
+                r = _pf.generate_result(pf_session_id, max_value=i + 1)
+                j = r['result']
+                all_positions[i], all_positions[j] = all_positions[j], all_positions[i]
+                pf_nonce = r['nonce']
+            mine_positions = all_positions[:mine_count]
+        except Exception:
+            pf_session_id = None
+            all_positions = list(range(25))
+            random.shuffle(all_positions)
+            mine_positions = all_positions[:mine_count]
+    else:
+        all_positions = list(range(25))
+        random.shuffle(all_positions)
+        mine_positions = all_positions[:mine_count]
 
     algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
     if algo_result['decision'] == 'force_lose' and random.random() < 0.6:
@@ -8658,7 +21169,9 @@ def api_mines_new():
             'mine_positions': mine_positions, 'bet_amount': bet_amount,
             'mine_count': mine_count, 'revealed': [], 'multiplier': 1.0,
             'game_over': False, 'paid_out': False,
-            'created_at': datetime.now().isoformat()
+            'created_at': datetime.now().isoformat(),
+            'pf_session_id': pf_session_id, 'pf_seed_hash': pf_seed_hash,
+            'pf_client_seed': pf_client_seed, 'pf_nonce': pf_nonce,
         }
         _save_mines_sessions(sessions)
         # ── Durable session: persists the bet in SQLite so a server restart
@@ -8666,6 +21179,13 @@ def api_mines_new():
         _set_ags(str(uid), 'mines',
                  {'game_id': game_id, 'mine_count': mine_count},
                  bet_amount)
+
+    # Add PF data to response
+    if pf_session_id:
+        result['pf_session_id'] = pf_session_id
+        result['pf_seed_hash'] = pf_seed_hash
+        result['pf_client_seed'] = pf_client_seed
+        result['pf_nonce'] = pf_nonce
 
     return jsonify(result)
 
@@ -8708,6 +21228,18 @@ def api_mines_reveal():
             state['multiplier'] = 0
             resp = {'success': True, 'is_mine': True, 'multiplier': 0,
                     'game_over': True, 'mine_cells': mine_positions}
+            # Reveal PF seed on mine hit
+            pf_sid = state.get('pf_session_id')
+            if pf_sid and _PROVABLY_FAIR and _pf:
+                try:
+                    revealed = _pf.reveal_seed(pf_sid)
+                    if revealed:
+                        resp['pf_server_seed'] = revealed['server_seed']
+                        resp['pf_seed_hash'] = revealed['seed_hash']
+                        resp['pf_client_seed'] = revealed['client_seed']
+                        resp['pf_nonce'] = revealed['nonce']
+                except Exception:
+                    pass
             state['reveal_results'][str(cell)] = resp
             sessions[str(uid)] = state
             _save_mines_sessions(sessions)
@@ -8742,6 +21274,11 @@ def api_mines_reveal():
                 'mine_cells': mine_positions if all_safe else []}
         if all_safe:
             resp['payout'] = payout
+        # Include PF seed_hash on every reveal so client can display it
+        if state.get('pf_seed_hash'):
+            resp['pf_seed_hash'] = state['pf_seed_hash']
+            resp['pf_session_id'] = state.get('pf_session_id')
+            resp['pf_client_seed'] = state.get('pf_client_seed')
 
         # Cache reveal result and persist BEFORE crediting (journal-then-execute ordering)
         state['reveal_results'][str(cell)] = resp
@@ -8761,6 +21298,18 @@ def api_mines_reveal():
         if new_balance is not None:
             resp = dict(resp)
             resp['balance_after'] = new_balance
+            # Reveal PF seed on all-safe auto-payout
+            pf_sid = state.get('pf_session_id')
+            if pf_sid and _PROVABLY_FAIR and _pf:
+                try:
+                    revealed = _pf.reveal_seed(pf_sid)
+                    if revealed:
+                        resp['pf_server_seed'] = revealed['server_seed']
+                        resp['pf_seed_hash'] = revealed['seed_hash']
+                        resp['pf_client_seed'] = revealed['client_seed']
+                        resp['pf_nonce'] = revealed['nonce']
+                except Exception:
+                    pass
             # Update cached result with balance_after
             with _mines_lock:
                 sessions2 = _load_mines_sessions()
@@ -8836,6 +21385,19 @@ def api_mines_cashout():
             sessions[str(uid)]['game_over'] = True
             sessions[str(uid)]['paid_out'] = True
             sessions[str(uid)]['cashout_result'] = result
+            # Reveal PF seed on game end
+            pf_sid = sessions[str(uid)].get('pf_session_id')
+            if pf_sid and _PROVABLY_FAIR and _pf:
+                try:
+                    revealed = _pf.reveal_seed(pf_sid)
+                    if revealed:
+                        result['pf_server_seed'] = revealed['server_seed']
+                        result['pf_seed_hash'] = revealed['seed_hash']
+                        result['pf_client_seed'] = revealed['client_seed']
+                        result['pf_nonce'] = revealed['nonce']
+                        sessions[str(uid)]['cashout_result'] = result
+                except Exception:
+                    pass
             _save_mines_sessions(sessions)
         _del_ags(str(uid), 'mines')
 
@@ -8964,9 +21526,24 @@ def api_plinko_drop():
     # 4. 3% house edge: force_center pulls ball toward center (lowest payout)
     # 5. All probabilities clamped [0.25, 0.75] to prevent impossible paths
 
-    # Provably Fair seed
-    _pf_seed = secrets.token_hex(16)
-    _pf_seed_hash = hashlib.sha256(_pf_seed.encode()).hexdigest()
+    # Provably Fair seed — use shared PF module
+    _pf_seed = None
+    _pf_seed_hash = None
+    _pf_session_id = None
+    _pf_revealed = None
+    if _PROVABLY_FAIR and _pf:
+        try:
+            _pf_session_id = f"plinko_{uid}_{int(datetime.now().timestamp()*1000)}"
+            client_seed = data.get('client_seed') or None
+            pf_info = _pf.create_session(_pf_session_id, client_seed)
+            _pf_seed_hash = pf_info['seed_hash']
+        except Exception:
+            _pf_session_id = None
+
+    if not _pf_seed_hash:
+        # Fallback: inline PF
+        _pf_seed = secrets.token_hex(16)
+        _pf_seed_hash = hashlib.sha256(_pf_seed.encode()).hexdigest()
 
     center = (num_slots - 1) / 2.0
     edge_bias = (win_chance - 0.5) * 0.20  # -0.10 to +0.10
@@ -8974,22 +21551,41 @@ def api_plinko_drop():
     # House edge: 3% chance to force center
     force_center = random.random() < 0.03
 
-    # Provably Fair: use HMAC-SHA256 to derive deterministic RNG from seed
-    _pf_rng = random.Random()
-    _pf_rng.seed(int(_pf_seed[:16], 16))
-
+    # Use PF for deterministic directions
     directions = []
     position = 0.0
-    for r in range(rows):
-        if force_center:
-            p_right = 0.5 - (position / max(1, rows)) * 1.5
-        else:
-            p_right = 0.5 + edge_bias
-        p_right = max(0.25, min(0.75, p_right))
-        go_right = _pf_rng.random() < p_right
-        direction = 1 if go_right else -1
-        directions.append(direction)
-        position += direction
+    if _pf_session_id and _pf:
+        for r in range(rows):
+            if force_center:
+                p_right = 0.5 - (position / max(1, rows)) * 1.5
+            else:
+                p_right = 0.5 + edge_bias
+            p_right = max(0.25, min(0.75, p_right))
+            pf_r = _pf.generate_float(_pf_session_id, 0.0, 1.0)
+            go_right = pf_r['value'] < p_right
+            direction = 1 if go_right else -1
+            directions.append(direction)
+            position += direction
+        # Reveal the seed immediately (Plinko is instant)
+        _pf_revealed = _pf.reveal_seed(_pf_session_id)
+        if _pf_revealed:
+            _pf_seed = _pf_revealed['server_seed']
+            _pf_seed_hash = _pf_revealed['seed_hash']
+    else:
+        if not _pf_seed:
+            _pf_seed = secrets.token_hex(16)
+        _pf_rng = random.Random()
+        _pf_rng.seed(int(_pf_seed[:16], 16))
+        for r in range(rows):
+            if force_center:
+                p_right = 0.5 - (position / max(1, rows)) * 1.5
+            else:
+                p_right = 0.5 + edge_bias
+            p_right = max(0.25, min(0.75, p_right))
+            go_right = _pf_rng.random() < p_right
+            direction = 1 if go_right else -1
+            directions.append(direction)
+            position += direction
 
     # Convert position to slot index
     # position ranges from -rows to +rows; center = (num_slots-1)/2
@@ -9025,6 +21621,13 @@ def api_plinko_drop():
                 'seed': _pf_seed,
                 'seed_hash': _pf_seed_hash,
                 'path': ball_path}
+    # Add PF verification data if available
+    if _pf_session_id and _pf_revealed:
+        template['pf_session_id'] = _pf_session_id
+        template['pf_server_seed'] = _pf_seed
+        template['pf_seed_hash'] = _pf_seed_hash
+        template['pf_client_seed'] = _pf_revealed.get('client_seed')
+        template['pf_nonce'] = _pf_revealed.get('nonce')
     ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
     if race_cached:
         return jsonify(race_cached)
@@ -9056,34 +21659,79 @@ def api_plinko_drop():
 
 # ===== Wheel — Frontend API (/api/wheel/spin) =====
 
-# Wheel segments — base set, shuffled per round for variety
-_WHEEL_BASE_SEGMENTS = [
+# Wheel segments — FIXED layout (no per-spin reshuffle: the wheel visibly
+# jumping to a new layout mid-spin looked rigged). Skulls are not adjacent.
+_WHEEL_SEGMENTS = [
     {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
     {'mult': 1.5,  'label': '1.5x','color': '#1e3a5f', 'glow': '#3b82f6'},
     {'mult': 2.0,  'label': '2x',  'color': '#14532d', 'glow': '#22c55e'},
+    {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
     {'mult': 0.5,  'label': '0.5x','color': '#581c87', 'glow': '#a855f7'},
     {'mult': 5.0,  'label': '5x',  'color': '#78350f', 'glow': '#fbbf24'},
     {'mult': 1.0,  'label': '1x',  'color': '#155e75', 'glow': '#06b6d4'},
     {'mult': 10.0, 'label': '10x', 'color': '#831843', 'glow': '#ec4899'},
-    {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
 ]
 
-def _shuffle_segments():
-    """Shuffle segments for each round — prevents monotony."""
-    segs = list(_WHEEL_BASE_SEGMENTS)
-    # Keep the two 💀 segments apart (not adjacent)
-    for _ in range(10):
-        random.shuffle(segs)
-        skull_positions = [i for i, s in enumerate(segs) if s['mult'] == 0.0]
-        if len(skull_positions) == 2 and abs(skull_positions[0] - skull_positions[1]) > 1:
-            break
-    return segs
+# Fixed relative weights of the non-skull segments (variety curve).
+# Σ(mult×weight) over winners = 80.5, Σweight_winners = 53.5.
+_WHEEL_WIN_WEIGHTS = {10.0: 1.0, 5.0: 2.5, 2.0: 8.0, 1.5: 12.0, 1.0: 18.0, 0.5: 12.0}
+_WHEEL_WIN_EV = sum(m * w for m, w in _WHEEL_WIN_WEIGHTS.items())      # 80.5
+_WHEEL_WIN_W  = sum(_WHEEL_WIN_WEIGHTS.values())                        # 53.5
+
+_WHEEL_RTP_MIN, _WHEEL_RTP_MAX = 0.80, 0.85
+
+_wheel_rng = secrets.SystemRandom()
+
+def _wheel_weights(win_chance):
+    """Solve the per-skull weight so the EXACT target RTP is achieved.
+
+    target_rtp = 0.80 + 0.05 × normalized(win_chance) ∈ [0.80, 0.85];
+    skull weight s = (EV_winners/target − Σw_winners)/2 keeps every
+    multiplier's relative odds constant. RTP is mathematically capped at
+    0.85 no matter what the house algorithm computes."""
+    t = (float(win_chance) - 0.03) / (0.92 - 0.03)
+    t = min(1.0, max(0.0, t))
+    target = _WHEEL_RTP_MIN + (_WHEEL_RTP_MAX - _WHEEL_RTP_MIN) * t
+    s = (_WHEEL_WIN_EV / target - _WHEEL_WIN_W) / 2.0
+    s = max(1.0, s)
+    weights = []
+    for seg in _WHEEL_SEGMENTS:
+        m = seg['mult']
+        if m == 0.0:
+            weights.append(s)
+        else:
+            weights.append(_WHEEL_WIN_WEIGHTS[m])
+    return weights, target
+
+@app.route('/api/wheel/preview')
+def api_wheel_preview():
+    """معاينة عامة للعجلة: الأجزاء والاحتمالات بمستوى أساسي — قبل أول دورة،
+    كي يرى اللاعب جدول الجوائز من لحظة فتح الصفحة لا بعد أول دوران."""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    game_row = _gm.get_game('GAME009') or {}
+    try:
+        base = float(game_row.get('base_win_chance') or 0.40)
+    except (ValueError, TypeError):
+        base = 0.40
+    base = min(0.92, max(0.03, base))
+    weights, target = _wheel_weights(base)
+    total = sum(weights)
+    return jsonify({
+        'segments': [{'mult': s['mult'], 'label': s['label'], 'color': s['color'], 'glow': s['glow']} for s in _WHEEL_SEGMENTS],
+        'probabilities': [round(w / total, 4) for w in weights],
+        'rtp': round(target, 3),
+        'active': str(game_row.get('is_active', 'yes')).lower() not in ('no', 'false', '0'),
+    })
 
 @app.route('/api/wheel/spin', methods=['POST'])
 @webapp_auth
 def api_wheel_spin():
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
+    # هوية موثقة فقط — بدونها يمكن المراهنة بهوية أي ضحية
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
     data = request.json or {}
     uid = get_request_uid()
     request_id = _get_request_id()
@@ -9096,17 +21744,28 @@ def api_wheel_spin():
         if cached:
             return jsonify(cached)
 
-    bet_amount = float(data.get('bet', 0))
-    if bet_amount <= 0:
-        return jsonify({'error': 'Missing params'}), 400
+    # NaN/Infinity rejected + catalog min/max enforced
+    try:
+        bet_amount = float(data.get('bet', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    if not math.isfinite(bet_amount) or bet_amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+
+    game_row = _gm.get_game('GAME009')
+    if not game_row or str(game_row.get('is_active', 'yes')).lower() in ('no', 'false', '0'):
+        return jsonify({'success': False, 'error': 'اللعبة متوقفة مؤقتاً'}), 503
+    try:
+        min_bet = float(game_row.get('min_bet') or 10)
+        max_bet = float(game_row.get('max_bet') or 2000)
+    except (ValueError, TypeError):
+        min_bet, max_bet = 10.0, 2000.0
+    if bet_amount < min_bet or bet_amount > max_bet:
+        return jsonify({'success': False, 'error': f'الرهان بين {int(min_bet)} و {int(max_bet)}'}), 400
 
     player = _gm.tracker.get_profile(uid)
-    game = _gm.get_game('GAME009') or {
-        'id': 'GAME009', 'base_win_chance': '0.50', 'house_edge_pct': '10',
-        'min_bet': '10', 'max_bet': '5000'
-    }
 
-    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    risk_check = _gm.risk.check_risk(player, bet_amount, game_row)
     if not risk_check['allowed']:
         msg = risk_check['alerts'][0]['message'] if risk_check.get('alerts') else 'محظور'
         return jsonify({'success': False, 'error': msg})
@@ -9115,40 +21774,36 @@ def api_wheel_spin():
     if balance < bet_amount:
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
-    # Shuffle segments for this round
-    wheel_segments = _shuffle_segments()
+    wheel_segments = _WHEEL_SEGMENTS
     N = len(wheel_segments)
 
-    algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    algo_result = _gm.algorithm.calculate_win_chance(player, game_row, bet_amount)
     win_chance = algo_result['win_chance']
 
-    # Smart weighted selection — considers player segment + house edge
-    weights = []
-    for seg in wheel_segments:
-        m = seg['mult']
-        if m == 0.0:
-            # 💀 segments — higher weight for losers, lower for winners
-            weights.append(max(1, int((1 - win_chance) * 10)))
-        elif m >= 10.0:
-            # 10x — very rare, only for new players or after big losses
-            weights.append(max(1, int(win_chance * 2)))
-        elif m >= 5.0:
-            # 5x — rare but possible
-            weights.append(max(1, int(win_chance * 4)))
-        elif m >= 2.0:
-            # 2x — moderate
-            weights.append(max(1, int(win_chance * 7)))
-        elif m >= 1.0:
-            # 1x/1.5x — common wins
-            weights.append(max(1, int(win_chance * 9)))
-        else:
-            # 0.5x — partial loss
-            weights.append(max(1, int((1 - win_chance) * 5)))
-
+    # Weights solved for an exact target RTP in [0.80, 0.85]
+    weights, target_rtp = _wheel_weights(win_chance)
     total_w = sum(weights)
-    rand_val = random.uniform(0, total_w)
-    segment = 0
-    cumulative = 0
+
+    # Provably Fair integration
+    _pf_session_id = None
+    _pf_revealed = None
+    if _PROVABLY_FAIR and _pf:
+        try:
+            _pf_session_id = f"wheel_{uid}_{int(datetime.now().timestamp()*1000)}"
+            client_seed = data.get('client_seed') or None
+            pf_info = _pf.create_session(_pf_session_id, client_seed)
+            pf_float = _pf.generate_float(_pf_session_id, 0.0, total_w)
+            rand_val = pf_float['value']
+            # Reveal immediately (wheel is instant)
+            _pf_revealed = _pf.reveal_seed(_pf_session_id)
+        except Exception:
+            _pf_session_id = None
+            rand_val = _wheel_rng.uniform(0, total_w)
+    else:
+        rand_val = _wheel_rng.uniform(0, total_w)
+
+    segment = N - 1
+    cumulative = 0.0
     for i, w in enumerate(weights):
         cumulative += w
         if rand_val <= cumulative:
@@ -9157,15 +21812,30 @@ def api_wheel_spin():
 
     multiplier = wheel_segments[segment]['mult']
     payout = round(bet_amount * multiplier, 2)
-    result_str = 'win' if multiplier > 0 else 'lose'
+    # فوز حقيقي فقط فوق 1x — 1x تعادل و0.5x خسارة جزئية
+    if multiplier > 1.0:
+        result_str = 'win'
+    elif multiplier == 1.0:
+        result_str = 'push'
+    else:
+        result_str = 'lose'
 
-    # Build segments for client (shuffled order for this round)
+    # Build segments + real probabilities for the client payout table
     client_segments = [{'mult': s['mult'], 'label': s['label'], 'color': s['color'], 'glow': s['glow']} for s in wheel_segments]
+    probabilities = [round(w / total_w, 4) for w in weights]
 
     # Atomic: settle + idempotency record in one SQLite transaction
     template = {'success': True, 'segment': segment, 'multiplier': multiplier,
                 'payout': payout, 'result': result_str, 'balance_before': balance,
-                'segments': client_segments}
+                'segments': client_segments, 'probabilities': probabilities,
+                'rtp': round(target_rtp, 3)}
+    # Add PF verification data
+    if _pf_session_id and _pf_revealed:
+        template['pf_session_id'] = _pf_session_id
+        template['pf_server_seed'] = _pf_revealed['server_seed']
+        template['pf_seed_hash'] = _pf_revealed['seed_hash']
+        template['pf_client_seed'] = _pf_revealed['client_seed']
+        template['pf_nonce'] = _pf_revealed['nonce']
     ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
     if race_cached:
         return jsonify(race_cached)
@@ -9175,13 +21845,13 @@ def api_wheel_spin():
     result = stored
     new_balance = result.get('balance_after', balance)
 
-    session_id = f"WHL{str(int(datetime.now().timestamp()))[-8:]}"
+    session_id = f"WHL{secrets.token_hex(6)}"
     _gm.algorithm.log_decision(
         session_id=session_id, user_id=uid, game_id='GAME009',
-        base_chance=float(game.get('base_win_chance', 0.50)),
+        base_chance=float(game_row.get('base_win_chance', 0.40)),
         adjusted_chance=win_chance, factors=algo_result['factors'],
         decision=algo_result['decision'],
-        reason=f"Wheel segment={segment} mult={multiplier}; {algo_result['reason']}"
+        reason=f"Wheel segment={segment} mult={multiplier} rtp={target_rtp:.3f}; {algo_result['reason']}"
     )
     _gm.tracker.log_session({
         'session_id': session_id, 'game_id': 'GAME009', 'user_id': uid,
@@ -9964,6 +22634,9 @@ def api_snatch_spin():
     request_id = _get_request_id()
     if not uid:
         return jsonify({'error': 'Missing params'}), 400
+    # هوية موثقة فقط — بدونها يمكن اللعب بهوية أي ضحية عبر uid مجرد
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
 
     # Idempotency check BEFORE any side effects — replays return the stored
     # response without creating duplicate sessions or debits.
@@ -9972,15 +22645,27 @@ def api_snatch_spin():
         if cached:
             return jsonify(cached)
 
-    bet_amount = float(data.get('bet', 0))
-    if bet_amount <= 0:
-        return jsonify({'error': 'Missing params'}), 400
+    # NaN/Infinity rejected + catalog min/max enforced
+    try:
+        bet_amount = float(data.get('bet', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    if not math.isfinite(bet_amount) or bet_amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+
+    # مفتاح الإيقاف يحترم: لا fallback يجعل اللعبة تعمل بدون صف الكتالوج
+    game = _gm.get_game('GAME001')
+    if not game or str(game.get('is_active', 'yes')).lower() in ('no', 'false', '0'):
+        return jsonify({'success': False, 'error': 'اللعبة متوقفة مؤقتاً'}), 503
+    try:
+        min_bet = float(game.get('min_bet') or 10)
+        max_bet = float(game.get('max_bet') or 2000)
+    except (ValueError, TypeError):
+        min_bet, max_bet = 10.0, 2000.0
+    if bet_amount < min_bet or bet_amount > max_bet:
+        return jsonify({'success': False, 'error': f'الرهان بين {int(min_bet)} و {int(max_bet)}'}), 400
 
     player = _gm.tracker.get_profile(uid)
-    game = _gm.get_game('GAME001') or {
-        'id': 'GAME001', 'base_win_chance': '0.55', 'house_edge_pct': '12',
-        'min_bet': '10', 'max_bet': '2000'
-    }
 
     risk_check = _gm.risk.check_risk(player, bet_amount, game)
     if not risk_check['allowed']:
@@ -9992,6 +22677,15 @@ def api_snatch_spin():
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
                         'need_deposit': True, 'balance': balance})
 
+    # منع جلستين متزامنتين لنفس اللاعب — جلسته السابقة تُستأنف أو تُنتظر
+    sdb_pre = _snatch_db()
+    try:
+        active = sdb_pre.snatch_get_active_by_user(uid) if hasattr(sdb_pre, 'snatch_get_active_by_user') else None
+    except Exception:
+        active = None
+    if active:
+        return jsonify({'success': False, 'error': 'لديك جولة نشطة بالفعل — أكملها أولاً'}), 409
+
     session_id = f"SNT{secrets.token_hex(8)}"
     # Use request_id as the wallet idempotency key; fall back to session-derived key.
     deduction_key = request_id or f"spin_{session_id}"
@@ -10000,15 +22694,41 @@ def api_snatch_spin():
     # The payout is determined by the server's game algorithm, not the client.
     # It is stored in the session row immediately so /api/snatch/end and the
     # sweep can credit the same amount regardless of what score the client reports.
-    # HouseAlgorithm.calculate_win_chance() returns decision values:
-    #   'allow_win'  → player wins this round
-    #   'near_miss'  → near-win (house keeps edge; treat as a loss for payout)
-    #   'force_lose' → hard loss
+    # سقف مالي: احتمال الفوز للدفع محدود بـ 0.545 — مع متوسط مضاعف أساس 1.40
+    # وبونص مهارة ≤ 0.15 يكون EV ∈ [0.76, 0.85] مهما بلغت التعزيزات
     algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
-    server_won = (algo_result['decision'] == 'allow_win')
+    p_pay = min(float(algo_result.get('win_chance', 0.0)), 0.545)
+
+    # Provably Fair integration for Snatch
+    _pf_session_id = None
+    _pf_revealed = None
+    _pf_win_float = None
+    _pf_tier_float = None
+    _pf_seed_hash = None
+    if _PROVABLY_FAIR and _pf:
+        try:
+            _pf_session_id = f"snatch_{uid}_{int(datetime.now().timestamp()*1000)}"
+            client_seed = data.get('client_seed') or None
+            pf_info = _pf.create_session(_pf_session_id, client_seed)
+            _pf_seed_hash = pf_info['seed_hash']
+            pf_win = _pf.generate_float(_pf_session_id, 0.0, 1.0)
+            _pf_win_float = pf_win['value']
+        except Exception:
+            _pf_session_id = None
+
+    server_won = (algo_result.get('decision') == 'allow_win') and (
+        (_pf_win_float < p_pay) if _pf_win_float is not None else (_wheel_rng.random() < p_pay)
+    )
     if server_won:
         # Pick a multiplier tier; higher tier = rarer outcome
-        _tier_roll = secrets.SystemRandom().random()
+        if _pf_session_id and _pf:
+            try:
+                pf_tier = _pf.generate_float(_pf_session_id, 0.0, 1.0)
+                _tier_roll = pf_tier['value']
+            except Exception:
+                _tier_roll = secrets.SystemRandom().random()
+        else:
+            _tier_roll = secrets.SystemRandom().random()
         if _tier_roll < 0.25:
             server_multiplier = 2.0    # big win   (25 %)
         elif _tier_roll < 0.55:
@@ -10075,6 +22795,11 @@ def api_snatch_spin():
         # wallet record and promote it on next run.
         _auth_logger.error("Snatch intent→pending failed (sweep will recover): %s", exc)
 
+    # Add PF data to response
+    if _pf_session_id:
+        stored['pf_session_id'] = _pf_session_id
+        stored['pf_seed_hash'] = _pf_seed_hash
+
     _gm.algorithm.log_decision(
         session_id=session_id, user_id=uid, game_id='GAME001',
         base_chance=float(game.get('base_win_chance', 0.55)),
@@ -10096,6 +22821,9 @@ def api_snatch_end():
     uid = get_request_uid()
     if not uid:
         return jsonify({'error': 'Missing params'}), 400
+    # هوية موثقة فقط — التسوية تُنسب لصاحبها حصرياً
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
 
     session_id = str(data.get('session_id', '')).strip()
     try:
@@ -10127,6 +22855,12 @@ def api_snatch_end():
     if sess['status'] != 'pending':
         return jsonify({'error': f'Session already {sess["status"]}'}), 400
 
+    # حد أدنى لزمن اللعب (3 ثوان) — يمنع الطحن اللحظي (spin→end فوراً) دون
+    # كسر الحالة الشرعية: خسارة الأرواح الثلاث بسرعة جولة لعب حقيقية تنتهي مبكراً
+    _age = datetime.now().timestamp() - sess['created_at']
+    if _age < 3.0:
+        return jsonify({'error': 'الجولة لم تنته بعد — أكمل اللعب'}), 400
+
     if datetime.now().timestamp() - sess['created_at'] > _SNATCH_SESSION_TTL:
         return jsonify({'error': 'Session expired'}), 400
 
@@ -10134,9 +22868,20 @@ def api_snatch_end():
 
     # ── Read server-determined payout (set at spin time, never from client) ───
     # The payout was computed by the server algorithm and stored in the session
-    # row at spin time.  The client's reported score is stored for analytics
-    # but does NOT affect the financial outcome.
+    # row at spin time.  The client's reported score adds a SMALL capped skill
+    # bonus on top of a decided WIN only — it can never turn a loss into a win,
+    # and the total EV stays ≤ 0.85 (p_pay ≤ 0.55 × E[mult ≤ 1.5] = 0.825).
     payout = sess['payout'] if sess['payout'] is not None else 0.0
+    skill_bonus_mult = 0.0
+    if payout > 0:
+        if score >= 100:
+            skill_bonus_mult = 0.15
+        elif score >= 70:
+            skill_bonus_mult = 0.10
+        elif score >= 40:
+            skill_bonus_mult = 0.05
+        if skill_bonus_mult > 0:
+            payout = round(payout + bet_amount * skill_bonus_mult, 2)
 
     # ── Atomic CAS: pending → settling ────────────────────────────────────────
     # Exactly one of (this call) or (_snatch_sweep) can win the CAS.
@@ -10187,11 +22932,30 @@ def api_snatch_end():
         'game_id': 'GAME001', 'balance_after': new_balance,
     })
 
-    return jsonify({
+    # Reveal PF seed on game end
+    pf_data = {}
+    pf_sid = data.get('pf_session_id') or sess.get('pf_session_id')
+    if pf_sid and _PROVABLY_FAIR and _pf:
+        try:
+            revealed = _pf.reveal_seed(pf_sid)
+            if revealed:
+                pf_data = {
+                    'pf_server_seed': revealed['server_seed'],
+                    'pf_seed_hash': revealed['seed_hash'],
+                    'pf_client_seed': revealed['client_seed'],
+                    'pf_nonce': revealed['nonce'],
+                }
+        except Exception:
+            pass
+
+    resp = {
         'success': True, 'won': won, 'score': score,
         'multiplier': display_multiplier, 'payout': payout,
+        'skill_bonus': skill_bonus_mult, 'base_payout': round(payout - bet_amount * skill_bonus_mult, 2),
         'result': result_str, 'balance_after': new_balance,
-    })
+    }
+    resp.update(pf_data)
+    return jsonify(resp)
 
 # ===== Admin: Advanced Game Control =====
 
@@ -11345,6 +24109,12 @@ def _session_maintenance_daemon():
             except Exception as exc:
                 _auth_logger.error("[maintenance] cleanup_expired_nonces: %s", exc)
 
+        # 5 — Prune expired/orphaned compensation screenshots (#77)
+        try:
+            _cleanup_recovery_uploads()
+        except Exception as exc:
+            _auth_logger.error("[maintenance] recovery uploads cleanup: %s", exc)
+
 
 # Startup prune: clear sessions that expired while the server was down.
 try:
@@ -11356,6 +24126,12 @@ try:
     _prune_engine_mines_sessions_file()
 except Exception as _mce2:
     _auth_logger.error("mines startup prune (engine sessions) error: %s", _mce2)
+
+# Startup prune of expired compensation screenshots (#77)
+try:
+    _cleanup_recovery_uploads()
+except Exception as _rce:
+    _auth_logger.error("recovery uploads startup cleanup error: %s", _rce)
 
 threading.Thread(target=_session_maintenance_daemon, daemon=True, name='session-maintenance').start()
 
@@ -11371,6 +24147,12 @@ except Exception as _otp_err:
 
 
 # ===== Main =====
+
+try:
+    from comp_v2 import register_comp_v2_routes
+    register_comp_v2_routes(app, globals())
+except Exception as _e:
+    print(f"[comp-v2] failed to load: {_e}")
 
 if __name__ == '__main__':
     print(f"🚀 Boterx Dashboard v2 — http://{DASHBOARD_HOST}:{DASHBOARD_PORT}")

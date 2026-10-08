@@ -1,13 +1,21 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js?v=20260823"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
+<meta property="og:title" content="VEX Games — العب واربح">
+<meta property="og:description" content="منصة ألعاب تيليغرام الأقوى — جوائز حقيقية وألعاب مثيرة">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://vex.deals/static/icons/og-domino.jpg?v=20260821b">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://vex.deals/static/icons/og-domino.jpg?v=20260821b">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <title>Plinko — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260816logo">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;background:#0b0e11;font-family:system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
@@ -73,6 +81,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;backg
 .big-win-num{font-size:56px;font-weight:900;font-family:'Courier New',monospace;color:#00e701;text-shadow:0 0 50px rgba(0,231,1,.8)}
 .big-win-text{font-size:16px;color:#fff;margin-top:8px}
 </style>
+<link rel="stylesheet" href="/static/css/bg-logo.css?v=1">
 </head>
 <body>
 <div id="app">
@@ -93,7 +102,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;backg
   <div class="controls-panel">
     <div class="controls-top">
       <div style="flex:1">
-        <div class="opt-label">الصفوف</div>
+        <div class="opt-label" data-i18n="x046">الصفوف</div>
         <div class="opt-box">
           <div class="opt-btn" id="r8" onclick="setRows(8)">8</div>
           <div class="opt-btn active" id="r12" onclick="setRows(12)">12</div>
@@ -102,31 +111,32 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;backg
         </div>
       </div>
       <div style="flex:1">
-        <div class="opt-label">المخاطرة</div>
+        <div class="opt-label" data-i18n="x055">المخاطرة</div>
         <div class="opt-box">
-          <div class="opt-btn active" id="rkL" onclick="setRisk('low')">منخفض</div>
-          <div class="opt-btn" id="rkM" onclick="setRisk('med')">متوسط</div>
-          <div class="opt-btn" id="rkH" onclick="setRisk('high')">عالي</div>
+          <div class="opt-btn active" id="rkL" onclick="setRisk('low')" data-i18n="x177">منخفض</div>
+          <div class="opt-btn" id="rkM" onclick="setRisk('med')" data-i18n="x168">متوسط</div>
+          <div class="opt-btn" id="rkH" onclick="setRisk('high')" data-i18n="x133">عالي</div>
         </div>
       </div>
     </div>
     <div class="controls-mid">
       <button class="ctrl-btn" onclick="adjBet(0.5)">½</button>
-      <input class="bet-inp" type="number" id="betInp" value="10" min="1">
       <button class="ctrl-btn" onclick="adjBet(2)">2×</button>
+      <button class="ctrl-btn" style="color:var(--gold)" onclick="maxBetPlinko()">MAX</button>
+      <input class="bet-inp" type="number" id="betInp" value="10" min="1">
       <div class="auto-section"><span class="auto-label">🔁</span><input class="auto-inp" type="number" id="autoCount" value="1" min="1" max="100"></div>
     </div>
     <div class="drop-btn-wrap">
       <button class="drop-btn" id="dropBtn" ontouchstart="onDropPressStart(event)" ontouchend="onDropPressEnd(event)" onmousedown="onDropPressStart(event)" onmouseup="onDropPressEnd(event)" onmouseleave="onDropPressEnd(event)">
         <div class="power-fill" id="powerFill"></div>
-        <div class="power-text" id="dropBtnText">🎯 إسقاط الكرة</div>
-        <div class="power-hint" id="powerHint">اضغط مع الاستمرار لزيادة القوة</div>
+        <div class="power-text" id="dropBtnText" data-i18n="x230">🎯 إسقاط الكرة</div>
+        <div class="power-hint" id="powerHint" data-i18n="x039">اضغط مع الاستمرار لزيادة القوة</div>
       </button>
     </div>
   </div>
 </div>
 <div class="big-win-overlay" id="bigWin"><div style="text-align:center"><div class="big-win-num" id="bwNum"></div><div class="big-win-text" id="bwTxt"></div></div></div>
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260819b"></script>
 <script>
 'use strict';
 
@@ -136,6 +146,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;backg
 
 var cv = document.getElementById('plinkoCanvas');
 var ctx = cv.getContext('2d');
+pfGameName='plinko';
 var gameArea = document.getElementById('gameArea');
 
 var W = 0, H = 0, DPR = 1;
@@ -168,6 +179,7 @@ function sndJackpot(){[392,523,659,784,1047,1319,1568].forEach(function(f,i){set
 function fmtA(n){return parseFloat(n||0).toLocaleString()}
 
 function adjBet(f){var i=document.getElementById('betInp');i.value=Math.max(1,Math.floor((parseFloat(i.value)||10)*f))}
+function maxBetPlinko(){var bal=parseFloat(document.getElementById('bal')?.textContent?.replace(/,/g,''))||0;document.getElementById('betInp').value=Math.max(1,Math.floor(bal))}
 function setRows(r){if(dropping)return;rows=r;document.querySelectorAll('.opt-btn').forEach(function(b){if(b.id&&b.id.startsWith('r'))b.classList.remove('active')});var rb=document.getElementById('r'+r);if(rb)rb.classList.add('active');initBoard()}
 function setRisk(r){if(dropping)return;risk=r;document.querySelectorAll('.opt-btn').forEach(function(b){if(b.id&&b.id.startsWith('rk'))b.classList.remove('active')});var rk=document.getElementById('rk'+r.charAt(0).toUpperCase());if(rk)rk.classList.add('active');initBoard()}
 
@@ -297,7 +309,7 @@ function onDropPressStart(e){
   var txt=document.getElementById('dropBtnText');
   var hint=document.getElementById('powerHint');
   btn.classList.add('charging');
-  txt.textContent='⚡ شحن...';
+  txt.textContent=I18N.t('y122');
   hint.textContent='0%';
   var startT=Date.now();
   if(powerTimer)clearInterval(powerTimer);
@@ -320,8 +332,8 @@ function onDropPressEnd(e){
   var hint=document.getElementById('powerHint');
   btn.classList.remove('charging');
   fill.style.width='0%';
-  txt.textContent='🎯 إسقاط الكرة';
-  hint.textContent='اضغط مع الاستمرار لزيادة القوة';
+  txt.textContent=I18N.t('x230');
+  hint.textContent=I18N.t('x039');
   // If barely tapped (power < 5), use default power 50
   var finalPower=powerVal<5?50:powerVal;
   powerVal=0;
@@ -334,7 +346,7 @@ function onDropPressEnd(e){
 function dropBall(power){
   if(dropping)return;
   var bet=parseFloat(document.getElementById('betInp').value)||10;
-  if(bet<1){showToast('أدخل مبلغ','error');return}
+  if(bet<1){showToast(I18N.t('y010'),'error');return}
   if(!checkBalanceBeforeBet(bet))return;
   dropping=true;
   document.getElementById('dropBtn').disabled=true;
@@ -360,7 +372,7 @@ function dropBall(power){
     startBall(d.slot,d.multiplier,d.payout,bet,dirs,power);
   })
   .catch(function(){
-    showToast('خطأ في الاتصال','error');
+    showToast(I18N.t('y061'),'error');
     dropping=false;document.getElementById('dropBtn').disabled=false;
   });
 }
@@ -472,13 +484,16 @@ function showResult(mult,payout,bet){
   if(mult>=10){
     sndJackpot();
     document.getElementById('bwNum').textContent='+'+fmtA(payout);
-    document.getElementById('bwTxt').textContent='جائزة كبرى! ('+mult.toFixed(1)+'x)';
+    document.getElementById('bwTxt').textContent=I18N.t('y047')+mult.toFixed(1)+'x)';
     document.getElementById('bigWin').classList.add('show');
     setTimeout(function(){document.getElementById('bigWin').classList.remove('show')},3000);
     haptic('heavy');
   }else if(mult>=2){sndWin(mult);haptic('medium')}
   else if(mult>=1){sndWin(mult)}
   else{sndLose();haptic('light')}
+  if(typeof addGameRound==='function'){
+    addGameRound({game:'plinko',bet:bet||0,payout:payout||0,multiplier:mult,result:mult>=1?'win':'lose'});
+  }
   var ac=parseInt(document.getElementById('autoCount').value)||1;
   if(ac>1){document.getElementById('autoCount').value=ac-1;setTimeout(function(){dropBall(50)},1000)}
 }
@@ -495,5 +510,7 @@ requestAnimationFrame(function(){
   });
 });
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
+<script src="/static/js/auth-gate.js?v=20260818a"></script>
 </body>
 </html>

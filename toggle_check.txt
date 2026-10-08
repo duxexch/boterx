@@ -1,0 +1,20 @@
+2:<html lang="ar" dir="rtl" x-data="baseApp()" :lang="lang" :dir="lang === 'ar' ? 'rtl' : 'ltr'" :class="darkMode ? '' : 'light-mode'">
+83:<body class="bg-slate-900 text-slate-100 font-cairo" :class="darkMode ? 'dark' : ''">
+317:                <button @click="toggleLang()" class="text-slate-400 hover:text-emerald-400 transition px-2 py-1 rounded text-sm font-bold" x-text="lang === 'ar' ? 'EN' : 'ع'" :title="lang === 'ar' ? 'Switch to English' : 'تحويل للعربية'"></button>
+320:                <button @click="toggleDarkMode()" class="text-slate-400 hover:text-emerald-400 transition" :title="t('connected')">
+321:                    <i class="fas fa-moon text-lg" x-show="darkMode"></i>
+322:                    <i class="fas fa-sun text-lg text-emerald-400" x-show="!darkMode"></i>
+632:        darkMode: localStorage.getItem('darkMode') !== 'false',
+638:        lang: localStorage.getItem('lang') || 'ar',
+648:        toggleLang() {
+649:            this.lang = this.lang === 'ar' ? 'en' : 'ar';
+650:            localStorage.setItem('lang', this.lang);
+656:            document.documentElement.lang = this.lang;
+657:            document.documentElement.dir = this.lang === 'ar' ? 'rtl' : 'ltr';
+660:        toggleDarkMode() {
+661:            this.darkMode = !this.darkMode;
+662:            localStorage.setItem('darkMode', this.darkMode);
+667:            if (this.darkMode) {
+925:            const currentLang = localStorage.getItem('lang') || 'ar';
+927:            const demoUrl = baseUrl + '/x/showcase?k=' + token + '&lang=' + currentLang;
+931:                              'Permanent Demo Link (EN): ' + baseUrl + '/x/showcase?k=' + token + '&lang=en\n' +

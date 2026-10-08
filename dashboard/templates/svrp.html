@@ -22,6 +22,14 @@
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
             <i class="fas fa-ticket ml-1"></i> الرموز الترويجية
         </button>
+        <button @click="switchTab('accounts')" :class="activeTab === 'accounts' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-id-card ml-1"></i> حسابات الشركات
+        </button>
+        <button @click="switchTab('web_comp')" :class="activeTab === 'web_comp' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-hand-holding-dollar ml-1"></i> تعويضات الويب
+        </button>
     </div>
 
     <!-- ==================== TAB 1: Wallets ==================== -->
@@ -112,7 +120,8 @@
                         <tr class="border-b border-slate-700 bg-slate-800/80">
                             <th class="text-right px-4 py-3 font-semibold text-slate-400">#</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="user">User</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="type">Type</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الشركة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">رقم الحساب</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="amount">Amount</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="date">Date</th>
@@ -126,7 +135,24 @@
                                 <td class="px-4 py-3 font-medium">
                                     <span x-text="r.user_name || r.user_id || '-'"></span>
                                 </td>
-                                <td class="px-4 py-3 text-xs" x-text="r.type || '-'"></td>
+                                <td class="px-4 py-3 text-xs">
+                                    <span x-text="r.company_name || '-'"></span>
+                                    <template x-if="r.affiliate_link">
+                                        <a :href="r.affiliate_link" target="_blank" rel="noopener"
+                                           class="text-blue-400 hover:text-blue-300 mr-1" title="رابط الأفيليه للتحقق">
+                                            <i class="fas fa-external-link-alt text-[10px]"></i>
+                                        </a>
+                                    </template>
+                                </td>
+                                <td class="px-4 py-3 text-xs font-mono">
+                                    <span x-text="r.account_number || '-'"></span>
+                                    <template x-if="(r.photo_file_id || '').startsWith('web:')">
+                                        <a :href="'/api/svrp/requests/' + r.id + '/screenshot'" target="_blank"
+                                           class="text-amber-400 hover:text-amber-300 mr-1" title="لقطة الشاشة المرفوعة">
+                                            <i class="fas fa-image text-[11px]"></i>
+                                        </a>
+                                    </template>
+                                </td>
                                 <td class="px-4 py-3 font-semibold" x-text="fmtAmount(r.amount, r.currency)"></td>
                                 <td class="px-4 py-3">
                                     <span x-html="statusBadge(r.status || 'pending')"></span>
@@ -150,7 +176,7 @@
                             </tr>
                         </template>
                         <tr x-show="recoveryRequests.length === 0">
-                            <td colspan="7" class="px-4 py-10 text-center text-slate-500">
+                            <td colspan="8" class="px-4 py-10 text-center text-slate-500">
                                 <i class="fas fa-rotate-left text-4xl mb-3 block opacity-30"></i>
                                 <p>لا توجد طلبات استرداد</p>
                             </td>
@@ -235,6 +261,62 @@
                             <td colspan="7" class="px-4 py-10 text-center text-slate-500">
                                 <i class="fas fa-gift text-4xl mb-3 block opacity-30"></i>
                                 <p>لا توجد طلبات مكافآت</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TAB: Company Accounts (Compensation registrations) ==================== -->
+    <div x-show="activeTab === 'accounts'">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">#</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="user">User</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الشركة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">رقم الحساب</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">فتح الحساب</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="date">Date</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="a in compAccounts" :key="a.id">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="px-4 py-3 text-slate-500 text-xs" x-text="a.id"></td>
+                                <td class="px-4 py-3 font-medium" x-text="a.user_id"></td>
+                                <td class="px-4 py-3" x-text="a.company_name || a.company_id"></td>
+                                <td class="px-4 py-3 font-mono text-xs" x-text="a.account_number"></td>
+                                <td class="px-4 py-3 text-xs" x-text="a.account_source === 'new' ? '🆕 عبر الرابط' : (a.account_source === 'existing' ? '🕘 حساب مسبق' : '-')"></td>
+                                <td class="px-4 py-3"><span x-html="statusBadge(a.status || 'active')"></span></td>
+                                <td class="px-4 py-3 text-slate-400 text-xs" x-text="a.created_at || '-'"></td>
+                                <td class="px-4 py-3">
+                                    <template x-if="a.status === 'pending'">
+                                        <div class="flex items-center gap-1">
+                                            <button @click="decideAccount(a, 'approve')" x-show="rbac('approve_deposits')"
+                                                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-500/20 text-green-400 hover:bg-green-500/30 transition">
+                                                <i class="fas fa-check text-xs"></i> تأكيد
+                                            </button>
+                                            <button @click="decideAccount(a, 'reject')" x-show="rbac('approve_deposits')"
+                                                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition">
+                                                <i class="fas fa-times text-xs"></i> رفض
+                                            </button>
+                                        </div>
+                                    </template>
+                                    <span x-show="a.status !== 'pending'" class="text-xs text-slate-500">-</span>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="compAccounts.length === 0">
+                            <td colspan="8" class="px-4 py-10 text-center text-slate-500">
+                                <i class="fas fa-id-card text-4xl mb-3 block opacity-30"></i>
+                                <p>لا توجد حسابات مسجلة</p>
                             </td>
                         </tr>
                     </tbody>
@@ -352,6 +434,106 @@
             </div>
         </div>
     </div>
+
+    <!-- ==================== TAB 6: Web Compensation Requests ==================== -->
+    <div x-show="activeTab === 'web_comp'">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">#</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المستخدم</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الشركة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">رقم الحساب</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الحالة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">التاريخ</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="r in webCompRequests" :key="r.id">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="px-4 py-3 text-slate-500 text-xs" x-text="r.id"></td>
+                                <td class="px-4 py-3 font-medium">
+                                    <span x-text="r.user_id"></span>
+                                </td>
+                                <td class="px-4 py-3 text-xs" x-text="r.company_name || '-'"></td>
+                                <td class="px-4 py-3 text-xs font-mono" x-text="r.account_number || '-'"></td>
+                                <td class="px-4 py-3">
+                                    <span x-show="r.status==='pending'" class="inline-flex items-center gap-1 bg-yellow-500/20 text-yellow-400 text-xs font-semibold px-2.5 py-1 rounded-full">
+                                        <i class="fas fa-clock"></i> بانتظار المراجعة
+                                    </span>
+                                    <span x-show="r.status==='approved'" class="inline-flex items-center gap-1 bg-green-500/20 text-green-400 text-xs font-semibold px-2.5 py-1 rounded-full">
+                                        <i class="fas fa-check"></i> تم التعويض
+                                    </span>
+                                    <span x-show="r.status==='rejected'" class="inline-flex items-center gap-1 bg-red-500/20 text-red-400 text-xs font-semibold px-2.5 py-1 rounded-full">
+                                        <i class="fas fa-times"></i> مرفوض
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-xs text-slate-400" x-text="r.created_at"></td>
+                                <td class="px-4 py-3">
+                                    <template x-if="r.status==='pending'">
+                                        <div class="flex items-center gap-2">
+                                            <template x-if="r.screenshot">
+                                                <a :href="'/api/comp/admin/requests/' + r.id + '/screenshot'" target="_blank"
+                                                   class="text-amber-400 hover:text-amber-300" title="لقطة الشاشة">
+                                                    <i class="fas fa-image text-sm"></i>
+                                                </a>
+                                            </template>
+                                            <button @click="approveWebComp(r)" class="text-green-400 hover:text-green-300 text-xs font-semibold px-2 py-1 rounded bg-green-500/10">
+                                                <i class="fas fa-check ml-1"></i> قبول
+                                            </button>
+                                            <button @click="rejectWebComp(r)" class="text-red-400 hover:text-red-300 text-xs font-semibold px-2 py-1 rounded bg-red-500/10">
+                                                <i class="fas fa-times ml-1"></i> رفض
+                                            </button>
+                                        </div>
+                                    </template>
+                                    <template x-if="r.status!=='pending'">
+                                        <span class="text-xs text-slate-500" x-text="r.reviewed_at || '-'"></span>
+                                    </template>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="webCompRequests.length === 0">
+                            <td colspan="7" class="px-4 py-10 text-center text-slate-500">
+                                <i class="fas fa-hand-holding-dollar text-4xl mb-3 block opacity-30"></i>
+                                <p>لا توجد طلبات تعويض من الويب</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Approve Modal -->
+        <div x-show="showWebCompApproveModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showWebCompApproveModal = false">
+            <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg shadow-2xl" @click.stop="">
+                <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                    <h3 class="text-lg font-bold">الموافقة على التعويض</h3>
+                    <button @click="showWebCompApproveModal = false" class="text-slate-400 hover:text-white transition">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
+                </div>
+                <div class="p-5 space-y-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">المبلغ (USD) <span class="text-red-400">*</span></label>
+                        <input x-model="webCompApproveAmount" type="number" step="any" min="0" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="0.00">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">ملاحظة (اختياري)</label>
+                        <input x-model="webCompApproveNote" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="ملاحظة...">
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button @click="confirmWebCompApprove()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">
+                            <i class="fas fa-check ml-1"></i> تأكيد الموافقة
+                        </button>
+                        <button @click="showWebCompApproveModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -377,6 +559,13 @@ function svrpPage() {
         approvalAmount: '',
         approvalTarget: null,
         approvalType: null,
+        compAccounts: [],
+        // Web Compensation
+        webCompRequests: [],
+        showWebCompApproveModal: false,
+        webCompApproveAmount: '',
+        webCompApproveNote: '',
+        webCompApproveTarget: null,
 
         get filteredWallets() {
             const q = (this.walletSearch || '').toLowerCase();
@@ -423,6 +612,30 @@ function svrpPage() {
                 this.bonusRequests = data.requests || data || [];
             } catch (e) {
                 toast('فشل تحميل طلبات المكافآت', 'error');
+            }
+        },
+
+        // ─── Company accounts (compensation registrations) ───
+        async loadAccounts() {
+            try {
+                const data = await api('/api/comp/admin/data');
+                this.compAccounts = data.accounts || [];
+            } catch (e) {
+                toast('فشل تحميل حسابات الشركات', 'error');
+            }
+        },
+
+        async decideAccount(a, action) {
+            if (action === 'reject' && !confirm('رفض هذا الحساب؟')) return;
+            try {
+                await api(`/api/comp/admin/account/${a.id}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ action }),
+                });
+                toast(action === 'approve' ? 'تم تأكيد الحساب وإشعار المستخدم' : 'تم رفض الحساب', 'success');
+                await this.loadAccounts();
+            } catch (e) {
+                toast('فشل تنفيذ الإجراء', 'error');
             }
         },
 
@@ -528,6 +741,55 @@ function svrpPage() {
             if (tab === 'recovery') await this.loadRecovery();
             if (tab === 'bonus') await this.loadBonus();
             if (tab === 'promo') await this.loadPromo();
+            if (tab === 'accounts') await this.loadAccounts();
+            if (tab === 'web_comp') await this.loadWebCompRequests();
+        },
+
+        // ─── Web Compensation Requests ───
+        async loadWebCompRequests() {
+            try {
+                const data = await api('/api/comp/admin/requests');
+                this.webCompRequests = data.requests || [];
+            } catch (e) {
+                toast('فشل تحميل طلبات التعويض', 'error');
+            }
+        },
+
+        approveWebComp(r) {
+            this.webCompApproveTarget = r;
+            this.webCompApproveAmount = '';
+            this.webCompApproveNote = '';
+            this.showWebCompApproveModal = true;
+        },
+
+        async confirmWebCompApprove() {
+            if (!this.webCompApproveTarget) return;
+            try {
+                await api(`/api/comp/admin/requests/${this.webCompApproveTarget.id}/approve`, {
+                    method: 'POST',
+                    body: JSON.stringify({ amount: this.webCompApproveAmount, note: this.webCompApproveNote }),
+                });
+                toast('تمت الموافقة على التعويض', 'success');
+                this.showWebCompApproveModal = false;
+                this.webCompApproveTarget = null;
+                await this.loadWebCompRequests();
+            } catch (e) {
+                toast('فشلت الموافقة', 'error');
+            }
+        },
+
+        async rejectWebComp(r) {
+            if (!confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
+            try {
+                await api(`/api/comp/admin/requests/${r.id}/reject`, {
+                    method: 'POST',
+                    body: JSON.stringify({ note: 'مرفوض' }),
+                });
+                toast('تم رفض الطلب', 'success');
+                await this.loadWebCompRequests();
+            } catch (e) {
+                toast('فشل الرفض', 'error');
+            }
         },
     };
 }

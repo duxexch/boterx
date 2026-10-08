@@ -1,0 +1,5 @@
+4:const I18N = {
+485:    const dict = I18N[lang] || I18N.ar;
+486:    const fallback = dict[key] || I18N.ar[key] || key;
+487:    if (window.ADMIN_I18N_RUNTIME && typeof window.ADMIN_I18N_RUNTIME.translate === 'function') {
+488:        return window.ADMIN_I18N_RUNTIME.translate(fallback);

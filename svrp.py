@@ -182,11 +182,12 @@ class SVRPManager:
 
     RECOVERY_REQUEST_FIELDS = [
         'id', 'user_id', 'customer_id', 'photo_file_id', 'status',
-        'recovery_amount', 'admin_note', 'created_at', 'approved_at', 'approved_by'
+        'recovery_amount', 'admin_note', 'created_at', 'approved_at', 'approved_by',
+        'company_id', 'company_name', 'account_number'
     ]
 
     SVRP_COMPANY_FIELDS = [
-        'id', 'name', 'registration_url', 'bonus_percentage', 'is_active', 'created_at'
+        'id', 'name', 'registration_url', 'bonus_percentage', 'is_active', 'show_in_comp', 'icon_url', 'description', 'created_at'
     ]
 
     USER_COMPANY_ACCOUNT_FIELDS = [
@@ -221,6 +222,26 @@ class SVRPManager:
                     writer = csv.writer(f)
                     writer.writerow(fields)
                 logger.info(f"Created recovery file: {filename}")
+            else:
+                self._migrate_csv_header(filename, fields)
+
+    def _migrate_csv_header(self, filename, fields):
+        """Add newly-introduced columns to an existing CSV (idempotent).
+
+        _append_csv writes rows positionally against the file's ORIGINAL
+        header, so appending rows with new fields to an old-header file would
+        misalign columns — the header must be upgraded first."""
+        try:
+            with open(filename, 'r', encoding='utf-8-sig') as f:
+                reader = csv.reader(f)
+                header = next(reader, None)
+            if header is None or set(fields) <= set(header):
+                return
+            rows = self._read_csv(filename)
+            if self._write_csv(filename, rows, fields):
+                logger.info(f"Migrated {filename} header → {fields}")
+        except Exception as e:
+            logger.error(f"خطأ في ترحيل {filename}: {e}")
 
     # ==================== أدوات مساعدة ====================
 
@@ -1132,11 +1153,12 @@ class SVRPManager:
 
     # ==================== معالجة كود الإحالة ====================
 
-    def process_referral_code(self, referrer_customer_id, referred_telegram_id):
+    def process_referral_code(self, referrer_customer_id, referred_telegram_id, referred_is_existing=False):
         """
         ربط كود الإحالة بالمستخدم الجديد
         referrer_customer_id: رقم عميل المُحيل (من كود REFxxxx)
         referred_telegram_id: معرف تلجرام المستخدم الجديد
+        referred_is_existing: الصديق لديه حساب بالفعل — نص فك التجميد (5% بدل 10%)
         """
         try:
             # العثور على المُحيل في users.csv
@@ -1169,7 +1191,7 @@ class SVRPManager:
                 'referrer_customer_id': referrer_customer_id,
                 'referred_id': str(referred_telegram_id),
                 'referred_phone': '',
-                'status': 'registered',
+                'status': 'existing' if referred_is_existing else 'registered',
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
                 'reward_given': 'no'
             }
@@ -1178,7 +1200,22 @@ class SVRPManager:
                               'referred_id', 'referred_phone', 'status',
                               'created_at', 'reward_given'])
 
-            logger.info(f"Recovery: Referral processed — referrer {referrer_tid} → {referred_telegram_id}")
+            logger.info(f"Recovery: Referral processed — referrer {referrer_tid} → {referred_telegram_id} (existing={referred_is_existing})")
+
+            # قاعدة فك التجميد: كل صديق جديد يسجل بكود الإحالة يفك 10% من
+            # الرصيد المجمد للمُحيل. لو الصديق لديه حساب بالفعل — النصف (5%).
+            unlock_pct = 0.05 if referred_is_existing else 0.10
+            try:
+                wallet = self.get_wallet(referrer_tid)
+                frozen = float(wallet.get('balance', 0) or 0)
+                if frozen > 0:
+                    self.unfreeze_balance(referrer_tid, round(frozen * unlock_pct, 6))
+                    logger.info(f"Referral unlock: {unlock_pct:.0%} of frozen unfrozen for referrer {referrer_tid}")
+            except Exception as _ue:
+                logger.warning(f"Referral unlock failed for {referrer_tid}: {_ue}")
+
+            if referred_is_existing:
+                return True, "تم ربط الصديق (حساب موجود بالفعل) — فُك لك 5% من الرصيد المجمد"
             return True, "تم ربط كود الإحالة بنجاح"
 
         except Exception as e:
@@ -1195,14 +1232,18 @@ class SVRPManager:
 
     # ==================== طلبات الاسترداد بلقطة شاشة ====================
 
-    def create_recovery_request(self, user_id, customer_id, photo_file_id):
-        """إنشاء طلب استرداد جديد بلقطة شاشة"""
+    def create_recovery_request(self, user_id, customer_id, photo_file_id,
+                                company_id='', company_name='', account_number=''):
+        """إنشاء طلب استرداد جديد بلقطة شاشة مرتبط بشركة وحساب مسجل"""
         req_id = self._generate_id('REC')
         row = {
             'id': req_id,
             'user_id': str(user_id),
             'customer_id': customer_id or '',
             'photo_file_id': photo_file_id,
+            'company_id': company_id or '',
+            'company_name': company_name or '',
+            'account_number': account_number or '',
             'status': 'pending',
             'recovery_amount': '',
             'admin_note': '',
@@ -1210,9 +1251,34 @@ class SVRPManager:
             'approved_at': '',
             'approved_by': ''
         }
-        self._append_csv('recovery_requests.csv', row, self.RECOVERY_REQUEST_FIELDS)
+        if not self._append_csv('recovery_requests.csv', row, self.RECOVERY_REQUEST_FIELDS):
+            logger.error(f"Recovery request persist FAILED for user {user_id}")
+            return None
         logger.info(f"Recovery request created: {req_id} by user {user_id}")
         return req_id
+
+    def create_recovery_request_if_no_pending(self, user_id, customer_id,
+                                              photo_file_id, company_id,
+                                              company_name='', account_number=''):
+        """إنشاء طلب تعويض بشرط عدم وجود طلب معلق لنفس المستخدم/الشركة — ذرّي.
+
+        الفحص والإنشاء داخل svrp_lock واحد فيستحيل أن يمرّ طلبان متزامنان
+        بالفحص معاً (سباق مالي: طلبان معلقان قد يُعتمدان مرتين).
+        Returns (req_id, None) on success or (None, error_msg) on conflict/failure.
+        """
+        with svrp_lock():
+            for r in self._read_csv('recovery_requests.csv'):
+                if (str(r.get('user_id', '')) == str(user_id)
+                        and r.get('status') == 'pending'
+                        and r.get('company_id', '') == str(company_id)):
+                    return None, 'لديك طلب تعويض معلق بالفعل لهذه الشركة'
+            req_id = self.create_recovery_request(
+                user_id, customer_id, photo_file_id,
+                company_id=str(company_id), company_name=company_name,
+                account_number=account_number)
+            if not req_id:
+                return None, 'فشل حفظ الطلب — حاول مجدداً'
+            return req_id, None
 
     def get_pending_recovery_requests(self):
         """الحصول على طلبات الاسترداد المعلقة"""
@@ -1374,49 +1440,54 @@ class SVRPManager:
         else:
             friend_count = len(unique_friends)
         
-        # ── الخصم والإضافة داخل قفل واحد لضمان الاتساق ───────────────────────
+        # ── التحويل الذرّي عبر SQLite (المصدر الموثوق) ثم مرآة CSV ───────────
         with svrp_lock():
-            # إعادة القراءة داخل القفل (أحدث حالة)
-            sender_wallet2  = self.get_wallet(tid)
-            sender_balance2 = float(sender_wallet2.get('balance', 0) or 0)
-            sender_used2    = float(sender_wallet2.get('total_used', 0) or 0)
-            max_per_friend2 = sender_balance2 * 0.25
-
-            if amount > max_per_friend2:
-                return False, f"الحد الأقصى لكل صديق: {max_per_friend2:.2f}"
-            if amount <= 0 or sender_balance2 <= 0:
-                return False, "المبلغ أو الرصيد غير صالح"
-
-            # 1. خصم من المرسل (SQLite delta first, then CSV)
+            transfer_id = self._generate_id('TRF')
             try:
                 from game_engine import GameManager as _GM
                 _gm_s = _GM()
-                _gm_s.delta_update_svrp_wallet(
-                    tid,
-                    frozen_balance_delta=-float(amount),
-                    total_used_delta=float(amount)
-                )
-                _gm_s.delta_update_svrp_wallet(
-                    str(receiver_tid),
-                    frozen_balance_delta=float(amount),
-                    total_earned_delta=float(amount)
-                )
+                # الرصيد الموثوق من SQLite — لا نعتمد على مرآة CSV في التفويض
+                sql_row = _gm_s.get_svrp_frozen_balance(tid) or {}
+                sender_balance2 = float(sql_row.get('frozen_balance', 0) or 0)
             except Exception as _se:
-                logger.warning(f'send_frozen_credits SQLite delta failed: {_se}')
-            self._update_wallet(tid, {
-                'balance':    round(sender_balance2 - amount, 6),
-                'total_used': round(sender_used2    + amount, 6),
-            })
+                logger.error(f'send_frozen_credits: SQLite unavailable: {_se}')
+                return False, "الخدمة غير متاحة حالياً — حاول لاحقاً"
 
-            # 2. إضافة للمستلم (مجمد) — قراءة حديثة داخل القفل (CSV mirror)
+            if amount <= 0 or sender_balance2 <= 0:
+                return False, "المبلغ أو الرصيد غير صالح"
+            if amount > sender_balance2 * 0.25:
+                return False, f"الحد الأقصى لكل صديق: {sender_balance2 * 0.25:.2f}"
+
+            # قاعدة فك التجميد: تحويل ≥10% من الرصيد المجمد لصديق مستخدم بالفعل
+            # يفك تجميد 5% إضافية للمرسل. المبلغ المحوَّل نفسه يذهب مجمداً للمستلم.
+            unlock_bonus = 0.0
+            if amount >= sender_balance2 * 0.10:
+                unlock_bonus = round(sender_balance2 * 0.05, 6)
+                unlock_bonus = min(unlock_bonus, max(0.0, sender_balance2 - amount))
+
+            # عملية واحدة ذرّية: خصم المرسل + مكافأة الفك + إضافة المستلم + سجل idempotent
+            try:
+                ok, result = _gm_s.transfer_svrp_frozen_p2p(
+                    transfer_id, tid, str(receiver_tid), float(amount), unlock_bonus)
+            except Exception as _te:
+                logger.error(f'send_frozen_credits p2p failed: {_te}')
+                return False, "فشل التحويل — لم يتم خصم أي مبلغ"
+            if not ok:
+                return False, result or "فشل التحويل"
+
+            # مرآة CSV (عرض فقط — SQLite هو المصدر الموثوق)
+            sender_wallet2 = self.get_wallet(tid)
+            self._update_wallet(tid, {
+                'balance':    round(max(0.0, float(sender_wallet2.get('balance', 0) or 0) - amount - unlock_bonus), 6),
+                'total_used': round(float(sender_wallet2.get('total_used', 0) or 0) + unlock_bonus, 6),
+            })
             receiver_wallet = self.get_wallet(receiver_tid)
             self._update_wallet(receiver_tid, {
                 'balance':      round(float(receiver_wallet.get('balance', 0) or 0)    + amount, 6),
                 'total_earned': round(float(receiver_wallet.get('total_earned', 0) or 0) + amount, 6),
             })
 
-            # 3. تسجيل التحويل
-            transfer_id = self._generate_id('TRF')
+            # سجل التحويل (CSV — للعرض وعدّ الأصدقاء)
             transfer = {
                 'id': transfer_id,
                 'sender_id': tid,
@@ -1427,9 +1498,71 @@ class SVRPManager:
             self._append_csv('svrp_transfers.csv', transfer,
                 ['id', 'sender_id', 'receiver_id', 'amount', 'created_at'])
 
-        logger.info(f"SVRP transfer: {tid} → {receiver_tid} amount={amount}")
-        remaining = max(0, 4 - friend_count)
-        return True, f"✅ تم إرسال {amount:.2f} للعميل {receiver_customer_id}\n💰 تم فك تجميد {amount:.2f} من رصيدك\n👥 عدد أصدقائك: {friend_count}/4\n{'⏳ تحتاج {0} أصدقاء آخرين لفك التجميد الكامل'.format(remaining) if remaining > 0 else '🎉 أكملت 4 أصدقاء!'}"
+        logger.info(f"SVRP transfer: {tid} → {receiver_tid} amount={amount} unlock_bonus={unlock_bonus}")
+        msg = f"✅ تم إرسال {amount:.2f} للعميل {receiver_customer_id} (يصل رصيداً مجمداً بنفس شروط الفك)"
+        if unlock_bonus > 0:
+            msg += f"\n💰 تم فك تجميد {unlock_bonus:.2f} (5%) من رصيدك لأنك حولت 10% أو أكثر"
+        else:
+            msg += f"\n⏳ حوّل 10% أو أكثر من رصيدك المجمد ليُفك لك 5%"
+        return True, msg
+
+    def send_frozen_credits_direct(self, sender_telegram_id, receiver_telegram_id, amount, is_claim=False):
+        """إرسال رصيد مجمد مباشرة عبر telegram_id (بدون customer_id lookup).
+        يُستخدم لروابط claim لمرة واحدة."""
+        tid = str(sender_telegram_id)
+        receiver_tid = str(receiver_telegram_id)
+        if tid == receiver_tid:
+            return False, "لا يمكنك إرسال رصيد لنفسك"
+        amount = float(amount)
+        if amount <= 0:
+            return False, "المبلغ يجب أن يكون أكبر من صفر"
+        try:
+            from game_engine import GameManager as _GM_d
+            transfer_id = self._generate_id('TRF')
+            # unfreeze bonus: claim = "new friend" → 10%, existing = 5%
+            unlock_pct = 0.10 if is_claim else 0.05
+            try:
+                frozen_bal = float(_GM_d.get_svrp_frozen_balance(tid).get('frozen_balance', 0) or 0)
+                unlock_bonus = round(frozen_bal * unlock_pct, 2)
+                if unlock_bonus < 0.01:
+                    unlock_bonus = 0.0
+            except Exception:
+                unlock_bonus = 0.0
+            # خصم من المرسل + إضافة للمستلم (atomic)
+            success, _bal = _GM_d.transfer_svrp_frozen_p2p(
+                transfer_id, tid, receiver_tid, amount, unlock_bonus)
+            if not success:
+                return False, "رصيدك المجمد غير كافٍ"
+            # Mirror to CSV wallets
+            self._mirror_p2p_transfer(tid, receiver_tid, amount)
+            # Record in transfers CSV
+            self._append_csv('svrp_transfers.csv', {
+                'id': transfer_id,
+                'sender_id': tid,
+                'receiver_id': receiver_tid,
+                'amount': str(round(amount, 2)),
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            }, ['id', 'sender_id', 'receiver_id', 'amount', 'created_at'])
+            logger.info(f"SVRP direct transfer: {tid} → {receiver_tid} amount={amount} claim={is_claim} unlock={unlock_bonus}")
+            msg = f"✅ تم استلام {amount:.2f} رصيد مجمد"
+            if unlock_bonus > 0:
+                msg += f" + فك تجميد {unlock_bonus:.2f}"
+            return True, msg
+        except Exception as e:
+            logger.error(f"send_frozen_credits_direct failed: {e}")
+            return False, "فشل الإرسال — حاول مجدداً"
+
+    def _mirror_p2p_transfer(self, sender_tid, receiver_tid, amount):
+        """تحديث CSV wallets بعد تحويل مباشر."""
+        wallets = self._read_csv('svrp_wallets.csv')
+        sender_w = next((w for w in wallets if w.get('telegram_id') == sender_tid), None)
+        receiver_w = next((w for w in wallets if w.get('telegram_id') == receiver_tid), None)
+        if sender_w:
+            sender_w['balance'] = str(round(float(sender_w.get('balance', 0) or 0) - amount, 6))
+        if receiver_w:
+            receiver_w['balance'] = str(round(float(receiver_w.get('balance', 0) or 0) + amount, 6))
+            receiver_w['total_earned'] = str(round(float(receiver_w.get('total_earned', 0) or 0) + amount, 6))
+        self._write_csv('svrp_wallets.csv', wallets, self.WALLET_FIELDS)
 
     # ==================== شركات الاسترداد ====================
 
@@ -1450,12 +1583,19 @@ class SVRPManager:
         return None
 
     def get_recovery_companies(self, active_only=True):
-        """جلب شركات الاسترداد من ملف الشركات الرئيسي companies.csv"""
+        """جلب شركات الاسترداد من ملف الشركات الرئيسي companies.csv
+
+        يحترم علم show_in_comp من لوحة الأدمن: الشركة المخفية من قسم
+        التعويض لا تظهر هنا (نفس سلوك الويب في /api/player/companies).
+        """
         rows = self._read_csv('companies.csv')
         result = []
         for r in rows:
             is_active = r.get('is_active', '').lower() in ['active', 'yes', '1', 'true']
             if active_only and not is_active:
+                continue
+            show_in_comp = (r.get('show_in_comp', '') or 'yes').strip().lower()
+            if show_in_comp in ('no', '0', 'false'):
                 continue
             result.append({
                 'id': r.get('id', ''),
@@ -1465,7 +1605,8 @@ class SVRPManager:
                 'bonus_percentage': '10',
                 'is_active': 'yes' if is_active else 'no',
                 'icon': r.get('icon', ''),
-                'details': r.get('details', '')
+                'details': r.get('details', ''),
+                'promo_code': (r.get('promo_code', '') or '').strip()
             })
         return result
 
@@ -1476,6 +1617,11 @@ class SVRPManager:
         if len(new_rows) < len(rows):
             return self._write_csv('svrp_companies.csv', new_rows, self.SVRP_COMPANY_FIELDS)
         return False
+
+    def get_companies_for_comp(self):
+        """إرجاع الشركات المتاحة للتسجيل في قسم التعويض (show_in_comp=yes, is_active=yes)"""
+        rows = self._read_csv('svrp_companies.csv')
+        return [r for r in rows if r.get('is_active') in ('yes', 'true', True) and r.get('show_in_comp') in ('yes', 'true', True)]
 
     # ==================== حسابات المستخدمين في الشركات ====================
 
@@ -1494,11 +1640,11 @@ class SVRPManager:
             'company_id': company_id,
             'company_name': company_name,
             'account_number': account_number,
-            'status': 'active',
+            'status': 'pending',
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
         }
         if self._append_csv('user_company_accounts.csv', row, self.USER_COMPANY_ACCOUNT_FIELDS):
-            return True, f"✅ تم تسجيل حسابك في {company_name}"
+            return True, f"✅ تم إرسال طلب تسجيل حسابك في {company_name} — بانتظار تأكيد الإدارة"
         return False, "❌ فشل في التسجيل"
 
     def get_user_company_accounts(self, user_id):
@@ -1530,6 +1676,8 @@ class SVRPManager:
         account = self.get_user_company_account(user_id, company_id)
         if not account:
             return None, "يجب تسجيل رقم حسابك أولاً"
+        if (account.get('status') or 'active') not in ('active', 'approved'):
+            return None, "حسابك بانتظار تأكيد الإدارة — سيتم إشعارك فور التأكيد"
 
         # نسبة المكافأة الافتراضية
         bonus_pct = 10
@@ -1719,63 +1867,6 @@ class SVRPManager:
         }
 
     # ==================== نظام الاسترداد بلقطة شاشة ====================
-
-    RECOVERY_FIELDS = [
-        'id', 'user_id', 'customer_id', 'photo_file_id', 'status',
-        'recovery_amount', 'admin_note', 'admin_id', 'created_at', 'approved_at'
-    ]
-
-    def init_recovery_requests_file(self):
-        """إنشاء ملف طلبات الاسترداد"""
-        if not os.path.exists('recovery_requests.csv'):
-            with open('recovery_requests.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.writer(f)
-                writer.writerow(self.RECOVERY_FIELDS)
-            logger.info("Created recovery_requests.csv")
-
-    def create_recovery_request(self, user_id, customer_id, photo_file_id):
-        """إنشاء طلب استرداد بلقطة شاشة"""
-        self.init_recovery_requests_file()
-        req_id = f"REC{datetime.now().strftime('%Y%m%d%H%M%S')}{random.randint(10,99)}"
-        row = {
-            'id': req_id,
-            'user_id': str(user_id),
-            'customer_id': customer_id,
-            'photo_file_id': photo_file_id,
-            'status': 'pending',
-            'recovery_amount': '0',
-            'admin_note': '',
-            'admin_id': '',
-            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
-            'approved_at': ''
-        }
-        self._append_csv('recovery_requests.csv', row, self.RECOVERY_FIELDS)
-        logger.info(f"Recovery request created: {req_id} for user {user_id}")
-        return req_id
-
-    def get_recovery_request(self, req_id):
-        """الحصول على طلب استرداد"""
-        rows = self._read_csv('recovery_requests.csv')
-        for row in rows:
-            if row['id'] == req_id:
-                return row
-        return None
-
-    def get_pending_recovery_requests(self):
-        """الحصول على طلبات الاسترداد المعلقة"""
-        rows = self._read_csv('recovery_requests.csv')
-        return [r for r in rows if r.get('status') == 'pending']
-
-    def reject_recovery_request(self, req_id, admin_id, note=''):
-        """رفض طلب استرداد"""
-        rows = self._read_csv('recovery_requests.csv')
-        for row in rows:
-            if row['id'] == req_id:
-                row['status'] = 'rejected'
-                row['admin_note'] = note
-                row['admin_id'] = str(admin_id)
-                row['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-                self._write_csv('recovery_requests.csv', rows, self.RECOVERY_FIELDS)
-                logger.info(f"Recovery rejected: {req_id}")
-                return True, "تم رفض الطلب"
-        return False, "الطلب غير موجود"
+    # (التطبيق الأساسي أعلاه — create/get/reject/approve_recovery_request.
+    #  حُذفت النسخة القديمة المكررة التي كانت تتجاوز التطبيق الأساسي
+    #  وتكتب بمخطط أعمدة قديم غير متوافق.)

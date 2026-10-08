@@ -1,0 +1,7 @@
+/health: 200
+/api/stats: 200
+/api/notifications: 404
+/api/users?limit=1: 200
+/api/agents?limit=1: 200
+/api/transactions?limit=1: 200
+/x/showcase?k=eyJzY29wZSI6ImRlY2siLCJleHAiOjAsIm5vbmNlIjoibVFxSFp1aWdLTjVIIiwicGVybWFuZW50Ijp0cnVlfQ.9575f071aa4c3fb15a9c6c5fce498148e2a53749aa1ea6d3bb05f205cf7faf51: 200

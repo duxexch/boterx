@@ -1,0 +1,91 @@
+<div class="bg-slate-800 rounded-xl border border-slate-700 p-4 space-y-3">
+    <div class="flex items-center justify-between"><h3 class="font-bold">🧠 AI Agents</h3><span class="text-xs text-slate-400" x-text="aiAgents.length + ' agent(s)'"></span></div>
+    
+    <!-- Agent List + Form in Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Agent List -->
+        <div class="bg-slate-900/50 rounded-xl border border-slate-700 p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="font-bold">📋 Agents</h4>
+                <button @click="openAddAgentModal()" class="btn btn-primary btn-sm">➕ Add AI Agent</button>
+            </div>
+            <div class="space-y-2 max-h-96 overflow-auto">
+                <template x-for="a in aiAgents" :key="a.id">
+                    <div class="p-3 rounded bg-slate-900/60 border border-slate-700 flex flex-col gap-2" :class="a.is_active === 'yes' ? 'border-green-500/30' : 'opacity-60'">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="font-bold" x-text="a.name"></span>
+                                <span class="ml-2 px-2 py-0.5 rounded text-xs" :class="a.is_active === 'yes' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'" x-text="a.is_active === 'yes' ? '✅ Active' : '⏸️ Inactive'"></span>
+                                <span class="ml-2 px-2 py-0.5 rounded text-xs" :class="providerClass(a.provider)" x-text="providerLabel(a.provider)"></span>
+                            </div>
+                            <div class="flex gap-1">
+                                <button @click="openAgentModal(a)" class="btn btn-sm" style="background:#334155">⚙️ Control</button>
+                                <button @click="testAIAgent(a)" class="btn btn-sm" style="background:#334155">🧪 Test</button>
+                                <button @click="toggleAgentActive(a)" class="btn btn-sm" :class="a.is_active === 'yes' ? 'bg-red-500/20' : 'bg-green-500/20'" x-text="a.is_active === 'yes' ? '⏸️' : '▶️'"></button>
+                                <button @click="deleteAIAgent(a.id)" class="btn btn-danger btn-sm">🗑️</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Agent Detail / Create Form -->
+        <div class="bg-slate-900/50 rounded-xl border border-slate-700 p-4" x-show="editingAgent">
+            <h4 class="font-bold mb-3" x-text="editingAgent ? '✏️ Edit Agent' : '➕ Create New Agent'"></h4>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">🤖 Agent Name *</label>
+                    <input x-model="agentForm.name" class="input w-full" placeholder="e.g., Content Moderator, Deal Finder, Support Bot">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">📝 Job Description / Function *</label>
+                    <textarea x-model="agentForm.job_description" rows="3" class="input w-full" placeholder="Describe what this agent does: e.g., 'Monitor all channels for spam and auto-ban', 'Find best deals across channels and post to deals channel', 'Auto-reply to customer questions with knowledge base'"></textarea>
+                    <p class="text-xs text-slate-500 mt-1">Describe the agent's role, triggers, actions, and decision logic</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">🤖 Provider</label>
+                        <select x-model="agentForm.provider" class="input w-full"><option value="auto">Auto</option><option value="openai">OpenAI</option><option value="claude">Claude</option><option value="kimi">Kimi</option><option value="openrouter">OpenRouter</option></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">🔄 Fallback Provider</label>
+                        <select x-model="agentForm.fallback_provider" class="input"><option value="">No fallback</option><option value="openai">OpenAI</option><option value="claude">Claude</option><option value="kimi">Kimi</option><option value="openrouter">OpenRouter</option></select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">🔑 API Key (per agent)</label>
+                    <input x-model="agentForm.api_key" type="password" class="input w-full font-mono" placeholder="sk-... (optional, uses provider default if empty)">
+                    <p class="text-xs text-slate-500 mt-1">Optional: Override provider default with agent-specific key</p>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">🔧 Custom Base URL (optional)</label>
+                    <input x-model="agentForm.base_url" type="text" class="input w-full" placeholder="e.g., https://openrouter.ai/api/v1">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">📋 Default Model</label>
+                    <input x-model="agentForm.default_model" type="text" class="input w-full" placeholder="e.g., gpt-4o, claude-3-5-sonnet, openai/gpt-4o">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">🎯 System Prompt / Instructions</label>
+                    <textarea x-model="agentForm.instructions" rows="4" class="input w-full" placeholder="System prompt defining agent behavior, rules, personality, and constraints..."></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm text-slate-400 mb-1">🌡 Temperature</label><input type="number" x-model.number="agentForm.temperature" step="0.1" min="0" max="2" class="input w-full" value="0.7"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1">Max Tokens</label><input type="number" x-model.number="agentForm.max_tokens" min="1" max="128000" class="input w-full" value="4096"></div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" x-model="agentForm.is_active" class="sr-only peer">
+                        <div class="w-10 h-5 bg-slate-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:bg-green-500 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                        <span class="ml-2 text-sm text-slate-300">Active</span>
+                    </label>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button @click="saveAgent()" class="btn btn-primary btn-sm flex-1" x-text="editingAgent ? '💾 Save Changes' : '➕ Create Agent'"></button>
+                    <button @click="cancelAgentForm()" class="btn btn-sm" style="background:#475569">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

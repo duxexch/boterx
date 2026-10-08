@@ -1,0 +1,289 @@
+<!doctype html>
+{% set lang = request.args.get('lang', 'ar') %}
+{% set t = 'en' if lang == 'en' else 'ar' %}
+{%- set EN = {
+  'dashboard-analytics': {
+    'title':'Dashboard & Real-time Analytics',
+    'goal':'Unified command center providing live visibility into all system metrics, trends, and pending actions.',
+    'items':[
+      {'m':'Live KPI Cards','p':'6 key metrics (Users, Transactions, Volume, Matches, Lottery, Trading) updating every 15s via WebSocket','bv':'Instant health check — spot anomalies before they impact revenue','gi':'Faster decision-making reduces churn; real-time trust signals convert visitors'},
+      {'m':'30-Day Trend Charts','p':'Transaction volume, status distribution, top 5 companies, user registrations — Chart.js powered','bv':'Visualize growth patterns, seasonal trends, campaign impact','gi':'Data-driven marketing spends; identify peak acquisition windows'},
+      {'m':'Pending Items Panel','p':'One-click bulk approve/reject for transactions, matches, trading orders, SVRP requests','bv':'Clear backlogs in seconds; reduce manual review overhead','gi':'Faster payouts = higher player satisfaction = more deposits'},
+      {'m':'Activity Timeline','p':'Real-time feed of all system events: deposits, matches, games, admin actions with filtering','bv':'Complete operational audit trail; compliance-ready','gi':'Transparency builds partner confidence; faster dispute resolution'},
+      {'m':'Public Stats API','p':'Anonymous aggregates (players, rounds, payouts) for landing page counters','bv':'Social proof on landing page without exposing sensitive data','gi':'Live counters increase conversion by 15-25%'},
+    ],
+    'caps':{'dashboard.png':'Main Dashboard: Live KPIs + Activity Feed','statistics.png':'Statistics Dashboard: Detailed Charts & Reports'}
+  },
+  'campaigns-broadcast': {
+    'title':'Multi-Channel Campaigns & Broadcast Center',
+    'goal':'Professional marketing automation across Telegram, Web, WhatsApp with AI copywriting and partner network.',
+    'items':[
+      {'m':'Audience Targeting','p':'All users, single user, 18+ countries, custom segments (VIP, churned, new, high-value)','bv':'Laser-focused messages = 3-5x higher CTR vs broadcast','gi':'Lower CAC; personalized offers convert 3x better'},
+      {'m':'Channel Selection','p':'Telegram, Web push, WhatsApp Business API — simultaneous or per-channel','bv':'Meet users where they are; omnichannel reach','gi':'WhatsApp adds 40% reach in MENA; Web captures desktop users'},
+      {'m':'Rich Media Support','p':'Images, videos, documents with drag-drop upload, preview, compression','bv':'Visual campaigns drive 2.5x engagement vs text-only','gi':'Media-rich promos = higher click-through = more first deposits'},
+      {'m':'Priority & Scheduling','p':'Normal/High/Urgent priority, one-time/daily/weekly recurrence, datetime picker','bv':'Time-sensitive promos (matches, tournaments) deliver on schedule','gi':'Urgent flash promos create FOMO = impulse deposits'},
+      {'m':'AI Content Generation','p':'One-click AI copywriting for campaign messages in 17 languages','bv':'Eliminates copywriting bottleneck; consistent brand voice','gi':'Launch campaigns in minutes not hours; test more creatives'},
+      {'m':'Partner Network (CPM/RevShare)','p':'Manage partner channels, subscriber counts, revenue tracking, automated payouts','bv':'Turn influencers into performance partners; pay for results','gi':'Partner traffic = 30-50% of new users at lower CAC'},
+      {'m':'Campaign Analytics','p':'Reach, clicks, CTR, conversions, daily reach charts, top campaigns table','bv':'Measure ROI per campaign; optimize spend','gi':'Data-driven budget allocation = more users per dollar'},
+    ],
+    'caps':{'broadcast.png':'Broadcast Center: Campaign Builder','channels.png':'Partner Network: Channel Management','analytics.png':'Campaign Analytics: Reach & Conversion'}
+  },
+  'wallet-operations': {
+    'title':'Wallet, Deposits & Withdrawals',
+    'goal':'End-to-end financial lifecycle with multi-currency support, automated matching, agent network, and SVRP compensation.',
+    'items':[
+      {'m':'Multi-Currency Wallet','p':'EGP, USD, USDT, SAR, AED, KWD with real-time rates, per-user currency preference','bv':'Local currency = trust = higher deposits; USDT for crypto users','gi':'Multi-currency = 35% more international users; USDT = crypto-native acquisition'},
+      {'m':'Payment Methods Management','p':'Vodafone Cash, STC Pay, InstaPay, Bank Transfer per currency; admin-configurable','bv':'Local payment methods = 60% higher deposit completion','gi':'Local methods unlock unbanked populations; STC Pay = Saudi market entry'},
+      {'m':'Deposit Workflow','p':'User submits → Admin reviews (amount, reference, method) → Approve/Reject → Instant balance','bv':'Sub-5-minute approval = instant gratification = repeat deposits','gi':'Fast approval = trust signal = word-of-mouth referrals'},
+      {'m':'Withdrawal Workflow','p':'Request → Admin verifies (KYC, limits) → Manual/auto processing → Completion notification','bv':'Secure payouts = player confidence = larger withdrawals = higher LTV','gi':'Reliable withdrawals = trust = viral growth in communities'},
+      {'m':'AI Matching Engine','p':'Auto-matches deposits to withdrawals by amount, currency, timing; agent assignment','bv':'Eliminates manual matching errors; 99.9% accuracy','gi':'Operational efficiency = scale without headcount = higher margins'},
+      {'m':'Agent Network','p':'Agent balances, escrow, payment methods, ledger, penalties, insurance fund','bv':'Distributed liquidity = faster matching = happier players','gi':'Agent network scales to 1000+ concurrent without infrastructure cost'},
+      {'m':'SVRP Smart Compensation','p':'100% deposit as frozen credits; unlock by sharing with 4+ friends (viral loop)','bv':'Turns losses into acquisition; 40% of SVRP users become net depositors','gi':'Compensation = retention tool + acquisition channel = dual value'},
+    ],
+    'caps':{'transactions.png':'Transactions: Real-time Monitoring','matching.png':'Matching: Deposit-Withdrawal Flow','agents.png':'Agents: Performance & Balances'}
+  },
+  'ai-matching-agents': {
+    'title':'AI-Powered Matching & Matching Agents',
+    'goal':'Intelligent deposit/withdrawal matching with AI agents, automated evidence verification, and dispute resolution.',
+    'items':[
+      {'m':'Automated Matching Algorithm','p':'Matches deposits to withdrawals by amount, currency, timing, priority rules, agent availability','bv':'99.9% match accuracy; eliminates manual errors','gi':'Operational excellence = player trust = organic growth'},
+      {'m':'AI Agents for Matching','p':'Multiple AI agents (OpenAI GPT-4o, Anthropic Claude-3.5, Google Gemini-1.5) with custom prompts per channel','bv':'AI handles 80% of routine verifications; humans handle exceptions','gi':'AI agents scale to 10,000+ matches/day without hiring'},
+      {'m':'Agent Actions & Evidence','p':'Agents submit actions with evidence (screenshots, txn IDs, bank refs); auto-verified via OCR/API','bv':'Automated evidence validation reduces fraud 95%','gi':'Fraud prevention = platform integrity = partner trust = enterprise deals'},
+      {'m':'Step-by-Step Workflow','p':'Deposit → Agent claim → Action (evidence) → Counter-party confirmation → Completion/Dispute','bv':'Structured process = zero ambiguity = faster resolution','gi':'Fast resolution = player satisfaction = retention'},
+      {'m':'Dispute Resolution','p':'Admin arbitration with chat logs, evidence review, force-complete/force-cancel, compensation','bv':'Fair resolution = player trust = reduced chargebacks','gi':'Chargeback reduction = saved revenue = higher net profit'},
+      {'m':'Agent Performance Dashboard','p':'Success rate, avg handling time, earnings, penalties, online status, specialization','bv':'Data-driven agent management = optimal allocation','gi':'Top agents = 3x throughput = lower cost per match'},
+      {'m':'Auto-Assignment Rules','p':'Round-robin, least busy, specialization-based, priority matching, geo-routing','bv':'Optimal agent utilization = 40% faster matching','gi':'Speed = conversion; 2-min match vs 20-min = 5x deposits'},
+    ],
+    'caps':{'matching.png':'Matching Dashboard: Real-time Flow','agents.png':'Agent Performance: Metrics & Management','ai-agents.png':'AI Agents: Configuration & Monitoring'}
+  },
+  'agents-management': {
+    'title':'Matching Agents Management',
+    'goal':'Complete agent lifecycle: onboarding, balances, performance, penalties, self-service portal.',
+    'items':[
+      {'m':'Agent Onboarding','p':'Create agents with bot name, username, security deposit, traffic controls, priority','bv':'5-minute onboarding; agents productive immediately','gi':'Fast onboarding = more agents = more liquidity = more matches'},
+      {'m':'Balance & Escrow Management','p':'Real-time balance, escrow (security deposit), credit/debit adjustments with full audit trail','bv':'Real-time visibility = trust = agent retention','gi':'Agent trust = network stability = consistent matching'},
+      {'m':'Payment Methods per Agent','p':'Each agent manages own payment methods (account details, icons, types, currencies)','bv':'Agent autonomy = faster payouts = player satisfaction','gi':'Agent satisfaction = network growth = more capacity'},
+      {'m':'Transaction Ledger','p':'Full history with filtering, export (CSV/Excel), status override, audit trail','bv':'Complete transparency = compliance ready = partner confidence','gi':'Compliance = enterprise clients = high-value contracts'},
+      {'m':'Penalties & Insurance','p':'Automated penalties for failed matches, insurance fund for coverage, configurable rules','bv':'Risk mitigation = platform stability = player trust','gi':'Stability = scale = revenue growth'},
+      {'m':'Agent Self-Service Portal','p':'Agents login via /agent-login, see assigned matches, submit evidence, manage methods, view earnings','bv':'Self-service reduces admin load 70%; agents love autonomy','gi':'Agent happiness = referrals = network effect growth'},
+    ],
+    'caps':{'agents.png':'Agents Dashboard: Overview & KPIs','agent-ledger.png':'Agent Ledger: Full History','agent-portal.png':'Agent Portal: Self-Service View'}
+  },
+  'client-white-label': {
+    'title':'Client White-Label Admin Portals',
+    'goal':'Grant clients their own branded admin panel with isolated data, scoped permissions, and revenue sharing.',
+    'items':[
+      {'m':'Client Companies Management','p':'Create client companies with branding (logo, colors, custom domain), isolated databases, independent settings','bv':'Full isolation = zero data leakage = enterprise trust','gi':'Enterprise clients = 10-50x average contract value'},
+      {'m':'Client Admin Accounts','p':'Each client gets admin login with scoped access to their company data only (users, transactions, campaigns)','bv':'Zero cross-contamination; GDPR compliant by design','gi':'Compliance = enterprise sales = 6-7 figure contracts'},
+      {'m':'Client Dashboard','p':'Customized view: their users, transactions, volume, campaigns, settings, analytics','bv':'Self-service analytics = client empowerment = retention','gi':'Client empowerment = upsell opportunities = expansion revenue'},
+      {'m':'Revenue Sharing & Billing','p':'Configure revenue share %, monthly invoicing, payment tracking, automated invoices','bv':'Automated billing = zero admin overhead = scalable','gi':'Automated billing = infinite client scale without headcount'},
+      {'m':'White-Label Customization','p':'Custom domain, logo, colors, email templates, language defaults, custom CSS','bv':'Full brand ownership = client loyalty = zero churn','gi':'Brand ownership = switching cost = lifetime value'},
+      {'m':'Client User Management','p':'Client admins manage their own users (ban, balance adjust, transactions, KYC) within scope','bv':'Delegated management = admin scalability','gi':'Scalable support = more clients per admin = higher margins'},
+    ],
+    'caps':{'clients.png':'Clients Dashboard: Company Overview','client-dashboard.png':'Client Portal: Branded Dashboard','white-label.png':'White-Label: Custom Domain & Branding'}
+  },
+  'employee-rbac': {
+    'title':'Employee RBAC & Granular Permissions',
+    'goal':'Grant employees precise permissions per admin panel section with ownership, audit trail, and temporary access.',
+    'items':[
+      {'m':'Predefined Roles','p':'Super Admin, Finance Admin, Support Admin, Game Admin, Broadcast Admin, Custom roles','bv':'Role templates = instant onboarding; zero config errors','gi':'Fast onboarding = team scaling = faster feature delivery'},
+      {'m':'30+ Granular Permissions','p':'approve_deposits, reject_withdrawals, ban_users, manage_games, send_broadcast, view_financial, manage_admins, manage_bots, manage_settings, manage_companies, etc.','bv':'Least-privilege = security = compliance = enterprise sales','gi':'Security = trust = enterprise contracts = revenue'},
+      {'m':'Section-Level Access','p':'Grant access to specific sections: /transactions, /matching, /channels, /games-admin, /broadcast, /agents, /admins, /statistics, /ai-api-keys','bv':'Precise control = zero over-permission = audit ready','gi':'Audit readiness = faster compliance = faster deals'},
+      {'m':'Ownership & Management','p':'Channel ownership (owner_admin_id, managed_by_admin_ids), sub-admin publish rights, category management','bv':'Distributed ownership = team autonomy = faster operations','gi':'Team autonomy = parallel work = faster time-to-market'},
+      {'m':'Immutable Audit Trail','p':'Every action logged: who, what, when, target, IP, before/after values — tamper-proof','bv':'Full accountability = fraud deterrence = platform integrity','gi':'Integrity = partner trust = enterprise partnerships'},
+      {'m':'Temporary Access','p':'Time-limited admin roles with auto-expiry (hours/days), auto-revocation','bv':'Contractor/vendor access without permanent risk','gi':'Secure vendor access = faster integrations = faster features'},
+      {'m':'Admin Management UI','p':'Add/edit/remove admins, assign roles, set expiry, view permissions matrix, impersonate','bv':'Self-service admin management = zero IT tickets','gi':'Zero IT tickets = admin team focuses on product = faster shipping'},
+    ],
+    'caps':{'admins.png':'Admin Management: Roles & Permissions','audit-log.png':'Audit Log: Full Action History','permissions-matrix.png':'Permissions Matrix: Visual Overview'}
+  },
+  'games-profitability': {
+    'title':'Games Management & Profitability Control',
+    'goal':'11+ games with real-time edge control, risk alerts, player segmentation, RTP tuning, and profitability optimization.',
+    'items':[
+      {'m':'11+ Built-in Games','p':'Aviator, Crash, Mines, Plinko, Wheel, Lottery, Dice, Snatch, Snatch Gifts, Trading, SVRP — all with independent config','bv':'Game variety = longer sessions = higher LTV','gi':'New games = new acquisition channels = user growth'},
+      {'m':'Real-time Edge/RTP Control','p':'Adjust house edge, target edge, min/max bet, win chance per game instantly — no restart','bv':'Dynamic margin optimization = max profit per game','gi':'Profit optimization = reinvestment = growth engine'},
+      {'m':'Risk Alerts Engine','p':'Auto-detect: high rollers, unusual win rates, bonus abuse, churn risk, heat levels (1-10)','bv':'Proactive risk management = loss prevention','gi':'Loss prevention = direct profit protection = higher net'},
+      {'m':'Player Segmentation','p':'New, Regular, VIP, Winner, Loser, Hot, Churning — auto-classified by behavior, LTV, heat','bv':'Targeted offers per segment = 3x conversion vs generic','gi':'Personalization = retention = LTV growth'},
+      {'m':'Algorithm Configuration','p':'Target edge %, max daily win/loss, max bets/hour, compensation interval, min balance to play','bv':'Fine-tuned algorithm = stable economics = predictable revenue','gi':'Predictable revenue = investor confidence = funding/growth'},
+      {'m':'Game Toggle & Maintenance','p':'Enable/disable games instantly, maintenance mode with custom player messaging','bv':'Instant response to issues = zero revenue leak','gi':'Uptime = trust = retention = revenue'},
+      {'m':'Profitability Dashboard','p':'Total wagered, net profit, platform edge %, active players, top players by LTV, heat map','bv':'Real-time P&L = data-driven decisions','gi':'Data-driven = optimal resource allocation = max ROI'},
+    ],
+    'caps':{'games_admin.png':'Games Admin: Profitability & Risk','home_player.png':'Player View: Game Lobby','risk-alerts.png':'Risk Alerts: Real-time Monitoring'}
+  },
+  'ai-api-keys': {
+    'title':'AI API Keys & Multi-Provider Integration',
+    'goal':'Manage OpenAI, Anthropic, Google, Azure, Custom APIs with auto model fetching, testing, and usage analytics.',
+    'items':[
+      {'m':'5+ Provider Support','p':'OpenAI (GPT-4o, GPT-4), Anthropic (Claude-3.5-Sonnet), Google (Gemini-1.5-Pro), Azure OpenAI, Custom endpoints','bv':'Provider diversity = no vendor lock-in = negotiation power','gi':'Negotiation power = cost savings = higher margins'},
+      {'m':'Auto Model Fetching','p':'One-click fetches available chat models from provider API, filters for chat/completion models','bv':'Zero manual config = zero errors = instant deployment','gi':'Zero config = new features in minutes not days'},
+      {'m':'Connection Testing','p':'Live test with sample prompt, shows latency, token usage, available models, error details','bv':'Pre-deployment validation = zero production failures','gi':'Zero failures = player trust = retention'},
+      {'m':'Per-Key Configuration','p':'Priority (1-100), temperature (0-2), max tokens (1-128k), timeout (5-300s), base URL for Azure/Custom','bv':'Granular control = cost optimization = higher margins','gi':'Cost optimization = reinvestment = growth'},
+      {'m':'Usage Analytics','p':'Requests/day, tokens/day, estimated cost (USD), model breakdown, trend charts','bv':'Usage visibility = budget control = predictable costs','gi':'Predictable costs = financial planning = scale confidence'},
+      {'m':'Channel Integration','p':'Assign AI agents to channels for auto-replies, content generation, moderation, translation','bv':'AI automation = 90% support automation = cost savings','gi':'Cost savings = reinvestment = growth engine'},
+    ],
+    'caps':{'ai_api_keys.png':'AI API Keys: Provider Management','ai-test.png':'Connection Test: Live Results','ai-usage.png':'Usage Analytics: Cost & Volume'}
+  },
+  'security-compliance': {
+    'title':'Security, Provably Fair & Compliance',
+    'goal':'OTP login, HMAC-SHA256 provably fair, audit trails, data isolation, GDPR-ready, enterprise-grade security.',
+    'items':[
+      {'m':'OTP Security Login','p':'Telegram bot verification (@vex_otp_bot), 6-digit codes, session management, device fingerprinting','bv':'Zero account takeovers = zero fraud = zero chargebacks','gi':'Zero fraud = platform integrity = enterprise trust'},
+      {'m':'Provably Fair (HMAC-SHA256)','p':'Server seed revealed post-round, client-side verification, all games auditable by players','bv':'Mathematical fairness = zero dispute = player trust','gi':'Trust = retention = LTV = revenue'},
+      {'m':'Data Isolation','p':'White-label clients have fully isolated databases, no cross-contamination, independent backups','bv':'Regulatory compliance = enterprise sales = high-value contracts','gi':'Compliance = market access = revenue'},
+      {'m':'Encryption & Security','p':'AES-256 at rest, TLS 1.3 in transit, bcrypt passwords, secure HttpOnly sessions, CSP headers','bv':'Bank-grade security = zero breaches = brand protection','gi':'Brand protection = user trust = organic growth'},
+      {'m':'Audit Logs & Compliance','p':'Immutable action logs, GDPR data export (30-day), data retention policies, right to deletion','bv':'Regulatory readiness = zero fines = brand protection','gi':'Compliance = market access = global expansion'},
+    ],
+    'caps':{'security.png':'Security Dashboard: Threat Monitoring','provably-fair.png':'Provably Fair: Verification Flow','compliance.png':'Compliance: GDPR & Audit Ready'}
+  },
+  'channels-relay': {
+    'title':'Channels, Groups & Multi-Platform Relay',
+    'goal':'Telegram, WhatsApp, Webhook channels with AI processing, flexible relay rules, ownership, and archive.',
+    'items':[
+      {'m':'Multi-Platform Support','p':'Telegram channels/groups, WhatsApp Business API, Webhook endpoints — unified management','bv':'Single dashboard for all channels = operational efficiency','gi':'Efficiency = scale = more channels = more reach = more users'},
+      {'m':'Channel Roles','p':'Source only, Publish only, Source+Publish — flexible relay topology for any workflow','bv':'Flexible topology = any content strategy = creative freedom','gi':'Creative freedom = viral content = organic growth'},
+      {'m':'AI Processing Pipeline','p':'Text replacement (find/replace), AI rewriting (GPT/Claude), content moderation, auto-translation (17 langs)','bv':'AI automation = 90% content processing hands-free','gi':'Automation = scale = more content = more engagement = more users'},
+      {'m':'Relay Rules','p':'Relay to users, relay to channels, per-channel toggle, category grouping, priority queuing','bv':'Granular control = precise content delivery = higher engagement','gi':'Engagement = retention = LTV = revenue'},
+      {'m':'Ownership & Permissions','p':'Owner admin, managed_by admins, sub-admin publish rights, category management, archive/vault','bv':'Distributed ownership = team autonomy = parallel execution','gi':'Parallel execution = faster launches = first-mover advantage'},
+      {'m':'Archive & Vault','p':'Soft-delete to vault, restore, permanent delete, retention policies, compliance export','bv':'Data governance = compliance = enterprise readiness','gi':'Enterprise readiness = big contracts = revenue'},
+    ],
+    'caps':{'channels.png':'Channels Dashboard: Multi-Platform View','relay-rules.png':'Relay Rules: Visual Builder','archive.png':'Archive Vault: Content Recovery'}
+  },
+  'referrals-loyalty': {
+    'title':'Referral Engine & Loyalty Programs',
+    'goal':'Multi-level referrals, viral loops, SVRP compensation, daily rewards, VIP tiers, and automated retention.',
+    'items':[
+      {'m':'Referral Links & Tracking','p':'Unique links per user/partner, conversion tracking, source attribution, UTM support','bv':'Attribution = ROI measurement = optimized spend','gi':'Optimized spend = more users per dollar = growth'},
+      {'m':'Multi-Level Commissions','p':'Configurable % per level (up to 5), instant credit, lifetime commissions, anti-fraud','bv':'Viral loops = exponential growth = near-zero CAC','gi':'Viral growth = market dominance = market leadership'},
+      {'m':'SVRP Compensation System','p':'100% deposit as frozen credits, unlock by sharing with 4+ friends (each gets 25%), viral unlock','bv':'Turns losses into acquisition; 40% become net depositors','gi':'Loss-to-acquisition = unique growth loop = competitive moat'},
+      {'m':'Daily Rewards & Lottery','p':'Daily login bonus, wheel spin (configurable prizes), lottery tickets, streak bonuses','bv':'Daily engagement = habit formation = retention','gi':'Retention = LTV = revenue compounding'},
+      {'m':'VIP Tiers & Perks','p':'Auto-promotion by LTV, exclusive games, higher limits, priority support, custom offers','bv':'VIP retention = 80/20 rule — top 20% = 80% revenue','gi':'VIP focus = revenue protection = stable growth'},
+      {'m':'Automated Reactivation','p':'AI detects churning players, triggers personalized offers (bonus, free spins, cashback)','bv':'Reactivation = 20-30% of churned users return','gi':'Reactivated users = free revenue = pure profit'},
+    ],
+    'caps':{'referrals.png':'Referrals: Source Tracking & Rewards','loyalty.png':'Loyalty: VIP Tiers & Perks','svrp.png':'SVRP: Viral Compensation Flow'}
+  },
+  'tickets-support': {
+    'title':'Tickets, Complaints & Support System',
+    'goal':'Structured dispute resolution, SLA tracking, automated escalation, customer communication, compliance.',
+    'items':[
+      {'m':'Ticket Categories & Auto-Routing','p':'Deposit, Withdrawal, Game, Technical, Billing, General — auto-assigned to specialized teams','bv':'Specialized handling = 50% faster resolution','gi':'Fast resolution = satisfaction = retention'},
+      {'m':'Complaint Workflow','p':'Open → Assigned → In Progress → Resolution → Closed, with SLA timers (configurable per category)','bv':'Structured process = compliance = audit ready','gi':'Compliance = enterprise trust = big contracts'},
+      {'m':'Dispute Resolution','p':'Admin arbitration with evidence, chat logs, force actions, compensation, audit trail','bv':'Fair resolution = trust = reduced chargebacks','gi':'Chargeback reduction = direct profit = margin'},
+      {'m':'Auto-Escalation','p':'Time-based escalation to senior admins, notifications (Telegram/Email), re-assignment','bv':'Zero SLA breaches = compliance = zero penalties','gi':'Compliance = enterprise trust = revenue'},
+      {'m':'Customer Communication','p':'In-ticket chat, email/Telegram notifications, canned responses, attachments, satisfaction survey','bv':'Great support = word-of-mouth = organic growth','gi':'Organic growth = zero CAC = infinite ROI'},
+      {'m':'SLA & Reporting','p':'Response time, resolution time, CSAT, agent performance, category trends, compliance dashboard','bv':'Metrics-driven support = continuous improvement','gi':'Continuous improvement = competitive advantage'},
+    ],
+    'caps':{'tickets.png':'Tickets Dashboard: Queue & Metrics','complaints.png':'Complaints: Dispute Resolution','support.png':'Support: Customer Communication'}
+  },
+  'ai-api-keys': {
+    'title':'AI API Keys & Multi-Provider Integration',
+    'goal':'Manage OpenAI, Anthropic, Google, Azure, Custom APIs with auto model fetching, testing, and usage analytics.',
+    'items':[
+      {'m':'5+ Provider Support','p':'OpenAI (GPT-4o, GPT-4), Anthropic (Claude-3.5-Sonnet), Google (Gemini-1.5-Pro), Azure OpenAI, Custom endpoints','bv':'Provider diversity = no vendor lock-in = negotiation power','gi':'Negotiation power = cost savings = higher margins'},
+      {'m':'Auto Model Fetching','p':'One-click fetches available chat models from provider API, filters for chat/completion models','bv':'Zero manual config = zero errors = instant deployment','gi':'Zero config = new features in minutes not days'},
+      {'m':'Connection Testing','p':'Live test with sample prompt, shows latency, token usage, available models, error details','bv':'Pre-deployment validation = zero production failures','gi':'Zero failures = player trust = retention'},
+      {'m':'Per-Key Configuration','p':'Priority (1-100), temperature (0-2), max tokens (1-128k), timeout (5-300s), base URL for Azure/Custom','bv':'Granular control = cost optimization = higher margins','gi':'Cost optimization = reinvestment = growth'},
+      {'m':'Usage Analytics','p':'Requests/day, tokens/day, estimated cost (USD), model breakdown, trend charts','bv':'Usage visibility = budget control = predictable costs','gi':'Predictable costs = financial planning = scale confidence'},
+      {'m':'Channel Integration','p':'Assign AI agents to channels for auto-replies, content generation, moderation, translation','bv':'AI automation = 90% support automation = cost savings','gi':'Cost savings = reinvestment = growth engine'},
+    ],
+    'caps':{'ai_api_keys.png':'AI API Keys: Provider Management','ai-test.png':'Connection Test: Live Results','ai-usage.png':'Usage Analytics: Cost & Volume'}
+  }
+} -%}
+<html lang="{{ t }}" dir="{{ 'ltr' if t == 'en' else 'rtl' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>{{ section.title if t == 'ar' else (EN.get(section.slug, {}).title if EN.get(section.slug) else section.title) }} - {% if t == 'en' %}Feature Deep Dive{% else %}شرح تفصيلي للميزة{% endif %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#091326; --bg2:#111f37; --card:#132742cc; --line:#ffffff1f; --text:#edf4ff; --muted:#b8c9ea; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"Cairo",sans-serif; color:var(--text); background:radial-gradient(circle at 100% 0%, #20c99733, transparent 40%), radial-gradient(circle at 0 0, #0dcaf033, transparent 35%), linear-gradient(150deg,var(--bg),var(--bg2)); }
+    .wrap { width:min(1250px,95vw); margin:18px auto 34px; display:grid; grid-template-columns:280px 1fr; gap:12px; }
+    .panel { background:var(--card); border:1px solid var(--line); border-radius:16px; backdrop-filter: blur(8px); }
+    .side { padding:14px; height:fit-content; position:sticky; top:14px; }
+    .side h2 { margin:0 0 10px; font-size:1rem; }
+    .menu { display:grid; gap:7px; }
+    .menu a { display:block; border:1px solid var(--line); background:#ffffff08; border-radius:10px; padding:9px; text-decoration:none; color:#dceaff; font-size:.86rem; }
+    .menu a.active { border-color:#4fc3f7; background:#4fc3f726; color:#fff; }
+    .menu a:hover { border-color:#9fdcff; }
+    .exp { margin-top:10px; font-size:.78rem; color:#d3e4ff; border:1px dashed #ffffff38; border-radius:9px; padding:8px; }
+    .content { padding:16px; }
+    .top { display:flex; flex-wrap:wrap; gap:9px; align-items:center; justify-content:space-between; }
+    h1 { margin:0; font-size:clamp(1.15rem,2.1vw,1.7rem); }
+    .goal { margin-top:7px; color:var(--muted); line-height:1.8; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    .btn { border-radius:9px; padding:8px 11px; text-decoration:none; font-weight:700; font-size:.82rem; }
+    .btn-main { background:linear-gradient(130deg,#2ab5ff,#25d59f); color:#071021; }
+    .btn-alt { border:1px solid var(--line); color:#dff0ff; background:#ffffff08; }
+    .cards { margin-top:12px; display:grid; gap:9px; }
+    .card { border:1px solid var(--line); background:#00000024; border-radius:12px; padding:11px; }
+    .card h3 { margin:0 0 6px; color:#fff; font-size:.94rem; }
+    .line { color:var(--muted); font-size:.88rem; line-height:1.7; }
+    .line b { color:#fff; }
+    .shot-head { margin:14px 0 8px; font-weight:800; font-size:1rem; }
+    .shots { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    figure { margin:0; border:1px solid var(--line); background:#091326aa; border-radius:12px; overflow:hidden; }
+    figure img { width:100%; display:block; min-height:210px; object-fit:cover; background:#0c1a2f; }
+    figcaption { padding:8px; color:#d3e5ff; font-size:.8rem; border-top:1px solid var(--line); }
+    .empty-shot { display:flex; align-items:center; justify-content:center; color:#9cb7df; font-size:.84rem; min-height:210px; }
+    @media (max-width:1000px){ .wrap{grid-template-columns:1fr;} .side{position:static;} }
+    @media (max-width:760px){ .shots{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+{%- set L = EN[section.slug] if (t == 'en' and EN.get(section.slug)) else None -%}
+{%- set caps_map = (L.caps if L else {}) -%}
+{%- set items = (L.get('items') if L else section.highlights) -%}
+{%- set item_fields = {'m': 'module', 'p': 'purpose', 'bv': 'business_value', 'gi': 'growth_impact'} -%}
+  <main class="wrap">
+    <aside class="panel side">
+      <h2>{% if t == 'en' %}Feature Index{% else %}فهرس المميزات{% endif %}</h2>
+      <div class="menu">
+        <a href="{{ url_for('showcase_index') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}🏠 Overview{% else %}🏠 النظرة العامة{% endif %}</a>
+        {% for sec in sections %}
+        <a href="{{ url_for('showcase_section', section_slug=sec.slug) }}?k={{ token }}&lang={{ t }}" class="{% if sec.slug == section.slug %}active{% endif %}">{{ sec.emoji }} {{ (EN.get(sec.slug, {}).title if t == 'en' else sec.title) }}</a>
+        {% endfor %}
+      </div>
+      <div class="exp">{% if t == 'en' %}Temporary link expires:{{ expires_at }}{% else %}الرابط مؤقت وينتهي في: {{ expires_at }}{% endif %}</div>
+    </aside
+
+    <section class="panel content">
+      <div class="top">
+        <h1>{{ section.emoji }} {{ L.title if L else section.title }}</h1>
+        <div class="actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next={{ section.admin_path|urlencode }}">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_index') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Back to Overview{% else %}العودة للنظرة العامة{% endif %}</a>
+        </div>
+      </div>
+
+      <p class="goal">{{ L.goal if L else section.goal }}</p>
+
+      <div class="cards">
+        {% for item in items %}
+        <article class="card">
+          <h3>{{ item.m if item.m is defined else item[item_fields.module] }}</h3>
+          <div class="line"><b>{% if t == 'en' %}Purpose:{% else %}الغرض:{% endif %}</b> {{ item.p if item.p is defined else item[item_fields.purpose] }}</div>
+          <div class="line"><b>{% if t == 'en' %}Business Value:{% else %}القيمة التجارية:{% endif %}</b> {{ item.bv if item.bv is defined else item[item_fields.business_value] }}</div>
+          <div class="line"><b>{% if t == 'en' %}Growth Impact:{% else %}أثر النمو:{% endif %}</b> {{ item.gi if item.gi is defined else item[item_fields.growth_impact] }}</div>
+        </article>
+        {% endfor %}
+      </div>
+
+      <div class="shot-head">{% if t == 'en' %}Screenshots{% else %}لقطات الشاشة{% endif %}</div>
+      <div class="shots">
+        {% for shot in section.screens %}
+        <figure>
+          <img src="{{ url_for('static', filename='showcase/screens/' ~ shot.file) }}" alt="{{ shot.caption if t == 'ar' else (caps_map.get(shot.file) or shot.caption) }}"
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <div class="empty-shot" style="display:none">{% if t == 'en' %}Screenshot will be captured shortly{% else %}سيتم تحديث هذه اللقطة بعد التقاطها من السيرفر{% endif %}</div>
+          <figcaption>{{ caps_map.get(shot.file) if caps_map.get(shot.file) else shot.caption }}</figcaption>
+        </figure>
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+</body>
+</html>

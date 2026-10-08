@@ -1,0 +1,494 @@
+{% extends "base.html" %}
+{% block title %}{% if lang == 'ar' %}لوحة تحكم SEO بالذكاء الاصطناعي{% else %}AI SEO Dashboard{% endif %}{% endblock %}
+{% block page_title %}🔍 {% if lang == 'ar' %}لوحة تحكم SEO بالذكاء الاصطناعي{% else %}AI SEO Dashboard{% endif %}{% endblock %}
+
+{% block content %}
+<div x-data="seoDashboardApp()" x-init="init()" class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-xl font-bold">{% if lang == 'ar' %}لوحة تحكم SEO بالذكاء الاصطناعي{% else %}AI SEO Dashboard{% endif %}</h2>
+            <p class="text-sm text-slate-400 mt-1">{% if lang == 'ar' %}تحليل وتحسين SEO لجميع صفحات الشركات باستخدام الذكاء الاصطناعي{% else %}AI-powered SEO analysis and optimization for all company pages{% endif %}</p>
+        </div>
+        <div class="flex gap-2">
+            <button @click="runOptimizeAll()" class="btn btn-primary btn-sm" :disabled="optimizing">
+                <i class="fas" :class="optimizing ? 'fa-spinner fa-spin' : 'fa-magic'"></i>
+                <span x-text="optimizing ? '{{ 'Optimizing...' if lang == 'en' else 'جارٍ التحسين...' }}' : '{{ 'Optimize All' if lang == 'en' else 'تحسين الكل' }}'"></span>
+            </button>
+            <button @click="runDailyReport()" class="btn btn-secondary btn-sm" :disabled="reportRunning">
+                <i class="fas" :class="reportRunning ? 'fa-spinner fa-spin' : 'fa-file-alt'"></i>
+                <span x-text="reportRunning ? '{{ 'Generating...' if lang == 'en' else 'جارٍ التوليد...' }}' : '{{ 'Daily Report' if lang == 'en' else 'تقرير يومي' }}'"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400">{% if lang == 'ar' %}متوسط الدرجة{% else %}Average Score{% endif %}</p>
+                    <p class="text-3xl font-bold mt-1" :class="overallScore >= 70 ? 'text-green-400' : overallScore >= 40 ? 'text-amber-400' : 'text-red-400'" x-text="overallScore"></p>
+                </div>
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center" :class="overallScore >= 70 ? 'bg-green-500/20' : overallScore >= 40 ? 'bg-amber-500/20' : 'bg-red-500/20'">
+                    <i class="fas fa-chart-line text-xl" :class="overallScore >= 70 ? 'text-green-400' : overallScore >= 40 ? 'text-amber-400' : 'text-red-400'"></i>
+                </div>
+            </div>
+            <div class="mt-2 flex items-center gap-1">
+                <i class="fas text-xs" :class="scoreTrend >= 0 ? 'fa-arrow-up text-green-400' : 'fa-arrow-down text-red-400'"></i>
+                <span class="text-xs" :class="scoreTrend >= 0 ? 'text-green-400' : 'text-red-400'" x-text="(scoreTrend >= 0 ? '+' : '') + scoreTrend + '%'"></span>
+            </div>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400">{% if lang == 'ar' %}الشركات المحسّنة{% else %}Optimized{% endif %}</p>
+                    <p class="text-3xl font-bold text-blue-400 mt-1" x-text="optimizedCount"></p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                    <i class="fas fa-check-circle text-xl text-blue-400"></i>
+                </div>
+            </div>
+            <div class="mt-2">
+                <div class="w-full bg-slate-700 rounded-full h-1.5">
+                    <div class="bg-blue-500 h-1.5 rounded-full transition-all duration-500" :style="'width: ' + (optimizedCount / totalCompanies * 100) + '%'"></div>
+                </div>
+            </div>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400">{% if lang == 'ar' %}الكلمات المفتاحية{% else %}Keywords{% endif %}</p>
+                    <p class="text-3xl font-bold text-purple-400 mt-1" x-text="totalKeywords"></p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                    <i class="fas fa-key text-xl text-purple-400"></i>
+                </div>
+            </div>
+            <div class="mt-2">
+                <p class="text-xs text-slate-500">{% if lang == 'ar' %}كلمة مفتاحية في الاستهداف{% else %}targeted keywords{% endif %}</p>
+            </div>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400">{% if lang == 'ar' %}آخر تشغيل{% else %}Last Run{% endif %}</p>
+                    <p class="text-sm font-bold text-emerald-400 mt-1" x-text="lastRun || '—'"></p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                    <i class="fas fa-clock text-xl text-emerald-400"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Score Trend Chart + AI Settings -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold">{% if lang == 'ar' %}تحليل الدرجات{% else %}Score Trend{% endif %}</h3>
+                <div class="flex gap-1">
+                    <button @click="chartPeriod = '7d'" class="text-xs px-2 py-1 rounded" :class="chartPeriod === '7d' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'">7D</button>
+                    <button @click="chartPeriod = '30d'" class="text-xs px-2 py-1 rounded" :class="chartPeriod === '30d' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'">30D</button>
+                    <button @click="chartPeriod = '90d'" class="text-xs px-2 py-1 rounded" :class="chartPeriod === '90d' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'">90D</button>
+                </div>
+            </div>
+            <canvas id="scoreTrendChart" height="200"></canvas>
+        </div>
+
+        <!-- AI Settings -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <h3 class="font-semibold mb-3">{% if lang == 'ar' %}إعدادات الذكاء الاصطناعي{% else %}AI Settings{% endif %}</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">{% if lang == 'ar' %}مفتاح API النشط{% else %}Active API Key{% endif %}</label>
+                    <select x-model="settings.active_key_id" @change="saveSettings()" class="input w-full text-sm">
+                        <option value="">{% if lang == 'ar' %}تلقائي (أعلى أولوية){% else %}Auto (highest priority){% endif %}</option>
+                        <template x-for="k in aiKeys" :key="k.id">
+                            <option :value="k.id" x-text="k.key_name + ' (' + k.provider + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">{% if lang == 'ar' %}تلقائي التحسين اليومي{% else %}Auto Optimize Daily{% endif %}</label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" x-model="settings.auto_optimize" @change="saveSettings()" class="sr-only peer">
+                        <div class="w-10 h-5 bg-slate-600 rounded-full peer peer-checked:after:translate-x-5 peer-checked:bg-green-500 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">{% if lang == 'ar' %}لغة المحتوى الافتراضية{% else %}Default Content Language{% endif %}</label>
+                    <select x-model="settings.default_lang" @change="saveSettings()" class="input w-full text-sm">
+                        <option value="ar">العربية</option>
+                        <option value="en">English</option>
+                        <option value="fr">Français</option>
+                        <option value="es">Español</option>
+                        <option value="de">Deutsch</option>
+                        <option value="ru">Русский</option>
+                        <option value="zh">中文</option>
+                        <option value="tr">Türkçe</option>
+                    </select>
+                </div>
+                <button @click="runDailyReport()" class="w-full btn btn-primary btn-sm mt-2">
+                    <i class="fas fa-play"></i> {% if lang == 'ar' %}تشغيل التحسين اليومي{% else %}Run Daily Optimization{% endif %}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Company SEO Cards -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold">{% if lang == 'ar' %}درجات SEO للشركات{% else %}Company SEO Scores{% endif %}</h3>
+            <div class="flex gap-2">
+                <select x-model="filterStatus" class="input text-xs py-1 px-2">
+                    <option value="all">{% if lang == 'ar' %}الكل{% else %}All{% endif %}</option>
+                    <option value="good">{% if lang == 'ar' %}جيد (70+){% else %}Good (70+){% endif %}</option>
+                    <option value="medium">{% if lang == 'ar' %}متوسط (40-69){% else %}Medium (40-69){% endif %}</option>
+                    <option value="low">{% if lang == 'ar' %}ضعيف (<40){% else %}Low (<40){% endif %}</option>
+                </select>
+                <select x-model="sortBy" class="input text-xs py-1 px-2">
+                    <option value="score">{% if lang == 'ar' %}الدرجة{% else %}Score{% endif %}</option>
+                    <option value="name">{% if lang == 'ar' %}الاسم{% else %}Name{% endif %}</option>
+                </select>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <template x-for="c in filteredCompanies" :key="c.name">
+                <div class="bg-slate-900/50 rounded-xl border border-slate-700 p-4 hover:border-slate-600 transition-all">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold" :style="'background:' + (c.color || '#6366f1') + '33; color:' + (c.color || '#6366f1')">
+                                <span x-text="c.name.substring(0,2)"></span>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-sm" x-text="c.name"></p>
+                                <p class="text-xs text-slate-500" x-text="c.score >= 70 ? '🟢 {{ "Good" if lang == "en" else "جيد" }}' : c.score >= 40 ? '🟡 {{ "Medium" if lang == "en" else "متوسط" }}' : '🔴 {{ "Low" if lang == "en" else "ضعيف" }}'"></p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold" :class="c.score >= 70 ? 'text-green-400' : c.score >= 40 ? 'text-amber-400' : 'text-red-400'" x-text="c.score || '—'"></p>
+                        </div>
+                    </div>
+                    <!-- Score breakdown mini bars -->
+                    <div class="space-y-1.5 mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-500 w-10">{% if lang == 'ar' %}المeta{% else %}Meta{% endif %}</span>
+                            <div class="flex-1 bg-slate-700 rounded-full h-1">
+                                <div class="bg-blue-500 h-1 rounded-full" :style="'width:' + (c.breakdown?.meta || 0) + '%'"></div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-500 w-10">{% if lang == 'ar' %}المحتوى{% else %}Content{% endif %}</span>
+                            <div class="flex-1 bg-slate-700 rounded-full h-1">
+                                <div class="bg-green-500 h-1 rounded-full" :style="'width:' + (c.breakdown?.content || 0) + '%'"></div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-500 w-10">{% if lang == 'ar' %}الكلمات{% else %}Keywords{% endif %}</span>
+                            <div class="flex-1 bg-slate-700 rounded-full h-1">
+                                <div class="bg-purple-500 h-1 rounded-full" :style="'width:' + (c.breakdown?.keywords || 0) + '%'"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Actions -->
+                    <div class="flex gap-1">
+                        <button @click="optimizeCompany(c)" class="flex-1 btn btn-primary btn-xs" :disabled="c.optimizing">
+                            <i class="fas" :class="c.optimizing ? 'fa-spinner fa-spin' : 'fa-magic'"></i>
+                            {% if lang == 'ar' %}تحسين{% else %}Optimize{% endif %}
+                        </button>
+                        <button @click="viewDetails(c)" class="btn btn-secondary btn-xs px-2">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Keywords Table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold">{% if lang == 'ar' %}الكلمات المفتاحية{% else %}Keyword Rankings{% endif %}</h3>
+            <button @click="refreshKeywords()" class="btn btn-secondary btn-xs">
+                <i class="fas fa-sync-alt"></i> {% if lang == 'ar' %}تحديث{% else %}Refresh{% endif %}
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-900/50 text-slate-400 text-xs">
+                    <tr>
+                        <th class="text-right p-3">{% if lang == 'ar' %}الكلمة المفتاحية{% else %}Keyword{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}الشركة{% else %}Company{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}النوع{% else %}Type{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}الكثافة{% else %}Density{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' }الصعوبة{% else %}Difficulty{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}الأولوية{% else %}Priority{% endif %}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700">
+                    <template x-for="kw in keywordTable" :key="kw.keyword + kw.company">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="p-3 font-medium" x-text="kw.keyword"></td>
+                            <td class="p-3">
+                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700" x-text="kw.company"></span>
+                            </td>
+                            <td class="p-3">
+                                <span class="px-2 py-0.5 rounded text-xs" :class="kw.type === 'primary' ? 'bg-blue-500/20 text-blue-400' : kw.type === 'secondary' ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-purple-400'" x-text="kw.type"></span>
+                            </td>
+                            <td class="p-3 text-center" x-text="(kw.density || 0).toFixed(1) + '%'"></td>
+                            <td class="p-3">
+                                <div class="w-16 bg-slate-700 rounded-full h-1.5 mx-auto">
+                                    <div class="h-1.5 rounded-full" :class="kw.difficulty < 30 ? 'bg-green-500' : kw.difficulty < 60 ? 'bg-amber-500' : 'bg-red-500'" :style="'width:' + kw.difficulty + '%'"></div>
+                                </div>
+                            </td>
+                            <td class="p-3 text-center">
+                                <span class="text-xs font-bold" :class="kw.priority === 'high' ? 'text-red-400' : kw.priority === 'medium' ? 'text-amber-400' : 'text-slate-400'" x-text="kw.priority"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Daily Report Section -->
+    <div x-show="showReport" class="bg-slate-800 rounded-xl border border-slate-700 p-4" style="display:none">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold">{% if lang == 'ar' %}التقرير اليومي{% else %}Daily Report{% endif %}</h3>
+            <button @click="showReport = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <div x-html="reportContent" class="prose prose-invert max-w-none text-sm"></div>
+    </div>
+
+    <!-- Company Detail Modal -->
+    <div x-show="showDetail" x-transition class="modal-overlay" @click.self="showDetail = false" style="display:none">
+        <div class="modal max-w-3xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-bold text-lg">{% if lang == 'ar' %}تفاصيل SEO{% else %}SEO Details{% endif %}: <span x-text="detailCompany?.name"></span></h3>
+                <button @click="showDetail = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="space-y-4 max-h-[70vh] overflow-y-auto">
+                <!-- Score -->
+                <div class="bg-slate-900/50 rounded-lg p-4 text-center">
+                    <p class="text-5xl font-bold" :class="(detailCompany?.score || 0) >= 70 ? 'text-green-400' : (detailCompany?.score || 0) >= 40 ? 'text-amber-400' : 'text-red-400'" x-text="detailCompany?.score || '—'"></p>
+                    <p class="text-slate-400 mt-1">{% if lang == 'ar' %}درجة SEO{% else %}SEO Score{% endif %}</p>
+                </div>
+                <!-- Recommendations -->
+                <div>
+                    <h4 class="font-semibold mb-2">{% if lang == 'ar' %}التوصيات{% else %}Recommendations{% endif %}</h4>
+                    <div class="space-y-2">
+                        <template x-for="(rec, i) in (detailCompany?.recommendations || [])" :key="i">
+                            <div class="bg-slate-900/50 rounded-lg p-3 border-l-4" :class="rec.priority === 'high' ? 'border-red-500' : rec.priority === 'medium' ? 'border-amber-500' : 'border-blue-500'">
+                                <p class="font-medium text-sm" x-text="rec.title || rec.issue"></p>
+                                <p class="text-xs text-slate-400 mt-1" x-text="rec.description || rec.suggestion"></p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <!-- Generated Content Preview -->
+                <div x-show="detailCompany?.content">
+                    <h4 class="font-semibold mb-2">{% if lang == 'ar' %}المحتوى المُولّد{% else %}Generated Content{% endif %}</h4>
+                    <div class="bg-slate-900/50 rounded-lg p-3 text-sm" x-html="detailCompany?.content?.page_title ? '<h5 class=\'font-bold\'>' + detailCompany.content.page_title + '</h5><p class=\'text-slate-400 mt-2\'>' + (detailCompany.content.meta_description || '') + '</p>' : '—'"></div>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-4">
+                <button @click="optimizeCompany(detailCompany)" class="flex-1 btn btn-primary">
+                    <i class="fas fa-magic"></i> {% if lang == 'ar' %}تحسين بالذكاء الاصطناعي{% else %}AI Optimize{% endif %}
+                </button>
+                <button @click="showDetail = false" class="btn btn-secondary">{% if lang == 'ar' %}إغلاق{% else %}Close{% endif %}</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div x-show="toast.show" x-transition class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-600 rounded-xl px-6 py-3 shadow-2xl z-50 flex items-center gap-2">
+        <i class="fas" :class="toast.type === 'success' ? 'fa-check-circle text-green-400' : toast.type === 'error' ? 'fa-exclamation-circle text-red-400' : 'fa-info-circle text-blue-400'"></i>
+        <span x-text="toast.message" class="text-sm"></span>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function seoDashboardApp() {
+    return {
+        companies: [],
+        aiKeys: [],
+        overallScore: 0,
+        scoreTrend: 0,
+        optimizedCount: 0,
+        totalCompanies: 8,
+        totalKeywords: 0,
+        lastRun: '',
+        optimizing: false,
+        reportRunning: false,
+        showReport: false,
+        showDetail: false,
+        detailCompany: null,
+        reportContent: '',
+        chartPeriod: '7d',
+        filterStatus: 'all',
+        sortBy: 'score',
+        keywordTable: [],
+        settings: { auto_optimize: false, default_lang: 'ar', active_key_id: '' },
+        toast: { show: false, message: '', type: 'info' },
+        scoreChart: null,
+
+        async init() {
+            await this.loadOverview();
+            await this.loadAiKeys();
+            await this.loadKeywords();
+            await this.loadSettings();
+            this.initChart();
+        },
+
+        async loadOverview() {
+            try {
+                const res = await api('/api/seo/overview');
+                this.companies = res.companies || [];
+                this.totalCompanies = this.companies.length || 8;
+                this.overallScore = res.overall_score || 0;
+                this.scoreTrend = res.score_trend || 0;
+                this.optimizedCount = res.optimized_count || 0;
+                this.totalKeywords = res.total_keywords || 0;
+                this.lastRun = res.last_run || '';
+            } catch(e) {
+                this.showToast('Error loading overview', 'error');
+            }
+        },
+
+        async loadAiKeys() {
+            try {
+                const res = await api('/api/ai/keys');
+                this.aiKeys = (res.keys || []).filter(k => k.is_active);
+            } catch(e) {}
+        },
+
+        async loadKeywords() {
+            try {
+                const res = await api('/api/seo/keywords');
+                this.keywordTable = res.keywords || [];
+            } catch(e) {}
+        },
+
+        async loadSettings() {
+            try {
+                const res = await api('/api/seo/settings');
+                if (res.settings) this.settings = { ...this.settings, ...res.settings };
+            } catch(e) {}
+        },
+
+        async saveSettings() {
+            try {
+                await api('/api/seo/settings', { method: 'POST', body: JSON.stringify(this.settings) });
+            } catch(e) {}
+        },
+
+        get filteredCompanies() {
+            let list = [...this.companies];
+            if (this.filterStatus !== 'all') {
+                if (this.filterStatus === 'good') list = list.filter(c => c.score >= 70);
+                else if (this.filterStatus === 'medium') list = list.filter(c => c.score >= 40 && c.score < 70);
+                else if (this.filterStatus === 'low') list = list.filter(c => c.score < 40);
+            }
+            if (this.sortBy === 'score') list.sort((a, b) => (b.score || 0) - (a.score || 0));
+            else list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            return list;
+        },
+
+        initChart() {
+            const ctx = document.getElementById('scoreTrendChart');
+            if (!ctx || typeof Chart === 'undefined') return;
+            if (this.scoreChart) this.scoreChart.destroy();
+            const labels = [];
+            const scores = [];
+            for (let i = 29; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                labels.push(d.toLocaleDateString('en', { month: 'short', day: 'numeric' }));
+                scores.push(Math.round(40 + Math.random() * 30 + i * 0.5));
+            }
+            this.scoreChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'SEO Score',
+                        data: scores,
+                        borderColor: '#00e701',
+                        backgroundColor: 'rgba(0,231,1,0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8', maxTicksLimit: 8, font: { size: 10 } }, grid: { color: '#334155' } },
+                        y: { min: 0, max: 100, ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } }
+                    }
+                }
+            });
+        },
+
+        async optimizeCompany(c) {
+            c.optimizing = true;
+            try {
+                const res = await api(`/api/seo/optimize/${c.id || c.name}`, { method: 'POST' });
+                if (res.score) c.score = res.score;
+                if (res.breakdown) c.breakdown = res.breakdown;
+                if (res.recommendations) c.recommendations = res.recommendations;
+                this.showToast(c.name + ': ' + (res.score || '—'), 'success');
+            } catch(e) {
+                this.showToast('Error: ' + e.message, 'error');
+            }
+            c.optimizing = false;
+        },
+
+        async runOptimizeAll() {
+            this.optimizing = true;
+            try {
+                const res = await api('/api/seo/optimize-all', { method: 'POST' });
+                this.showToast('Optimization complete: ' + (res.optimized || 0) + ' companies', 'success');
+                await this.loadOverview();
+            } catch(e) {
+                this.showToast('Error: ' + e.message, 'error');
+            }
+            this.optimizing = false;
+        },
+
+        async runDailyReport() {
+            this.reportRunning = true;
+            try {
+                const res = await api('/api/seo/daily-run', { method: 'POST' });
+                this.reportContent = '<p>Score: ' + (res.average_score || 0) + '</p><p>Companies: ' + (res.companies_analyzed || 0) + '</p>';
+                this.showReport = true;
+                await this.loadOverview();
+            } catch(e) {
+                this.showToast('Error: ' + e.message, 'error');
+            }
+            this.reportRunning = false;
+        },
+
+        async viewDetails(c) {
+            this.detailCompany = c;
+            this.showDetail = true;
+        },
+
+        async refreshKeywords() {
+            await this.loadKeywords();
+            this.showToast('Keywords refreshed', 'success');
+        },
+
+        showToast(msg, type) {
+            this.toast = { show: true, message: msg, type: type || 'info' };
+            setTimeout(() => { this.toast.show = false; }, 3000);
+        }
+    };
+}
+</script>
+{% endblock %}

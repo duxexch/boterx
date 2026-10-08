@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+{% block title %}أخبار الرياضة — VEX{% endblock %}
+{% block page_title %}📰 مركز الأخبار الرياضية{% endblock %}
+
+{% block content %}
+<div x-data="newsApp()" x-init="load()" class="max-w-6xl mx-auto space-y-6">
+
+    <!-- ── HERO + ACTIONS ── -->
+    <div class="bg-gradient-to-l from-slate-800 via-slate-800 to-emerald-950/40 rounded-2xl border border-slate-700 p-5 shadow-xl flex flex-wrap items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-700 flex items-center justify-center text-2xl shadow-lg">📰</div>
+        <div class="flex-1 min-w-[200px]">
+            <h3 class="font-bold text-slate-100 text-lg">المصادر تُفحص تلقائياً كل 10 دقائق</h3>
+            <p class="text-xs text-slate-400">عناوين جديدة فقط — تُحوَّل لإشعارات ويب فورية وبوستات جميلة في قنواتك بروابط مواقعنا</p>
+        </div>
+        <div class="flex gap-2">
+            <button @click="runNow()" :disabled="running"
+                class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2">
+                <i class="fas fa-rotate" :class="running && 'fa-spin'"></i> فحص الآن
+            </button>
+            <button @click="publishDigest()" :disabled="publishing"
+                class="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2">
+                <i class="fas fa-paper-plane"></i> نشر الملخص الآن
+            </button>
+        </div>
+    </div>
+
+    <!-- ── STATS ── -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="bg-slate-800/80 rounded-xl border border-slate-700 p-4">
+            <p class="text-[10px] text-slate-500 font-bold uppercase">المصادر المفعّلة</p>
+            <p class="text-2xl font-black text-emerald-400" x-text="sources.filter(s=>s.enabled==='yes').length"></p>
+        </div>
+        <div class="bg-slate-800/80 rounded-xl border border-slate-700 p-4">
+            <p class="text-[10px] text-slate-500 font-bold uppercase">عناوين محفوظة</p>
+            <p class="text-2xl font-black text-sky-400" x-text="items.length"></p>
+        </div>
+        <div class="bg-slate-800/80 rounded-xl border border-slate-700 p-4">
+            <p class="text-[10px] text-slate-500 font-bold uppercase">قنوات النشر</p>
+            <p class="text-2xl font-black text-amber-400" x-text="channels.length"></p>
+        </div>
+        <div class="bg-slate-800/80 rounded-xl border border-slate-700 p-4">
+            <p class="text-[10px] text-slate-500 font-bold uppercase">آخر ملخّص</p>
+            <p class="text-sm font-bold text-slate-200 mt-1" x-text="last_digest ? lastDigestAgo() : 'لم يُنشر بعد'"></p>
+        </div>
+    </div>
+
+    <!-- ── SOURCES ── -->
+    <div class="bg-slate-800/80 rounded-2xl border border-slate-700 shadow-xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-700 flex items-center gap-2">
+            <span class="w-1 h-4 bg-emerald-500 rounded-full"></span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">مصادر الأخبار</span>
+        </div>
+        <div class="p-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <template x-for="s in sources" :key="s.name">
+                <div class="rounded-xl border border-slate-700 bg-slate-900/60 p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">🌐</span>
+                            <span class="font-bold text-slate-200 text-sm" x-text="s.name"></span>
+                        </div>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                            :class="statusClass(s.last_status)"
+                            x-text="statusLabel(s.last_status)"></span>
+                    </div>
+                    <p class="text-[10px] text-slate-500 truncate" x-text="s.url"></p>
+                    <p class="text-[10px] text-slate-600" x-text="s.last_check ? 'آخر فحص: ' + s.last_check : 'لم يُفحص بعد'"></p>
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400">تفعيل</span>
+                        <button @click="toggle(s, 'enabled')"
+                            class="w-11 h-6 rounded-full transition relative"
+                            :class="s.enabled==='yes' ? 'bg-emerald-500' : 'bg-slate-600'">
+                            <span class="absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all shadow"
+                                :class="s.enabled==='yes' ? 'right-0.5' : 'right-5'"></span>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400">نشر بالبوستات</span>
+                        <button @click="toggle(s, 'post_to_channels')"
+                            class="w-11 h-6 rounded-full transition relative"
+                            :class="s.post_to_channels==='yes' ? 'bg-sky-500' : 'bg-slate-600'">
+                            <span class="absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all shadow"
+                                :class="s.post_to_channels==='yes' ? 'right-0.5' : 'right-5'"></span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- ── DIGEST PREVIEW ── -->
+    <div class="bg-slate-800/80 rounded-2xl border border-slate-700 shadow-xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="w-1 h-4 bg-sky-500 rounded-full"></span>
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">معاينة البوست (كما سيظهر في القناة)</span>
+            </div>
+            <button @click="loadPreview()" class="text-xs text-sky-400 hover:underline">تحديث ↻</button>
+        </div>
+        <div class="p-5">
+            <!-- Telegram-style bubble -->
+            <div class="max-w-xl mx-auto">
+                <div class="rounded-2xl rounded-tr-md bg-slate-700/80 border border-slate-600 p-4 shadow-lg">
+                    <div x-html="preview || '<span class=\'text-slate-400 text-sm\'>لا توجد عناوين كافية للمعاينة بعد — اضغط فحص الآن</span>'"
+                         class="text-[13.5px] leading-6 text-slate-100 space-y-1 [&_a]:text-sky-300 [&_a]:underline [&_b]:font-bold [&_i]:text-emerald-300"></div>
+                    <div class="text-[10px] text-slate-400 text-left mt-2" x-text="nowTime()"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── LATEST ITEMS ── -->
+    <div class="bg-slate-800/80 rounded-2xl border border-slate-700 shadow-xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-700 flex items-center gap-2">
+            <span class="w-1 h-4 bg-amber-500 rounded-full"></span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">آخر العناوين المستخرجة</span>
+            <span class="text-[10px] text-slate-600 mr-auto" x-text="items.length + ' عنوان'"></span>
+        </div>
+        <div class="p-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[420px] overflow-y-auto">
+            <template x-for="(it, idx) in items" :key="it.hash || idx">
+                <div class="rounded-xl border border-slate-700 bg-slate-900/60 p-4 flex flex-col gap-2 hover:border-slate-500 transition">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30" x-text="it.source"></span>
+                        <span class="text-[10px] text-slate-600" x-text="shortTime(it.ts)"></span>
+                    </div>
+                    <p class="text-[13px] text-slate-200 font-medium leading-5 flex-1" x-text="it.title"></p>
+                    <button @click="publishItem(it)"
+                        class="self-start text-xs px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/40 transition font-bold">
+                        <i class="fas fa-paper-plane ml-1"></i> نشر
+                    </button>
+                </div>
+            </template>
+            <p x-show="items.length===0" class="text-slate-500 text-sm col-span-full text-center py-8">لا توجد عناوين بعد — أول فحص يبدأ بعد دقيقة من تشغيل الخدمة</p>
+        </div>
+    </div>
+
+    <!-- ── TARGET CHANNELS ── -->
+    <div class="bg-slate-800/80 rounded-2xl border border-slate-700 shadow-xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-700 flex items-center gap-2">
+            <span class="w-1 h-4 bg-purple-500 rounded-full"></span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">القنوات المستهدفة (بوت كأدمن)</span>
+        </div>
+        <div class="p-5 flex flex-wrap gap-2">
+            <template x-for="c in channels" :key="c.id">
+                <span class="px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-bold flex items-center gap-2">
+                    <i class="fab fa-telegram"></i> <span x-text="c.title || c.chat_id"></span>
+                </span>
+            </template>
+            <p x-show="channels.length===0" class="text-slate-500 text-sm">لا توجد قنوات نشطة — أضف البوت أدمن في قناة وسيُسجَّل تلقائياً</p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function newsApp() {
+    return {
+        sources: [], items: [], channels: [], domains: [],
+        preview: '', last_digest: '',
+        running: false, publishing: false,
+
+        async load() {
+            try {
+                const d = await api('/api/news/state');
+                this.sources = d.sources || [];
+                this.items = d.items || [];
+                this.channels = d.channels || [];
+                this.domains = d.domains || [];
+                this.last_digest = d.last_digest || '';
+                this.loadPreview();
+            } catch (e) { toast('فشل تحميل الأخبار', 'error'); }
+        },
+
+        async loadPreview() {
+            try {
+                const d = await api('/api/news/digest-preview');
+                this.preview = d.message || '';
+            } catch (e) {}
+        },
+
+        async toggle(s, key) {
+            const next = s[key] === 'yes' ? 'no' : 'yes';
+            const before = s[key];
+            s[key] = next;
+            try {
+                await api('/api/news/sources', { method: 'PUT', body: JSON.stringify({ name: s.name, [key]: next }) });
+                toast(next === 'yes' ? 'تم التفعيل ✓' : 'تم الإيقاف', 'success');
+            } catch (e) { s[key] = before; toast('فشل الحفظ', 'error'); }
+        },
+
+        async runNow() {
+            this.running = true;
+            try {
+                await api('/api/news/run', { method: 'POST', body: '{}' });
+                toast('بدأ الفحص الآن — يستغرق نحو 45 ثانية', 'info');
+                setTimeout(() => { this.running = false; this.load(); }, 50000);
+            } catch (e) { this.running = false; toast('فشل بدء الفحص', 'error'); }
+        },
+
+        async publishDigest() {
+            this.publishing = true;
+            try {
+                const d = await api('/api/news/publish', { method: 'POST', body: '{}' });
+                toast(`تم جدولة الملخص — ${d.items} عنوان → ${d.queued} قناة`, 'success');
+                this.load();
+            } catch (e) {
+                const msg = e && e.message ? e.message : 'فشل النشر';
+                toast(msg, 'error');
+            } finally { this.publishing = false; }
+        },
+
+        async publishItem(it) {
+            try {
+                const d = await api('/api/news/publish', { method: 'POST',
+                    body: JSON.stringify({ title: it.title, source: it.source, url: it.url }) });
+                toast(`تم جدولة النشر → ${d.queued} قناة`, 'success');
+            } catch (e) { toast(e && e.message ? e.message : 'فشل النشر', 'error'); }
+        },
+
+        statusClass(st) {
+            if (!st) return 'bg-slate-600/30 text-slate-400 border border-slate-600';
+            if (String(st).startsWith('ok')) return 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+            if (String(st).startsWith('error')) return 'bg-red-500/15 text-red-300 border border-red-500/30';
+            return 'bg-slate-600/30 text-slate-400 border border-slate-600';
+        },
+        statusLabel(st) {
+            if (!st) return 'بانتظار';
+            if (String(st).startsWith('ok')) return 'سليم ✓';
+            if (String(st).startsWith('error')) return 'خطأ ✗';
+            return String(st).slice(0, 18);
+        },
+        shortTime(ts) {
+            if (!ts) return '';
+            try {
+                const d = new Date(ts.replace(' ', 'T'));
+                const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+                if (mins < 1) return 'الآن';
+                if (mins < 60) return mins + ' د';
+                if (mins < 1440) return Math.round(mins / 60) + ' س';
+                return Math.round(mins / 1440) + ' يوم';
+            } catch (e) { return ts.slice(5, 16); }
+        },
+        lastDigestAgo() {
+            if (!this.last_digest) return 'لم يُنشر بعد';
+            return this.shortTime(this.last_digest) + ' مضت';
+        },
+        nowTime() {
+            const d = new Date();
+            return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        },
+    };
+}
+</script>
+{% endblock %}

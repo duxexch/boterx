@@ -1,13 +1,21 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js?v=20260823"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
+<meta property="og:title" content="VEX Games — العب واربح">
+<meta property="og:description" content="منصة ألعاب تيليغرام الأقوى — جوائز حقيقية وألعاب مثيرة">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://vex.deals/static/icons/og-domino.jpg?v=20260821b">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://vex.deals/static/icons/og-domino.jpg?v=20260821b">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>عجلة الحظ — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
+<title data-i18n="x135">عجلة الحظ — VEX</title>
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260816logo">
 <style>
 html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:none}
 #app{display:flex;flex-direction:column;height:100dvh}
@@ -40,6 +48,7 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
 .big-win-num{font-size:64px;font-weight:900;font-family:'Courier New',monospace;color:#00e701;text-shadow:0 0 40px rgba(0,231,1,.6);animation:bwP 1s infinite}
 @keyframes bwP{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
 </style>
+<link rel="stylesheet" href="/static/css/bg-logo.css?v=1">
 </head>
 <body>
 <div id="app">
@@ -67,18 +76,21 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
     </div>
 
     <div class="bet-row">
-      <button class="ctrl-btn" onclick="adjustBet('betInp',0.5)">½</button>
+      <button class="ctrl-btn" onclick="adjustBet(0.5,'betInp')">½</button>
       <input type="number" class="bet-inp" id="betInp" value="10" min="1">
-      <button class="ctrl-btn" onclick="adjustBet('betInp',2)">2×</button>
-      <button class="ctrl-btn" onclick="setBetMin('betInp',10)">Min</button>
-      <button class="ctrl-btn" onclick="setBetMax('betInp',5000)">Max</button>
+      <button class="ctrl-btn" onclick="adjustBet(2,'betInp')">2×</button>
+      <button class="ctrl-btn" onclick="setBet('min','betInp',10,2000)">Min</button>
+      <button class="ctrl-btn" onclick="setBet('max','betInp',10,2000)">Max</button>
     </div>
 
     <button class="spin-btn" id="spinBtn">
       🎰 أدر العجلة
       <div class="spin-power-bar" id="powerBar" style="width:0"></div>
     </button>
-    <div class="spin-hint">اضغط مع الاستمرار لتحديد قوة الدوران</div>
+    <label style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:var(--muted,#8794a3);margin-top:6px;cursor:pointer;user-select:none">
+      <input type="checkbox" id="quickSpin" style="accent-color:#00e701" onchange="quickSpin=this.checked"> ⚡ دوران سريع
+    </label>
+    <div class="spin-hint" data-i18n="x038">اضغط مع الاستمرار لتحديد قوة الدوران</div>
     <div class="seg-legend" id="segLegend"></div>
   </div>
 </div>
@@ -86,13 +98,14 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
 <div class="big-win-overlay" id="bigWinOverlay">
   <div style="text-align:center">
     <div class="big-win-num" id="bigWinNum">+0</div>
-    <div style="font-size:18px;color:#fff;margin-top:8px" id="bigWinText">جائزة كبرى!</div>
+    <div style="font-size:18px;color:#fff;margin-top:8px" id="bigWinText" data-i18n="x093">جائزة كبرى!</div>
   </div>
 </div>
 
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260819b"></script>
 <script>
 'use strict';
+pfGameName='wheel';
 var canvas = document.getElementById('wheelCanvas');
 var ctx = canvas.getContext('2d');
 var spinning = false;
@@ -100,6 +113,7 @@ var currentAngle = 0;
 var pressTimer = null;
 var pressStart = 0;
 var powerLevel = 50; // 0-100
+var quickSpin = false;
 
 // Default segments (overridden by server each round)
 var SEGMENTS = [
@@ -175,12 +189,18 @@ function drawWheel(angle){
   ctx.beginPath(); ctx.arc(cx, cy, hubR*0.3, 0, Math.PI*2); ctx.fillStyle = '#78350f'; ctx.fill();
 }
 
+var lastProbabilities = null;
 function buildLegend(){
   var el = document.getElementById('segLegend'); el.innerHTML = '';
-  SEGMENTS.forEach(function(s){
+  SEGMENTS.forEach(function(s, i){
     var chip = document.createElement('div'); chip.className = 'seg-chip';
     chip.style.background = s.color + '44'; chip.style.color = '#fff';
-    chip.style.border = '1px solid ' + s.glow + '66'; chip.textContent = s.label;
+    chip.style.border = '1px solid ' + s.glow + '66';
+    var prob = '';
+    if(lastProbabilities && lastProbabilities[i] !== undefined){
+      prob = ' <span style="opacity:.65;font-size:9px">(' + (lastProbabilities[i]*100).toFixed(1) + '%)</span>';
+    }
+    chip.innerHTML = s.label + prob;
     el.appendChild(chip);
   });
 }
@@ -195,7 +215,7 @@ function startCharge(e){
   pressStart = Date.now();
   powerLevel = 10;
   spinBtn.classList.add('charging');
-  spinBtn.textContent = '⚡ تحميل...';
+  spinBtn.textContent = I18N.t('y120');
   // Add power bar element back
   var pb = document.createElement('div'); pb.className = 'spin-power-bar'; pb.id = 'powerBar'; pb.style.width = '10%';
   spinBtn.appendChild(pb);
@@ -216,7 +236,7 @@ function releaseSpin(e){
   spinBtn.classList.remove('charging');
   pressStart = 0;
   // Reset button
-  spinBtn.innerHTML = '🎰 أدر العجلة';
+  spinBtn.innerHTML = I18N.t('y138');
   // Spin!
   doSpin();
 }
@@ -229,7 +249,7 @@ spinBtn.addEventListener('mouseleave', function(e){ if(pressStart) releaseSpin(e
 
 function doSpin(){
   var bet = parseFloat(document.getElementById('betInp').value) || 10;
-  if(bet < 1){ showToast('أدخل مبلغ','error'); return; }
+  if(bet < 1){ showToast(I18N.t('y010'),'error'); return; }
   spinning = true; spinBtn.disabled = true;
   document.getElementById('resultMult').classList.remove('show');
   document.getElementById('resultSub').classList.remove('show');
@@ -246,25 +266,25 @@ function doSpin(){
     if(d.segments && d.segments.length > 0){
       SEGMENTS = d.segments; N = SEGMENTS.length;
       segAngle = (Math.PI * 2) / N;
-      buildLegend();
     }
+    if(d.probabilities){ lastProbabilities = d.probabilities; buildLegend(); }
     var segIdx = d.segment !== undefined ? d.segment : 0;
     var seg = SEGMENTS[segIdx];
     // Calculate target angle for pointer at top
     var targetAngle = -segIdx * segAngle - segAngle/2;
     currentAngle = currentAngle % (Math.PI*2);
     // Full spins based on power level (higher power = more spins)
-    var minSpins = 3 + Math.floor(powerLevel / 25); // 3-7 spins
+    var minSpins = quickSpin ? 2 : (3 + Math.floor(powerLevel / 25)); // 3-7 spins
     var fullSpins = minSpins * Math.PI * 2;
     var finalAngle = currentAngle + fullSpins;
     var diff = (targetAngle - (finalAngle % (Math.PI*2)) + Math.PI*4) % (Math.PI*2);
     finalAngle += diff;
     // Duration based on power (higher = longer spin)
-    var duration = 3000 + powerLevel * 20; // 3-5s
+    var duration = quickSpin ? 1100 : (3000 + powerLevel * 20); // ⚡ أو 3-5s
     animateSpin(currentAngle, finalAngle, seg, d.payout || 0, bet, d.multiplier || seg.mult, duration);
     if(d.balance_after !== undefined) document.getElementById('bal').textContent = d.balance_after.toLocaleString();
   }).catch(function(){
-    showToast('خطأ في الشبكة','error');
+    showToast(I18N.t('x108'),'error');
     spinning = false; spinBtn.disabled = false;
   });
 }
@@ -294,36 +314,75 @@ function animateSpin(fromAngle, toAngle, seg, payout, bet, mult, duration){
 function showResult(seg, payout, bet, mult){
   var multEl = document.getElementById('resultMult');
   var subEl = document.getElementById('resultSub');
-  if(seg.mult === 0 || payout === 0){
-    multEl.textContent = '💀 خسارة'; multEl.style.color = '#ef4444';
-    subEl.textContent = 'حظ أوفر في المرة القادمة';
+  if(seg.mult === 0){
+    multEl.textContent = '💀 ' + I18N.t('y141'); multEl.style.color = '#ef4444';
+    subEl.textContent = I18N.t('y057');
     soundLose(); haptic('heavy');
+    addHist('💀', false, false);
+  } else if(seg.mult === 1.0){
+    // تعادل — استردت رهانك
+    multEl.textContent = '1.0x — تعادل'; multEl.style.color = '#06b6d4';
+    subEl.textContent = '↩ ' + fmtAmount(payout) + ' ' + gameCurrency;
+    soundTick(); haptic('light');
+    addHist('1x', false, false);
+  } else if(seg.mult < 1.0){
+    // خسارة جزئية — استردت نصف رهانك
+    multEl.textContent = '0.5x'; multEl.style.color = '#a855f7';
+    subEl.textContent = '↩ ' + fmtAmount(payout) + ' ' + gameCurrency;
+    soundLose(); haptic('medium');
+    addHist('½', false, false);
   } else {
     multEl.textContent = (mult || seg.mult).toFixed(1) + 'x';
     multEl.style.color = seg.mult >= 5 ? '#00e701' : '#22c55e';
     subEl.textContent = '+' + fmtAmount(payout) + ' ' + gameCurrency;
     soundWin(seg.mult >= 5); haptic('medium');
+    addHist((mult || seg.mult).toFixed(1) + 'x', true, seg.mult >= 5);
     if(seg.mult >= 5) showBigWin(payout, seg.mult);
   }
   multEl.classList.add('show'); subEl.classList.add('show');
-  addHistItem(document.getElementById('histBar'), seg.mult || 0.1);
   loadBalance(); // Real-time balance update
+  if(typeof addGameRound==='function'){
+    var isWin = seg.mult > 1.0;
+    addGameRound({game:'wheel',bet:bet||0,payout:payout||0,multiplier:mult||seg.mult,result:isWin?'win':'lose'});
+  }
 }
 
 function fmtAmount(n){ return parseFloat(n||0).toLocaleString(); }
 
+// سجل محلي — addHistory في game-base تتوقع رقماً فقط، وهنا نصوص/رموز
+function addHist(value, isWin, isBig){
+  var container = document.getElementById('histBar');
+  if(!container) return;
+  var el = document.createElement('div');
+  el.className = 'hist-item ' + (isBig ? 'hist-big' : isWin ? 'hist-win' : 'hist-lose');
+  el.textContent = value;
+  container.insertBefore(el, container.firstChild);
+  while(container.children.length > 15) container.removeChild(container.lastChild);
+}
+
 function showBigWin(payout, mult){
   var o = document.getElementById('bigWinOverlay');
   document.getElementById('bigWinNum').textContent = '+' + fmtAmount(payout);
-  document.getElementById('bigWinText').textContent = 'جائزة كبرى! (' + mult.toFixed(1) + 'x)';
+  document.getElementById('bigWinText').textContent = I18N.t('y047') + mult.toFixed(1) + 'x)';
   o.classList.add('show');
   setTimeout(function(){ o.classList.remove('show'); }, 3000);
 }
 
-// Init
+// Init — احتمالات حقيقية من أول لحظة (قبل أول دورة) عبر معاينة عامة
 resizeCanvas(); drawWheel(0); buildLegend();
+fetch(BASE + '/api/wheel/preview').then(function(r){return r.json()}).then(function(d){
+  if(d && d.probabilities){
+    lastProbabilities = d.probabilities;
+    if(d.segments && d.segments.length){ SEGMENTS = d.segments; N = SEGMENTS.length; segAngle = (Math.PI*2)/N; }
+    buildLegend();
+  }
+}).catch(function(){});
 loadBalance(); setInterval(loadBalance, 10000);
 setTimeout(injectDepositButton, 100);
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
+<script src="/static/js/admin-phrases.js?v=20260826b" defer></script>
+<script src="/static/js/i18n-admin-runtime.js?v=20260826b" defer></script>
+<script src="/static/js/auth-gate.js?v=20260818a"></script>
 </body>
 </html>

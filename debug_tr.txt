@@ -1,0 +1,4 @@
+98:  function translateCore(text, targetLang) {
+131:  function translatePreserveSpacing(raw) {
+147:  function translateNode(node) {
+158:  function translateAttrs(el) {

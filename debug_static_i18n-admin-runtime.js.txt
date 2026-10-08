@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Tue, 25 Aug 2026 00:36:32 GMT
+Connection: keep-alive
+Content-Disposition: inline; filename=i18n-admin-runtime.js

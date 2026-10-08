@@ -1,0 +1,7 @@
+11:<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+12:    <script src="{{ url_for('static', filename='vendor/alpine.min.js') }}" defer></script>
+13:    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260825a" defer></script>
+14:    <script src="{{ url_for('static', filename='js/i18n-admin-lexicon.js') }}?v=20260825a" defer></script>
+15:    <script src="{{ url_for('static', filename='js/i18n-admin-runtime.js') }}?v=20260825a" defer></script>
+16:    <script src="{{ url_for('static', filename='js/base-app.js') }}?v=20260825a" defer></script>
+435:<script src="{{ url_for('static', filename='js/fx.js') }}" defer></script>

@@ -1,0 +1,1194 @@
+{% extends 'base.html' %}
+{% block title %}Games Admin{% endblock %}
+{% block content %}
+<style>
+.top-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
+.top-tab{padding:9px 16px;border-radius:12px;font-size:12px;font-weight:700;color:#6b7a90;cursor:pointer;border:1px solid transparent;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.top-tab:hover{color:#e8edf4;background:#1a2233}
+.top-tab.active{background:#00e701;color:#000;border-color:#00e701}
+body.light-mode .top-tab{color:#64748b}
+body.light-mode .top-tab:hover{color:#0f172a;background:#f1f5f9}
+body.light-mode .top-tab.active{background:#16a34a;color:#fff;border-color:#16a34a}
+.sub-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px}
+.sub-tab{padding:7px 14px;border-radius:10px;font-size:11px;font-weight:600;color:#6b7a90;cursor:pointer;border:1px solid transparent;transition:all .2s;white-space:nowrap}
+.sub-tab:hover{color:#e8edf4;background:#1a2233}
+.sub-tab.active{background:#1e3a5f;color:#93c5fd;border-color:#3b82f6}
+body.light-mode .sub-tab{color:#64748b}
+body.light-mode .sub-tab:hover{color:#0f172a;background:#f1f5f9}
+body.light-mode .sub-tab.active{background:#dbeafe;color:#1d4ed8;border-color:#3b82f6}
+.stats-grid-4{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media(min-width:768px){.stats-grid-4{grid-template-columns:repeat(4,1fr)}}
+.stat-card{background:#161c28;border:1px solid #252e3d;border-radius:16px;padding:14px 12px;text-align:center;transition:transform .15s}
+body.light-mode .stat-card{background:#ffffff;border-color:#e2e8f0}
+.stat-card:active{transform:scale(.97)}
+.stat-val{font-size:22px;font-weight:900;line-height:1}
+.stat-label{font-size:10px;color:#6b7a90;margin-top:4px}
+body.light-mode .stat-label{color:#64748b}
+.data-table{width:100%;font-size:13px;border-collapse:collapse}
+.data-table th{background:#0f1218;color:#6b7a90;padding:10px 12px;font-size:11px;text-align:right;white-space:nowrap}
+body.light-mode .data-table th{background:#f1f5f9;color:#64748b}
+.data-table td{padding:10px 12px;border-top:1px solid #252e3d;white-space:nowrap}
+body.light-mode .data-table td{border-top-color:#e2e8f0}
+.data-table tr:hover td{background:rgba(255,255,255,.02)}
+body.light-mode .data-table tr:hover td{background:rgba(0,0,0,.02)}
+.card{background:#161c28;border:1px solid #252e3d;border-radius:16px;overflow:hidden}
+body.light-mode .card{background:#ffffff;border-color:#e2e8f0}
+.card-header{padding:14px 18px;border-bottom:1px solid #252e3d;display:flex;align-items:center;justify-content:space-between}
+body.light-mode .card-header{border-bottom-color:#e2e8f0}
+.card-body{padding:14px 18px}
+.badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:99px}
+.badge-green{background:rgba(34,197,94,.15);color:#22c55e}
+.badge-red{background:rgba(239,68,68,.15);color:#ef4444}
+.badge-amber{background:rgba(251,191,36,.15);color:#fbbf24}
+.badge-blue{background:rgba(59,130,246,.15);color:#3b82f6}
+.badge-slate{background:rgba(100,116,139,.15);color:#94a3b8}
+.btn{padding:8px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:4px}
+.btn:active{transform:scale(.96)}
+.btn-green{background:#22c55e;color:#fff}
+.btn-red{background:#ef4444;color:#fff}
+.btn-blue{background:#3b82f6;color:#fff}
+.btn-amber{background:#f59e0b;color:#000}
+.btn-slate{background:#334155;color:#e2e8f0}
+.btn-ghost{background:transparent;color:#6b7a90;border:1px solid #252e3d}
+body.light-mode .btn-ghost{color:#64748b;border-color:#e2e8f0}
+.btn-ghost:hover{color:#e8edf4;border-color:#45556d}
+body.light-mode .btn-ghost:hover{color:#0f172a;border-color:#94a3b8}
+.form-input{width:100%;background:#0f1218;border:1px solid #252e3d;border-radius:10px;padding:9px 12px;color:#e8edf4;font-size:13px;outline:none;transition:border-color .2s}
+body.light-mode .form-input{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
+.form-input:focus{border-color:#3b82f6}
+.form-label{display:block;font-size:11px;font-weight:600;color:#6b7a90;margin-bottom:4px}
+body.light-mode .form-label{color:#64748b}
+.modal-bg{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.modal-content{background:#161c28;border:1px solid #252e3d;border-radius:20px;width:calc(100% - 32px);max-width:480px;max-height:85vh;overflow-y:auto;padding:24px 18px}
+body.light-mode .modal-content{background:#ffffff;border-color:#e2e8f0}
+.filter-btn{padding:6px 14px;border-radius:10px;font-size:11px;font-weight:700;transition:all .2s;border:1px solid transparent}
+.filter-btn.active{color:#fff}
+.filter-btn:not(.active){background:#161c28;color:#6b7a90;border-color:#252e3d}
+body.light-mode .filter-btn:not(.active){background:#ffffff;color:#64748b;border-color:#e2e8f0}
+.filter-btn:not(.active):hover{color:#e8edf4;background:#1a2233}
+body.light-mode .filter-btn:not(.active):hover{color:#0f172a;background:#f1f5f9}
+</style>
+
+<div x-data="gamesPage()" x-init="init()" class="space-y-6">
+
+  <div class="top-tabs">
+    <button @click="switchMainTab('dashboard')" :class="mainTab==='dashboard' && 'active'" class="top-tab">
+      <i class="fas fa-chart-pie text-sm"></i>
+      <span x-text="t('games_dashboard')"></span>
+    </button>
+    <button @click="switchMainTab('lottery')" :class="mainTab==='lottery' && 'active'" class="top-tab">
+      <i class="fas fa-dice text-sm"></i>
+      <span x-text="t('lottery')"></span>
+    </button>
+    <button @click="switchMainTab('wheel')" :class="mainTab==='wheel' && 'active'" class="top-tab">
+      <i class="fas fa-circle-notch text-sm"></i>
+      <span x-text="t('wheel')"></span>
+    </button>
+    <button @click="switchMainTab('trading')" :class="mainTab==='trading' && 'active'" class="top-tab">
+      <i class="fas fa-coins text-sm"></i>
+      <span x-text="t('trading')"></span>
+    </button>
+    <button @click="switchMainTab('svrp')" :class="mainTab==='svrp' && 'active'" class="top-tab">
+      <i class="fas fa-gem text-sm"></i>
+      <span x-text="t('svrp')"></span>
+    </button>
+  </div>
+
+  <!-- ==================== DASHBOARD TAB ==================== -->
+  <div x-show="mainTab==='dashboard'" x-transition>
+
+    <div class="stats-grid-4 mb-6">
+      <div class="stat-card">
+        <div class="stat-val text-amber-400" x-text="stats.total_wagered?.toLocaleString() || '0'"></div>
+        <div class="stat-label" x-text="t('total_wagered')"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val text-green-400" x-text="stats.net_profit?.toLocaleString() || '0'"></div>
+        <div class="stat-label" x-text="t('net_profit')"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val text-blue-400" x-text="(stats.platform_edge * 100)?.toFixed(1) + '%' || '0%'"></div>
+        <div class="stat-label" x-text="t('platform_edge')"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val text-purple-400" x-text="stats.active_players || '0'"></div>
+        <div class="stat-label" x-text="t('active_players')"></div>
+      </div>
+    </div>
+
+    <div class="card mb-6" x-show="alerts.length > 0">
+      <div class="card-header">
+        <h3 class="text-sm font-bold text-red-400"><i class="fas fa-triangle-exclamation mr-1"></i> <span x-text="t('risk_alerts')"></span> (<span x-text="alerts.length"></span>)</h3>
+      </div>
+      <div class="card-body space-y-2">
+        <template x-for="alert in alerts" :key="alert.id">
+          <div class="flex items-center justify-between bg-slate-900/50 rounded-xl p-3">
+            <div>
+              <span class="text-xs font-bold" :class="alert.severity === 'critical' ? 'text-red-400' : alert.severity === 'high' ? 'text-orange-400' : 'text-yellow-400'" x-text="alert.severity"></span>
+              <span class="text-sm text-slate-300 mr-2" x-text="alert.message"></span>
+            </div>
+            <button @click="resolveAlert(alert.id)" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg"><i class="fas fa-check"></i></button>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <div class="card mb-6">
+      <div class="card-header">
+        <h3 class="text-sm font-bold text-amber-400"><i class="fas fa-money-bill mr-1"></i> <span x-text="t('pending_deposits')"></span> (<span x-text="deposits.length"></span>)</h3>
+      </div>
+      <div class="card-body space-y-2">
+        <template x-for="dep in deposits" :key="dep.id">
+          <div class="flex items-center justify-between bg-slate-900/50 rounded-xl p-3">
+            <div class="text-sm">
+              <span class="font-bold text-amber-400" x-text="dep.amount"></span>
+              <span class="text-slate-400 mr-2">&mdash; <span x-text="dep.account_number"></span></span>
+              <span class="text-xs text-slate-500">UID: <span x-text="dep.user_id"></span></span>
+            </div>
+            <div class="flex gap-2">
+              <button @click="approveDeposit(dep.id)" x-show="rbac('approve_deposits')" class="btn btn-green text-xs" x-text="t('approve')"></button>
+              <button @click="rejectDeposit(dep.id)" x-show="rbac('reject_deposits')" class="btn btn-red text-xs" x-text="t('reject')"></button>
+            </div>
+          </div>
+        </template>
+        <div class="text-sm text-slate-500 text-center py-4" x-show="deposits.length === 0" x-text="t('no_pending_deposits')"></div>
+      </div>
+    </div>
+
+    <div class="flex gap-2 border-b border-slate-700 mb-4">
+      <button @click="dashTab='games'" :class="dashTab==='games' ? 'text-amber-400 border-amber-400' : 'text-slate-400 border-transparent'" class="pb-2 px-4 border-b-2 font-medium text-sm" x-text="t('games')"></button>
+      <button @click="dashTab='players'" :class="dashTab==='players' ? 'text-amber-400 border-amber-400' : 'text-slate-400 border-transparent'" class="pb-2 px-4 border-b-2 font-medium text-sm" x-text="t('players')"></button>
+      <button @click="dashTab='config'" :class="dashTab==='config' ? 'text-amber-400 border-amber-400' : 'text-slate-400 border-transparent'" class="pb-2 px-4 border-b-2 font-medium text-sm" x-text="t('config')"></button>
+    </div>
+
+    <div x-show="dashTab==='games'" class="space-y-3">
+      <template x-for="game in games" :key="game.id">
+        <div class="card">
+          <div class="card-body flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-3xl" x-text="game.icon"></span>
+              <div>
+                <div class="font-bold text-sm" x-text="game.name"></div>
+                <div class="text-xs text-slate-400" x-text="game.description"></div>
+                <div class="text-xs text-amber-400 mt-1">
+                  Min: <span x-text="game.min_bet"></span> | Max: <span x-text="game.max_bet"></span> | RTP: <span x-text="game.rtp_target"></span>% | Edge: <span x-text="game.house_edge_pct"></span>%
+                </div>
+              </div>
+            </div>
+            <button @click="toggleGame(game.id)" x-show="rbac('manage_games')" class="text-xs px-3 py-1 rounded-lg font-bold" :class="game.is_active === 'yes' ? 'bg-green-600 text-white' : 'bg-slate-600 text-white'" x-text="game.is_active === 'yes' ? t('active') : t('off')"></button>
+          </div>
+        </div>
+      </template>
+      {% if not admin_perms or admin_perms.get('manage_games') %}
+      <button @click="showAddGame = true" class="w-full card hover:border-slate-500 p-3 text-sm text-slate-400 border-dashed cursor-pointer">
+        <i class="fas fa-plus mr-1"></i> <span x-text="t('add_game')"></span>
+      </button>
+      {% endif %}
+    </div>
+
+    <div x-show="dashTab==='players'" class="space-y-3">
+      <div class="flex gap-2">
+        <select x-model="sortBy" @change="loadPlayers()" class="form-input w-auto">
+          <option value="total_wagered" x-text="t('total_wagered')"></option>
+          <option value="net_position" x-text="t('net_profit')"></option>
+          <option value="total_games" x-text="t('games')"></option>
+          <option value="lifetime_value">LTV</option>
+        </select>
+      </div>
+      <template x-for="p in players" :key="p.telegram_id">
+        <div class="card">
+          <div class="card-body">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm" x-text="p.name || p.telegram_id"></span>
+                <span class="text-xs px-2 py-0.5 rounded-full font-bold" :class="segmentColor(getSegment(p))" x-text="getSegment(p)"></span>
+                <span x-show="p.is_vex_partner === 'yes'" class="text-xs px-2 py-0.5 rounded-full bg-purple-600 text-white">VEX</span>
+              </div>
+              <div class="flex gap-1">
+                <button @click="toggleVex(p.telegram_id, p.is_vex_partner !== 'yes')" x-show="rbac('ban_users')" class="btn btn-ghost text-xs" x-text="p.is_vex_partner === 'yes' ? 'Remove VEX' : 'Set VEX'"></button>
+                <button @click="cooldownPlayer(p.telegram_id)" x-show="rbac('ban_users')" class="btn btn-blue text-xs"><i class="fas fa-snowflake mr-1"></i> <span x-text="t('cooldown')"></span></button>
+              </div>
+            </div>
+            <div class="grid grid-cols-4 gap-2 text-xs">
+              <div class="bg-slate-900/50 rounded-lg p-2"><div class="text-slate-500" x-text="t('games')"></div><div class="font-bold" x-text="p.total_games"></div></div>
+              <div class="bg-slate-900/50 rounded-lg p-2"><div class="text-slate-500" x-text="t('total_wagered')"></div><div class="font-bold text-amber-400" x-text="Number(p.total_wagered || 0).toFixed(0)"></div></div>
+              <div class="bg-slate-900/50 rounded-lg p-2"><div class="text-slate-500" x-text="t('net_profit')"></div><div class="font-bold" :class="Number(p.net_position) >= 0 ? 'text-green-400' : 'text-red-400'" x-text="Number(p.net_position || 0).toFixed(0)"></div></div>
+              <div class="bg-slate-900/50 rounded-lg p-2"><div class="text-slate-500">Heat</div><div class="font-bold" :class="Number(p.heat_level) > 7 ? 'text-red-400' : Number(p.heat_level) > 5 ? 'text-yellow-400' : 'text-green-400'" x-text="(p.heat_level || '0') + '/10'"></div></div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div x-show="dashTab==='config'" class="space-y-4">
+      <div class="card">
+        <div class="card-body space-y-3">
+          <h3 class="text-sm font-bold text-amber-400" x-text="t('algorithm_config')"></h3>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" x-text="t('target_edge')"></label>
+              <input type="number" x-model="config.target_house_edge" class="form-input">
+            </div>
+            <div>
+              <label class="form-label" x-text="t('max_daily_loss')"></label>
+              <input type="number" x-model="config.max_daily_loss_per_player" class="form-input">
+            </div>
+            <div>
+              <label class="form-label" x-text="t('max_daily_win')"></label>
+              <input type="number" x-model="config.max_daily_win_per_player" class="form-input">
+            </div>
+            <div>
+              <label class="form-label" x-text="t('max_bets_hour')"></label>
+              <input type="number" x-model="config.max_bets_per_hour" class="form-input">
+            </div>
+            <div>
+              <label class="form-label" x-text="t('compensation_interval')"></label>
+              <input type="number" x-model="config.compensation_interval" class="form-input">
+            </div>
+            <div>
+              <label class="form-label" x-text="t('min_balance')"></label>
+              <input type="number" x-model="config.min_balance_to_play" class="form-input">
+            </div>
+          </div>
+          {% if not admin_perms or admin_perms.get('manage_games') %}
+          <button @click="saveConfig()" class="btn btn-amber" x-text="t('save')"></button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div x-show="showAddGame" x-transition class="modal-bg" @click.self="showAddGame = false">
+      <div class="modal-content space-y-3" @click.stop>
+        <h3 class="font-bold text-lg" x-text="t('add_game')"></h3>
+        <input x-model="newGame.name" :placeholder="t('name')" class="form-input">
+        <input x-model="newGame.icon" placeholder="Icon (emoji)" class="form-input">
+        <input x-model="newGame.description" :placeholder="t('description')" class="form-input">
+        <input x-model="newGame.min_bet" type="number" :placeholder="t('min_bet')" class="form-input">
+        <input x-model="newGame.max_bet" type="number" :placeholder="t('max_bet')" class="form-input">
+        <input x-model="newGame.base_win_chance" type="number" step="0.01" placeholder="Win Chance (0-1)" class="form-input">
+        <input x-model="newGame.house_edge_pct" type="number" placeholder="House Edge %" class="form-input">
+        <button @click="addGame()" class="w-full btn btn-amber font-bold py-2" x-text="t('add')"></button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== LOTTERY TAB ==================== -->
+  <div x-show="mainTab==='lottery'" x-transition>
+
+    <div class="card mb-6">
+      <div class="card-header">
+        <h3 class="font-bold text-sm"><i class="fas fa-dice mr-1 text-amber-400"></i> <span x-text="t('lottery_rounds')"></span></h3>
+        <button @click="loadLotteryRounds()" class="btn btn-ghost text-xs"><i class="fas fa-refresh mr-1"></i> <span x-text="t('refresh')"></span></button>
+      </div>
+      <div class="card-body">
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th x-text="t('type')"></th>
+                <th x-text="t('status')"></th>
+                <th x-text="t('amount')"></th>
+                <th x-text="t('date')"></th>
+                <th x-text="t('actions')"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="r in lotteryRounds" :key="r.id">
+                <tr>
+                  <td class="text-xs text-slate-500" x-text="r.id"></td>
+                  <td><span class="badge badge-blue" x-text="r.draw_type || '-'"></span></td>
+                  <td><span x-html="statusBadge(r.status || 'active')"></span></td>
+                  <td class="font-semibold" x-text="r.total_prize || r.prize_pool || '-'"></td>
+                  <td class="text-xs text-slate-400" x-text="r.created_at || '-'"></td>
+                  <td>
+                    <div class="flex gap-1">
+                      <button @click="drawLottery(r.id)" x-show="r.status === 'active'" class="btn btn-green text-xs"><i class="fas fa-wand-magic-sparkles mr-1"></i> <span x-text="t('draw')"></span></button>
+                      <button @click="deleteLottery(r.id)" x-show="rbac('manage_games')" class="btn btn-red text-xs"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="lotteryRounds.length === 0">
+                <td colspan="6" class="text-center py-8 text-slate-500"><i class="fas fa-dice text-4xl mb-3 block opacity-30"></i><p x-text="t('no_data')"></p></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="font-bold text-sm"><i class="fas fa-plus-circle mr-1 text-green-400"></i> <span x-text="t('create_round')"></span></h3>
+      </div>
+      <div class="card-body space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label" x-text="t('type')"></label>
+            <select x-model="lotteryForm.draw_type" class="form-input">
+              <option value="hourly">Hourly</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" x-text="t('amount')"></label>
+            <input x-model="lotteryForm.ticket_price" type="number" class="form-input" placeholder="50">
+          </div>
+        </div>
+        <button @click="createLotteryRound()" class="btn btn-green" x-text="t('create')"></button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== WHEEL TAB ==================== -->
+  <div x-show="mainTab==='wheel'" x-transition>
+
+    <div class="card mb-6">
+      <div class="card-header">
+        <h3 class="font-bold text-sm"><i class="fas fa-circle-notch mr-1 text-amber-400"></i> <span x-text="t('wheel_rounds')"></span></h3>
+        <button @click="loadWheelRounds()" class="btn btn-ghost text-xs"><i class="fas fa-refresh mr-1"></i> <span x-text="t('refresh')"></span></button>
+      </div>
+      <div class="card-body">
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th x-text="t('status')"></th>
+                <th x-text="t('amount')"></th>
+                <th x-text="t('date')"></th>
+                <th x-text="t('actions')"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="r in wheelRounds" :key="r.id">
+                <tr>
+                  <td class="text-xs text-slate-500" x-text="r.id"></td>
+                  <td><span x-html="statusBadge(r.status || 'active')"></span></td>
+                  <td class="font-semibold" x-text="r.total_bets || '-'"></td>
+                  <td class="text-xs text-slate-400" x-text="r.created_at || '-'"></td>
+                  <td>
+                    <div class="flex gap-1">
+                      <button @click="endWheelRound(r.id)" x-show="r.status === 'active'" class="btn btn-amber text-xs"><i class="fas fa-stop mr-1"></i> <span x-text="t('end_round')"></span></button>
+                      <button @click="deleteWheelRound(r.id)" x-show="rbac('manage_games')" class="btn btn-red text-xs"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="wheelRounds.length === 0">
+                <td colspan="5" class="text-center py-8 text-slate-500"><i class="fas fa-circle-notch text-4xl mb-3 block opacity-30"></i><p x-text="t('no_data')"></p></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="font-bold text-sm"><i class="fas fa-plus-circle mr-1 text-green-400"></i> <span x-text="t('create_round')"></span></h3>
+      </div>
+      <div class="card-body space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label" x-text="t('min_bet')"></label>
+            <input x-model="wheelForm.min_bet" type="number" class="form-input" placeholder="10">
+          </div>
+          <div>
+            <label class="form-label" x-text="t('max_bet')"></label>
+            <input x-model="wheelForm.max_bet" type="number" class="form-input" placeholder="2000">
+          </div>
+        </div>
+        <button @click="createWheelRound()" class="btn btn-green" x-text="t('create')"></button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== TRADING TAB ==================== -->
+  <div x-show="mainTab==='trading'" x-transition>
+
+    <div class="stats-grid-4 mb-6">
+      <div class="stat-card">
+        <div class="stat-val" x-text="fmtNum(tradeStats.total)"></div>
+        <div class="stat-label" x-text="t('total')"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val text-amber-400" x-text="fmtNum(tradeStats.pending)"></div>
+        <div class="stat-label" x-text="t('pending')"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val text-green-400" x-text="fmtNum(tradeStats.buy)"></div>
+        <div class="stat-label" x-text="t('buy')"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val text-red-400" x-text="fmtNum(tradeStats.sell)"></div>
+        <div class="stat-label" x-text="t('sell')"></div>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-4">
+      <button @click="tradeFilter = 'all'" :class="tradeFilter === 'all' ? 'bg-blue-600 text-white' : ''" class="filter-btn">
+        <span x-text="t('all')"></span> <span class="text-xs opacity-70" x-text="'(' + fmtNum(tradeStats.total) + ')'"></span>
+      </button>
+      <button @click="tradeFilter = 'pending'" :class="tradeFilter === 'pending' ? 'bg-amber-600 text-white' : ''" class="filter-btn">
+        <span x-text="t('pending')"></span> <span class="text-xs opacity-70" x-text="'(' + fmtNum(tradeStats.pending) + ')'"></span>
+      </button>
+      <button @click="tradeFilter = 'buy'" :class="tradeFilter === 'buy' ? 'bg-green-600 text-white' : ''" class="filter-btn">
+        <span x-text="t('buy')"></span> <span class="text-xs opacity-70" x-text="'(' + fmtNum(tradeStats.buy) + ')'"></span>
+      </button>
+      <button @click="tradeFilter = 'sell'" :class="tradeFilter === 'sell' ? 'bg-red-600 text-white' : ''" class="filter-btn">
+        <span x-text="t('sell')"></span> <span class="text-xs opacity-70" x-text="'(' + fmtNum(tradeStats.sell) + ')'"></span>
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th x-text="t('user')"></th>
+                <th x-text="t('type')"></th>
+                <th x-text="t('asset')"></th>
+                <th x-text="t('network')"></th>
+                <th x-text="t('amount')"></th>
+                <th x-text="t('currency')"></th>
+                <th x-text="t('status')"></th>
+                <th x-text="t('date')"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="order in filteredTradeOrders" :key="order.id">
+                <tr>
+                  <td class="text-xs text-slate-500" x-text="order.id"></td>
+                  <td class="font-medium">
+                    <span x-text="order.user_name || order.user_id || '-'"></span>
+                    <span x-show="order.user_id && order.user_name" class="text-[10px] text-slate-500 block" x-text="'ID: ' + order.user_id"></span>
+                  </td>
+                  <td>
+                    <span class="badge" :class="order.type === 'buy' ? 'badge-green' : 'badge-red'" x-text="order.type === 'buy' ? t('buy') : t('sell')"></span>
+                  </td>
+                  <td class="font-mono text-xs" x-text="order.asset || '-'"></td>
+                  <td class="text-xs" x-text="order.network || '-'"></td>
+                  <td class="font-semibold font-mono text-xs" x-text="order.amount || '-'"></td>
+                  <td x-text="order.currency || '-'"></td>
+                  <td><span x-html="statusBadge(order.status || 'pending')"></span></td>
+                  <td class="text-xs text-slate-400 whitespace-nowrap" x-text="order.date || order.created_at || '-'"></td>
+                </tr>
+              </template>
+              <tr x-show="filteredTradeOrders.length === 0">
+                <td colspan="9" class="text-center py-10 text-slate-500">
+                  <i class="fas fa-coins text-4xl mb-3 block opacity-30"></i>
+                  <p x-text="t('no_trading_orders')"></p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== SVRP TAB ==================== -->
+  <div x-show="mainTab==='svrp'" x-transition>
+
+    <div class="sub-tabs">
+      <button @click="switchSvrpTab('wallets')" :class="svrpTab === 'wallets' && 'active'" class="sub-tab">
+        <i class="fas fa-wallet mr-1"></i> <span x-text="t('wallets')"></span>
+      </button>
+      <button @click="switchSvrpTab('recovery')" :class="svrpTab === 'recovery' && 'active'" class="sub-tab">
+        <i class="fas fa-rotate-left mr-1"></i> <span x-text="t('recovery_requests')"></span>
+      </button>
+      <button @click="switchSvrpTab('bonus')" :class="svrpTab === 'bonus' && 'active'" class="sub-tab">
+        <i class="fas fa-gift mr-1"></i> <span x-text="t('bonus_requests')"></span>
+      </button>
+      <button @click="switchSvrpTab('promo')" :class="svrpTab === 'promo' && 'active'" class="sub-tab">
+        <i class="fas fa-ticket mr-1"></i> <span x-text="t('promo_codes')"></span>
+      </button>
+      <button @click="switchSvrpTab('accounts')" :class="svrpTab === 'accounts' && 'active'" class="sub-tab">
+        <i class="fas fa-id-card mr-1"></i> <span x-text="t('company_accounts')"></span>
+      </button>
+    </div>
+
+    <!-- Wallets -->
+    <div x-show="svrpTab === 'wallets'">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div class="stat-card">
+          <div class="stat-val text-green-400" x-text="fmtAmount(walletStats.total_balance, 'USD')"></div>
+          <div class="stat-label" x-text="t('total_balance')"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val text-amber-400" x-text="fmtAmount(walletStats.total_frozen, 'USD')"></div>
+          <div class="stat-label" x-text="t('total_frozen')"></div>
+        </div>
+      </div>
+      <div class="mb-4">
+        <div class="relative max-w-md">
+          <i class="fas fa-search absolute right-3 top-3 text-slate-400 text-sm"></i>
+          <input x-model="walletSearch" type="text" :placeholder="t('search_users')" class="form-input pr-10">
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <div class="overflow-x-auto">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th x-text="t('user')"></th>
+                  <th>User ID</th>
+                  <th x-text="t('svrp_balance')"></th>
+                  <th x-text="t('pending_friends')"></th>
+                  <th x-text="t('total_used')"></th>
+                  <th x-text="t('wagering')"></th>
+                  <th x-text="t('currency')"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="w in filteredWallets" :key="w.id || w.user_id">
+                  <tr>
+                    <td class="font-medium" x-text="w.user_name || w.username || w.telegram_id || '-'"></td>
+                    <td class="font-mono text-xs text-slate-400" x-text="w.telegram_id || w.user_id || '-'"></td>
+                    <td class="font-semibold font-mono text-sm" :class="(+w.wagering_completed||0)>=(+w.wagering_required||3) ? 'text-purple-400' : 'text-blue-400'" x-text="fmtAmount(w.balance, w.currency)"></td>
+                    <td class="font-mono text-sm text-amber-400" x-text="fmtAmount(w.pending_balance||0, w.currency)"></td>
+                    <td class="font-mono text-sm text-slate-400" x-text="fmtAmount(w.total_used||0, w.currency)"></td>
+                    <td class="text-xs">
+                      <div class="flex items-center gap-2">
+                        <div class="h-1.5 w-16 bg-slate-700 rounded-full overflow-hidden">
+                          <div class="h-full rounded-full transition-all" :class="(+w.wagering_completed||0)>=(+w.wagering_required||3) ? 'bg-green-500' : 'bg-purple-500'" :style="`width:${Math.min(100,Math.round((+w.wagering_completed||0)/(+w.wagering_required||3)*100))}%`"></div>
+                        </div>
+                        <span class="text-slate-400" x-text="`${w.wagering_completed||0}/${w.wagering_required||3}`"></span>
+                        <span x-show="(+w.wagering_completed||0)>=(+w.wagering_required||3)" class="text-green-400 text-xs font-semibold"><i class="fas fa-check"></i></span>
+                      </div>
+                    </td>
+                    <td x-text="w.currency || '-'"></td>
+                  </tr>
+                </template>
+                <tr x-show="filteredWallets.length === 0">
+                  <td colspan="7" class="text-center py-10 text-slate-500">
+                    <i class="fas fa-wallet text-4xl mb-3 block opacity-30"></i>
+                    <p x-text="t('no_wallets')"></p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recovery Requests -->
+    <div x-show="svrpTab === 'recovery'">
+      <div class="card">
+        <div class="card-body">
+          <div class="overflow-x-auto">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th x-text="t('user')"></th>
+                  <th x-text="t('company')"></th>
+                  <th x-text="t('account_number')"></th>
+                  <th x-text="t('amount')"></th>
+                  <th x-text="t('status')"></th>
+                  <th x-text="t('date')"></th>
+                  <th x-text="t('actions')"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="r in recoveryRequests" :key="r.id">
+                  <tr>
+                    <td class="text-xs text-slate-500" x-text="r.id"></td>
+                    <td class="font-medium" x-text="r.user_name || r.user_id || '-'"></td>
+                    <td class="text-xs">
+                      <span x-text="r.company_name || '-'"></span>
+                      <template x-if="r.affiliate_link">
+                        <a :href="r.affiliate_link" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 mr-1"><i class="fas fa-external-link-alt text-[10px]"></i></a>
+                      </template>
+                    </td>
+                    <td class="text-xs font-mono">
+                      <span x-text="r.account_number || '-'"></span>
+                      <template x-if="(r.photo_file_id || '').startsWith('web:')">
+                        <a :href="'/api/svrp/requests/' + r.id + '/screenshot'" target="_blank" class="text-amber-400 hover:text-amber-300 mr-1"><i class="fas fa-image text-[11px]"></i></a>
+                      </template>
+                    </td>
+                    <td class="font-semibold" x-text="fmtAmount(r.amount, r.currency)"></td>
+                    <td><span x-html="statusBadge(r.status || 'pending')"></span></td>
+                    <td class="text-xs text-slate-400" x-text="r.created_at || '-'"></td>
+                    <td>
+                      <template x-if="r.status === 'pending'">
+                        <div class="flex items-center gap-1">
+                          <button @click="approveItem(r, 'recovery')" x-show="rbac('approve_deposits')" class="btn btn-green text-xs"><i class="fas fa-check mr-1"></i> <span x-text="t('approve')"></span></button>
+                          <button @click="rejectItem(r, 'recovery')" x-show="rbac('reject_deposits')" class="btn btn-red text-xs"><i class="fas fa-times mr-1"></i> <span x-text="t('reject')"></span></button>
+                        </div>
+                      </template>
+                      <span x-show="r.status !== 'pending'" class="text-xs text-slate-500">-</span>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="recoveryRequests.length === 0">
+                  <td colspan="8" class="text-center py-10 text-slate-500">
+                    <i class="fas fa-rotate-left text-4xl mb-3 block opacity-30"></i>
+                    <p x-text="t('no_recovery_requests')"></p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div x-show="showApprovalModal" x-transition class="modal-bg" @click.self="showApprovalModal = false">
+        <div class="modal-content" @click.stop>
+          <h3 class="font-bold text-lg mb-4" x-text="t('confirm_approval')"></h3>
+          <div class="space-y-4">
+            <div>
+              <label class="form-label" x-text="t('approved_amount')"></label>
+              <input x-model="approvalAmount" type="number" step="any" class="form-input" :placeholder="t('enter_amount')">
+            </div>
+            <div class="flex gap-3">
+              {% if not admin_perms or admin_perms.get('approve_deposits') %}
+              <button @click="confirmApproval()" class="flex-1 btn btn-green" x-text="t('confirm')"></button>
+              {% endif %}
+              <button @click="showApprovalModal = false" class="flex-1 btn btn-ghost" x-text="t('cancel')"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bonus Requests -->
+    <div x-show="svrpTab === 'bonus'">
+      <div class="card">
+        <div class="card-body">
+          <div class="overflow-x-auto">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th x-text="t('user')"></th>
+                  <th x-text="t('type')"></th>
+                  <th x-text="t('amount')"></th>
+                  <th x-text="t('status')"></th>
+                  <th x-text="t('date')"></th>
+                  <th x-text="t('actions')"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="b in bonusRequests" :key="b.id">
+                  <tr>
+                    <td class="text-xs text-slate-500" x-text="b.id"></td>
+                    <td class="font-medium" x-text="b.user_name || b.user_id || '-'"></td>
+                    <td class="text-xs" x-text="b.type || '-'"></td>
+                    <td class="font-semibold" x-text="fmtAmount(b.amount, b.currency)"></td>
+                    <td><span x-html="statusBadge(b.status || 'pending')"></span></td>
+                    <td class="text-xs text-slate-400" x-text="b.created_at || '-'"></td>
+                    <td>
+                      <template x-if="b.status === 'pending'">
+                        <div class="flex items-center gap-1">
+                          <button @click="approveItem(b, 'bonus')" x-show="rbac('approve_deposits')" class="btn btn-green text-xs"><i class="fas fa-check mr-1"></i> <span x-text="t('approve')"></span></button>
+                          <button @click="rejectItem(b, 'bonus')" x-show="rbac('reject_deposits')" class="btn btn-red text-xs"><i class="fas fa-times mr-1"></i> <span x-text="t('reject')"></span></button>
+                        </div>
+                      </template>
+                      <span x-show="b.status !== 'pending'" class="text-xs text-slate-500">-</span>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="bonusRequests.length === 0">
+                  <td colspan="7" class="text-center py-10 text-slate-500">
+                    <i class="fas fa-gift text-4xl mb-3 block opacity-30"></i>
+                    <p x-text="t('no_bonus_requests')"></p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Promo Codes -->
+    <div x-show="svrpTab === 'promo'">
+      {% if not admin_perms or admin_perms.get('manage_companies') %}
+      <div class="flex justify-end mb-4">
+        <button @click="openPromoModal()" class="btn btn-blue"><i class="fas fa-plus mr-1"></i> <span x-text="t('create_promo')"></span></button>
+      </div>
+      {% endif %}
+      <div class="card">
+        <div class="card-body">
+          <div class="overflow-x-auto">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th x-text="t('code')"></th>
+                  <th x-text="t('amount')"></th>
+                  <th x-text="t('currency')"></th>
+                  <th x-text="t('uses')"></th>
+                  <th x-text="t('max_uses')"></th>
+                  <th x-text="t('expires')"></th>
+                  <th x-text="t('status')"></th>
+                  <th x-text="t('actions')"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="p in promoCodes" :key="p.id">
+                  <tr>
+                    <td><span class="font-mono font-bold text-amber-400" x-text="p.code"></span></td>
+                    <td class="font-semibold" x-text="fmtAmount(p.amount, p.currency)"></td>
+                    <td x-text="p.currency || '-'"></td>
+                    <td><span class="text-sm" x-text="(p.used_count || 0) + ' / ' + (p.max_uses || '∞')"></span></td>
+                    <td class="text-xs" x-text="p.max_uses || t('unlimited')"></td>
+                    <td class="text-xs" x-text="p.expires_at || t('no_expiry')"></td>
+                    <td><span x-html="statusBadge(p.is_active ? 'active' : 'inactive')"></span></td>
+                    <td>
+                      <button @click="togglePromo(p)" x-show="rbac('manage_companies')" class="btn btn-ghost text-xs"><i class="fas fa-power-off"></i></button>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="promoCodes.length === 0">
+                  <td colspan="8" class="text-center py-10 text-slate-500">
+                    <i class="fas fa-ticket text-4xl mb-3 block opacity-30"></i>
+                    <p x-text="t('no_promo_codes')"></p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div x-show="showPromoModal" x-transition class="modal-bg" @click.self="showPromoModal = false">
+        <div class="modal-content" @click.stop>
+          <h3 class="font-bold text-lg mb-4" x-text="t('create_promo')"></h3>
+          <form @submit.prevent="createPromo()" class="space-y-4">
+            <div>
+              <label class="form-label" x-text="t('code')"></label>
+              <input x-model="promoForm.code" required type="text" class="form-input font-mono" placeholder="WELCOME2024">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="form-label" x-text="t('amount')"></label>
+                <input x-model="promoForm.amount" required type="number" step="any" class="form-input" placeholder="10">
+              </div>
+              <div>
+                <label class="form-label" x-text="t('currency')"></label>
+                <select x-model="promoForm.currency" required class="form-input">
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="USDT">USDT</option>
+                  <option value="BTC">BTC</option>
+                  <option value="ETH">ETH</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" x-text="t('max_uses')"></label>
+              <input x-model="promoForm.max_uses" type="number" class="form-input" :placeholder="t('leave_empty_unlimited')">
+            </div>
+            <div>
+              <label class="form-label" x-text="t('expiry_date')"></label>
+              <input x-model="promoForm.expires_at" type="datetime-local" class="form-input">
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button type="submit" class="flex-1 btn btn-blue" x-text="t('create')"></button>
+              <button type="button" @click="showPromoModal = false" class="flex-1 btn btn-ghost" x-text="t('cancel')"></button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Company Accounts -->
+    <div x-show="svrpTab === 'accounts'">
+      <div class="card">
+        <div class="card-body">
+          <div class="overflow-x-auto">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th x-text="t('user')"></th>
+                  <th x-text="t('company')"></th>
+                  <th x-text="t('account_number')"></th>
+                  <th x-text="t('account_source')"></th>
+                  <th x-text="t('status')"></th>
+                  <th x-text="t('date')"></th>
+                  <th x-text="t('actions')"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="a in compAccounts" :key="a.id">
+                  <tr>
+                    <td class="text-xs text-slate-500" x-text="a.id"></td>
+                    <td class="font-medium" x-text="a.user_id"></td>
+                    <td x-text="a.company_name || a.company_id"></td>
+                    <td class="font-mono text-xs" x-text="a.account_number"></td>
+                    <td class="text-xs" x-text="a.account_source === 'new' ? t('new_account') : (a.account_source === 'existing' ? t('existing_account') : '-')"></td>
+                    <td><span x-html="statusBadge(a.status || 'active')"></span></td>
+                    <td class="text-xs text-slate-400" x-text="a.created_at || '-'"></td>
+                    <td>
+                      <template x-if="a.status === 'pending'">
+                        <div class="flex items-center gap-1">
+                          <button @click="decideAccount(a, 'approve')" x-show="rbac('approve_deposits')" class="btn btn-green text-xs"><i class="fas fa-check mr-1"></i> <span x-text="t('confirm')"></span></button>
+                          <button @click="decideAccount(a, 'reject')" x-show="rbac('approve_deposits')" class="btn btn-red text-xs"><i class="fas fa-times mr-1"></i> <span x-text="t('reject')"></span></button>
+                        </div>
+                      </template>
+                      <span x-show="a.status !== 'pending'" class="text-xs text-slate-500">-</span>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="compAccounts.length === 0">
+                  <td colspan="8" class="text-center py-10 text-slate-500">
+                    <i class="fas fa-id-card text-4xl mb-3 block opacity-30"></i>
+                    <p x-text="t('no_accounts')"></p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function gamesPage() {
+  return {
+    mainTab: 'dashboard',
+    dashTab: 'games',
+    svrpTab: 'wallets',
+    stats: {},
+    alerts: [],
+    deposits: [],
+    games: [],
+    players: [],
+    sortBy: 'total_wagered',
+    config: {},
+    showAddGame: false,
+    newGame: { name: '', icon: '🎮', description: '', min_bet: 10, max_bet: 1000, base_win_chance: 0.45, house_edge_pct: 15 },
+    lotteryRounds: [],
+    lotteryForm: { draw_type: 'hourly', ticket_price: 50 },
+    wheelRounds: [],
+    wheelForm: { min_bet: 10, max_bet: 2000 },
+    tradeOrders: [],
+    tradeFilter: 'all',
+    tradeStats: { total: 0, pending: 0, buy: 0, sell: 0 },
+    wallets: [],
+    walletSearch: '',
+    walletStats: { total_balance: 0, total_frozen: 0 },
+    recoveryRequests: [],
+    bonusRequests: [],
+    promoCodes: [],
+    showPromoModal: false,
+    promoForm: { code: '', amount: '', currency: 'USD', max_uses: '', expires_at: '' },
+    showApprovalModal: false,
+    approvalAmount: '',
+    approvalTarget: null,
+    approvalType: null,
+    compAccounts: [],
+
+    get filteredTradeOrders() {
+      if (this.tradeFilter === 'all') return this.tradeOrders;
+      if (this.tradeFilter === 'pending') return this.tradeOrders.filter(o => o.status === 'pending');
+      return this.tradeOrders.filter(o => o.type === this.tradeFilter);
+    },
+
+    get filteredWallets() {
+      const q = (this.walletSearch || '').toLowerCase();
+      if (!q) return this.wallets;
+      return this.wallets.filter(w =>
+        (w.user_name || '').toLowerCase().includes(q) ||
+        (w.username || '').toLowerCase().includes(q) ||
+        String(w.user_id || '').includes(q)
+      );
+    },
+
+    async init() {
+      await this.loadDashboardData();
+    },
+
+    async loadDashboardData() {
+      await Promise.all([this.loadStats(), this.loadAlerts(), this.loadDeposits(), this.loadGames(), this.loadPlayers(), this.loadConfig()]);
+      this._dashTimer = setInterval(() => { if (this.mainTab === 'dashboard') { this.loadStats(); this.loadAlerts(); this.loadDeposits(); } }, 10000);
+    },
+
+    async switchMainTab(tab) {
+      this.mainTab = tab;
+      if (tab === 'lottery') await this.loadLotteryRounds();
+      if (tab === 'wheel') await this.loadWheelRounds();
+      if (tab === 'trading') await this.loadTradingOrders();
+      if (tab === 'svrp') await this.switchSvrpTab(this.svrpTab);
+    },
+
+    async switchSvrpTab(tab) {
+      this.svrpTab = tab;
+      if (tab === 'wallets') await this.loadWallets();
+      if (tab === 'recovery') await this.loadRecovery();
+      if (tab === 'bonus') await this.loadBonus();
+      if (tab === 'promo') await this.loadPromo();
+      if (tab === 'accounts') await this.loadAccounts();
+    },
+
+    async loadStats() {
+      try { const r = await fetch('/api/games/stats'); this.stats = await r.json(); } catch(e) {}
+    },
+    async loadAlerts() {
+      try { const r = await fetch('/api/games/alerts'); this.alerts = (await r.json()).alerts || []; } catch(e) {}
+    },
+    async loadDeposits() {
+      try { const r = await fetch('/api/deposit/pending'); this.deposits = (await r.json()).deposits || []; } catch(e) {}
+    },
+    async loadGames() {
+      try { const r = await fetch('/api/games/all'); this.games = (await r.json()).games || []; } catch(e) {}
+    },
+    async loadPlayers() {
+      try { const r = await fetch('/api/games/top-players?sort=' + this.sortBy); this.players = (await r.json()).players || []; } catch(e) {}
+    },
+    async loadConfig() {
+      try { const r = await fetch('/api/games/config'); this.config = (await r.json()).config || {}; } catch(e) {}
+    },
+
+    async approveDeposit(id) {
+      await fetch('/api/deposit/' + id + '/approve', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      toast('Approved', 'success'); this.loadDeposits(); this.loadStats();
+    },
+    async rejectDeposit(id) {
+      await fetch('/api/deposit/' + id + '/reject', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      toast('Rejected', 'info'); this.loadDeposits();
+    },
+    async resolveAlert(id) {
+      toast('Resolved', 'success'); this.loadAlerts();
+    },
+    async toggleGame(id) {
+      await fetch('/api/games/' + id + '/toggle', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      this.loadGames();
+    },
+    async addGame() {
+      await fetch('/api/games/create', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(this.newGame) });
+      this.showAddGame = false; this.loadGames(); toast('Game added', 'success');
+    },
+    async saveConfig() {
+      await fetch('/api/games/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(this.config) });
+      toast('Config saved', 'success');
+    },
+    async toggleVex(uid, isPartner) {
+      await fetch('/api/player/vex-status', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({uid, is_partner: isPartner}) });
+      this.loadPlayers(); toast('VEX status updated', 'success');
+    },
+    async cooldownPlayer(uid) {
+      toast('Cooldown activated', 'info'); this.loadPlayers();
+    },
+
+    getSegment(p) {
+      const g = Number(p.total_games || 0);
+      const net = Number(p.net_position || 0);
+      const heat = Number(p.heat_level || 0);
+      if (g < 10) return 'new';
+      if (net > 1000) return 'winner';
+      if (net < -1000) return 'loser';
+      if (heat > 7) return 'hot';
+      if (Number(p.churn_risk || 0) > 60) return 'churning';
+      if (Number(p.lifetime_value || 0) > 5000) return 'vip';
+      return 'regular';
+    },
+    segmentColor(seg) {
+      const colors = { new:'bg-green-600', winner:'bg-red-600', loser:'bg-yellow-600', hot:'bg-orange-600', churning:'bg-blue-600', vip:'bg-purple-600', regular:'bg-slate-600' };
+      return colors[seg] || 'bg-slate-600';
+    },
+
+    async loadLotteryRounds() {
+      try { const r = await fetch('/api/lottery/rounds'); const d = await r.json(); this.lotteryRounds = d.rounds || d || []; } catch(e) {}
+    },
+    async createLotteryRound() {
+      try {
+        await fetch('/api/lottery/create', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(this.lotteryForm) });
+        toast('Round created', 'success'); this.loadLotteryRounds();
+      } catch(e) { toast('Error', 'error'); }
+    },
+    async drawLottery(id) {
+      if (!confirm(t('confirm_draw'))) return;
+      try {
+        const r = await fetch('/api/lottery/' + id + '/draw', { method: 'POST', headers: {'Content-Type':'application/json'} });
+        const d = await r.json();
+        toast(d.message || 'Draw complete', 'success'); this.loadLotteryRounds();
+      } catch(e) { toast('Error', 'error'); }
+    },
+    async deleteLottery(id) {
+      if (!confirm(t('confirm_delete'))) return;
+      try {
+        await fetch('/api/lottery/' + id, { method: 'DELETE' });
+        toast('Deleted', 'success'); this.loadLotteryRounds();
+      } catch(e) { toast('Error', 'error'); }
+    },
+
+    async loadWheelRounds() {
+      try { const r = await fetch('/api/wheel/rounds'); const d = await r.json(); this.wheelRounds = d.rounds || d || []; } catch(e) {}
+    },
+    async createWheelRound() {
+      try {
+        await fetch('/api/wheel/create', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(this.wheelForm) });
+        toast('Round created', 'success'); this.loadWheelRounds();
+      } catch(e) { toast('Error', 'error'); }
+    },
+    async endWheelRound(id) {
+      if (!confirm(t('confirm_end_round'))) return;
+      try {
+        const r = await fetch('/api/wheel/' + id + '/end', { method: 'POST', headers: {'Content-Type':'application/json'} });
+        const d = await r.json();
+        toast(d.message || 'Round ended', 'success'); this.loadWheelRounds();
+      } catch(e) { toast('Error', 'error'); }
+    },
+    async deleteWheelRound(id) {
+      if (!confirm(t('confirm_delete'))) return;
+      try {
+        await fetch('/api/wheel/' + id, { method: 'DELETE' });
+        toast('Deleted', 'success'); this.loadWheelRounds();
+      } catch(e) { toast('Error', 'error'); }
+    },
+
+    async loadTradingOrders() {
+      try {
+        const r = await fetch('/api/trading/orders');
+        const d = await r.json();
+        this.tradeOrders = d.orders || d || [];
+        this.tradeStats.total = this.tradeOrders.length;
+        this.tradeStats.pending = this.tradeOrders.filter(o => o.status === 'pending').length;
+        this.tradeStats.buy = this.tradeOrders.filter(o => o.type === 'buy').length;
+        this.tradeStats.sell = this.tradeOrders.filter(o => o.type === 'sell').length;
+      } catch(e) {}
+    },
+
+    async loadWallets() {
+      try {
+        const r = await fetch('/api/svrp/wallets');
+        const d = await r.json();
+        this.wallets = d.wallets || d || [];
+        this.walletStats.total_balance = this.wallets.reduce((s, w) => s + (parseFloat(w.balance) || 0), 0);
+        this.walletStats.total_frozen = this.wallets.reduce((s, w) => s + (parseFloat(w.frozen) || 0), 0);
+      } catch(e) {}
+    },
+    async loadRecovery() {
+      if (this.recoveryRequests.length > 0) return;
+      try {
+        const r = await fetch('/api/svrp/requests');
+        const d = await r.json();
+        this.recoveryRequests = d.requests || d || [];
+      } catch(e) {}
+    },
+    async loadBonus() {
+      if (this.bonusRequests.length > 0) return;
+      try {
+        const r = await fetch('/api/svrp/bonus-requests');
+        const d = await r.json();
+        this.bonusRequests = d.requests || d || [];
+      } catch(e) {}
+    },
+    async loadAccounts() {
+      try {
+        const r = await fetch('/api/comp/admin/data');
+        const d = await r.json();
+        this.compAccounts = d.accounts || [];
+      } catch(e) {}
+    },
+    async decideAccount(a, action) {
+      if (action === 'reject' && !confirm(t('confirm_reject'))) return;
+      try {
+        await fetch('/api/comp/admin/account/' + a.id, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ action }),
+        });
+        toast(action === 'approve' ? t('account_confirmed') : t('account_rejected'), 'success');
+        await this.loadAccounts();
+      } catch(e) { toast('Error', 'error'); }
+    },
+
+    async loadPromo() {
+      if (this.promoCodes.length > 0) return;
+      try {
+        const r = await fetch('/api/svrp/promo-codes');
+        const d = await r.json();
+        this.promoCodes = d.codes || d || [];
+      } catch(e) {}
+    },
+    openPromoModal() {
+      this.promoForm = { code: '', amount: '', currency: 'USD', max_uses: '', expires_at: '' };
+      this.showPromoModal = true;
+    },
+    async createPromo() {
+      try {
+        await fetch('/api/svrp/promo-codes', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(this.promoForm),
+        });
+        toast('Promo created', 'success');
+        this.showPromoModal = false;
+        this.promoCodes = [];
+        await this.loadPromo();
+      } catch(e) { toast('Error', 'error'); }
+    },
+    async togglePromo(p) {
+      try {
+        await fetch('/api/svrp/promo-codes', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ code: p.code, status: p.is_active ? 'inactive' : 'active' })
+        });
+        toast('Status updated', 'success');
+        this.promoCodes = [];
+        await this.loadPromo();
+      } catch(e) { toast('Error', 'error'); }
+    },
+
+    approveItem(item, type) {
+      this.approvalTarget = item;
+      this.approvalType = type;
+      this.approvalAmount = item.amount || '';
+      this.showApprovalModal = true;
+    },
+    async confirmApproval() {
+      if (!this.approvalTarget) return;
+      try {
+        const url = this.approvalType === 'recovery' ?
+          '/api/svrp/requests/' + this.approvalTarget.id + '/approve' :
+          '/api/svrp/bonus-requests/' + this.approvalTarget.id + '/approve';
+        await fetch(url, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ amount: this.approvalAmount }),
+        });
+        toast('Approved', 'success');
+        this.showApprovalModal = false;
+        this.approvalTarget = null;
+        this.approvalType = null;
+        if (this.svrpTab === 'recovery') { this.recoveryRequests = []; await this.loadRecovery(); }
+        else { this.bonusRequests = []; await this.loadBonus(); }
+      } catch(e) { toast('Error', 'error'); }
+    },
+    async rejectItem(item, type) {
+      if (!confirm(t('confirm_reject'))) return;
+      try {
+        const url = type === 'recovery' ?
+          '/api/svrp/requests/' + item.id + '/reject' :
+          '/api/svrp/bonus-requests/' + item.id + '/reject';
+        await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+        toast('Rejected', 'success');
+        if (type === 'recovery') { this.recoveryRequests = []; await this.loadRecovery(); }
+        else { this.bonusRequests = []; await this.loadBonus(); }
+      } catch(e) { toast('Error', 'error'); }
+    },
+
+    fmtNum(n) { return Number(n || 0).toLocaleString(); },
+    fmtAmount(n, cur) { return parseFloat(n || 0).toLocaleString() + (cur ? ' ' + cur : ''); }
+  };
+}
+</script>
+{% endblock %}

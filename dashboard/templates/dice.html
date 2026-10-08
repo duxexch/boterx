@@ -1,13 +1,21 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js?v=20260823"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
+<meta property="og:title" content="VEX Games — العب واربح">
+<meta property="og:description" content="منصة ألعاب تيليغرام الأقوى — جوائز حقيقية وألعاب مثيرة">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://vex.deals/static/icons/og-domino.jpg?v=20260821b">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://vex.deals/static/icons/og-domino.jpg?v=20260821b">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Dice — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260816logo">
 <style>
 /* ── Green felt arena ── */
 .game-area{overflow:hidden;position:relative;flex:1;background:linear-gradient(180deg,#0d4a23 0%,#1a6a33 40%,#0d5c2e 100%)}
@@ -36,8 +44,12 @@
 .num-btn.selected{border-color:#7eff9a;background:linear-gradient(135deg,#0d7a1f,#1a8a2e);color:#fff;box-shadow:0 0 20px rgba(0,231,1,.4),inset 0 0 10px rgba(255,255,255,.1)}
 .num-btn .num-label{position:absolute;bottom:2px;font-size:9px;font-weight:700;opacity:.7}
 .num-btn.selected .num-label{opacity:1;color:#7eff9a}
-.bet-row{display:flex;gap:6px;align-items:center}
-.bet-input{flex:1;background:var(--bg);border:2px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:16px;font-weight:700;text-align:center;outline:none;font-family:'Courier New',monospace}
+.bet-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.bet-actions{display:flex;gap:3px}
+.bet-action-btn{padding:6px 10px;border-radius:6px;background:var(--surface-3);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:800;cursor:pointer;transition:all .1s}
+.bet-action-btn:active{transform:scale(.9)}
+.bet-action-btn.bet-max-btn{background:rgba(251,191,36,.1);color:var(--gold);border-color:rgba(251,191,36,.3)}
+.bet-input{flex:1;min-width:60px;background:var(--bg);border:2px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:16px;font-weight:700;text-align:center;outline:none;font-family:'Courier New',monospace}
 .bet-input:focus{border-color:#7eff9a}
 .quick-bets{display:flex;gap:3px;flex-wrap:wrap}
 .qb{padding:4px 8px;border-radius:6px;background:var(--surface-3);border:1px solid var(--border);color:var(--muted);font-size:10px;font-weight:700;cursor:pointer;transition:all .1s}
@@ -46,6 +58,19 @@
 .x-btn{padding:6px 12px;border-radius:8px;background:var(--surface-3);border:2px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;transition:all .1s;font-family:'Courier New',monospace}
 .x-btn:active{transform:scale(.9)}
 .x-btn.selected{border-color:#7eff9a;background:rgba(0,231,1,.1);color:#7eff9a}
+/* ── Mode tabs (exact / even / odd) ── */
+.mode-tabs{display:flex;gap:4px}
+.mode-tab{flex:1;padding:7px 4px;border-radius:8px;background:var(--surface-3);border:2px solid var(--border);color:var(--muted);font-size:11px;font-weight:800;cursor:pointer;transition:all .15s;text-align:center}
+.mode-tab.selected{border-color:#00e701;background:rgba(0,231,1,.12);color:#00e701}
+/* ── Potential win + auto controls ── */
+.potential-win{font-size:11px;font-weight:700;color:var(--muted);text-align:center;padding:4px;background:var(--surface-3);border-radius:8px}
+.potential-win b{color:#fbbf24}
+.auto-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.auto-toggle{padding:5px 10px;border-radius:8px;background:var(--surface-3);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:800;cursor:pointer}
+.auto-toggle.on{border-color:#00e701;color:#00e701;background:rgba(0,231,1,.1)}
+.auto-count{background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:11px;padding:5px;font-family:inherit}
+.auto-stop{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer}
+.auto-stop input{accent-color:#00e701}
 /* ── Power bar ── */
 .power-bar-container{position:relative;height:36px;background:var(--bg);border:2px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;touch-action:none}
 .power-bar-fill{height:100%;width:50%;background:linear-gradient(90deg,#0d7a1f,#7eff9a,#00e701,#ff4757);border-radius:8px;transition:width .1s}
@@ -72,6 +97,7 @@
 .prow .ppred{font-size:10px;color:var(--muted);margin:0 4px}
 .prow .ppay{font-family:'Courier New',monospace;font-weight:700;color:var(--gold);margin-right:4px}
 </style>
+<link rel="stylesheet" href="/static/css/bg-logo.css?v=1">
 </head>
 <body>
 <div class="loader-screen" id="loading"><div class="skeleton-bar"></div><div class="skeleton-bar tall"></div><div class="skeleton-bar short"></div></div>
@@ -89,7 +115,7 @@
   <div class="hist-bar" id="history"></div>
   <div class="game-area" id="gameArea">
     <canvas id="canvas"></canvas>
-    <div class="dice-status" id="statusText">اختر رقم واسحب النرد 🎲</div>
+    <div class="dice-status" id="statusText" data-i18n="x024">اختر رقم واسحب النرد 🎲</div>
     <div class="result-display" id="resultDisplay">
       <div class="result-num" id="resultNum">-</div>
       <div class="result-text" id="resultText"></div>
@@ -102,10 +128,24 @@
     <div class="recovery-msg" id="recoveryMsg"></div>
   </div>
   <div class="bet-panel">
-    <div class="panel-label">اختر الرقم المتوقع:</div>
-    <div class="number-picker" id="numberPicker"></div>
+    <div class="mode-tabs">
+      <div class="mode-tab selected" id="modeExact" onclick="setBetMode('exact')">🎯 رقم محدد</div>
+      <div class="mode-tab" id="modeEven" onclick="setBetMode('even')">⚖️ زوجي 1.70x</div>
+      <div class="mode-tab" id="modeOdd" onclick="setBetMode('odd')">⚖️ فردي 1.70x</div>
+    </div>
+    <div id="exactSection">
+      <div class="panel-label" data-i18n="x023">اختر الرقم المتوقع:</div>
+      <div class="number-picker" id="numberPicker"></div>
+      <div class="panel-label" data-i18n="x148">قيمة الاكس:</div>
+      <div class="x-picker" id="xPicker"></div>
+    </div>
     <div class="bet-row">
-      <input type="number" class="bet-input" id="betAmount" value="10" min="1" placeholder="المبلغ">
+      <div class="bet-actions">
+        <button class="bet-action-btn" onclick="halfBet()" title="نصف">½</button>
+        <button class="bet-action-btn" onclick="doubleBet()" title="ضعف">2×</button>
+        <button class="bet-action-btn bet-max-btn" onclick="maxBet()" title="أقصى رهان">MAX</button>
+      </div>
+      <input type="number" class="bet-input" id="betAmount" value="10" min="1" placeholder="المبلغ" data-i18n-ph="x052">
       <div class="quick-bets">
         <div class="qb" onclick="setBet(10)">10</div>
         <div class="qb" onclick="setBet(50)">50</div>
@@ -114,26 +154,40 @@
         <div class="qb" onclick="setBet(1000)">1K</div>
       </div>
     </div>
-    <div class="panel-label">قيمة الاكس:</div>
-    <div class="x-picker" id="xPicker"></div>
-    <div class="panel-label">قوة الرمية (اسحب بإصبعك):</div>
+    <div class="potential-win" id="potentialWin">💰 الربح المحتمل: <b id="potentialVal">50</b></div>
+    <div class="panel-label" data-i18n="x146">قوة الرمية (اسحب بإصبعك):</div>
     <div class="power-bar-container" id="powerBar">
       <div class="power-bar-fill" id="powerFill"></div>
       <div class="power-bar-label" id="powerLabel">50%</div>
     </div>
-    <button class="roll-btn idle" id="rollBtn" onclick="onRoll()">ارمِ النرد 🎲</button>
+    <div class="auto-row">
+      <div class="auto-toggle" id="autoToggle" onclick="toggleAuto()">🤖 تلقائي: إيقاف</div>
+      <select class="auto-count" id="autoCount">
+        <option value="5">5 رميات</option>
+        <option value="10" selected>10 رميات</option>
+        <option value="25">25 رمية</option>
+        <option value="50">50 رمية</option>
+      </select>
+      <label class="auto-stop"><input type="checkbox" id="autoStopWin"> ⏹ عند الربح</label>
+      <label class="auto-stop"><input type="checkbox" id="autoStopLoss"> ⏹ عند الخسارة <input type="number" id="autoLossLimit" value="100" min="1" style="width:60px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:10px;margin:0 4px"> </label>
+    </div>
+    <button class="roll-btn idle" id="rollBtn" onclick="onRoll()" data-i18n="x034">ارمِ النرد 🎲</button>
   </div>
   <div class="players-panel">
     <div class="total-bets-bar">💰 <span id="totalBetsEgp">0</span> جنيه</div>
     <div class="players-list" id="playersList"></div>
   </div>
 </div>
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260819b"></script>
 <script>
 'use strict';
 var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
-var predictedNum=0,selectedX=5.0,power=50,isRolling=false;
+var predictedNum=0,selectedX=5.0,power=50,isRolling=false,isRequesting=false;
+var betMode='exact';
+var autoRunning=false,autoRemaining=0;
 var sessionW=0,sessionL=0,sessionPL=0;
+var autoSessionPL=0;
+pfGameName='dice';
 var diceX=0,diceY=0,diceRotX=0,diceRotY=0,diceRotZ=0,diceVX=0,diceVY=0,diceVRot=0;
 var diceScale=1,diceBounces=0,animF=null;
 var histTimer=null;
@@ -175,9 +229,80 @@ function selectX(x){
   selectedX=x;
   var btns=document.querySelectorAll('.x-btn');
   btns.forEach(function(b){b.classList.toggle('selected',parseFloat(b.dataset.x)===x)});
+  updatePotential();
 }
 
-function setBet(v){document.getElementById('betAmount').value=v}
+function setBetMode(mode){
+  betMode=mode;
+  var tabs={exact:'modeExact',even:'modeEven',odd:'modeOdd'};
+  Object.keys(tabs).forEach(function(m){
+    var el=document.getElementById(tabs[m]);
+    if(el)el.classList.toggle('selected',m===mode);
+  });
+  var ex=document.getElementById('exactSection');
+  if(ex)ex.style.display=(mode==='exact')?'block':'none';
+  updatePotential();
+}
+
+function updatePotential(){
+  var amt=parseFloat(document.getElementById('betAmount').value)||0;
+  var x=(betMode==='exact')?selectedX:1.70;
+  var el=document.getElementById('potentialVal');
+  if(el)el.textContent=(amt*x).toFixed(0);
+}
+document.addEventListener('input',function(e){
+  if(e.target&&e.target.id==='betAmount')updatePotential();
+});
+
+function setBet(v){document.getElementById('betAmount').value=v;updatePotential()}
+
+function halfBet(){
+  var inp=document.getElementById('betAmount');
+  var v=parseFloat(inp.value)||0;
+  inp.value=Math.max(1,Math.floor(v/2));
+  updatePotential();
+}
+function doubleBet(){
+  var inp=document.getElementById('betAmount');
+  var v=parseFloat(inp.value)||0;
+  inp.value=Math.min(100000,v*2);
+  updatePotential();
+}
+function maxBet(){
+  var bal=parseFloat(document.getElementById('bal')?.textContent?.replace(/,/g,''))||0;
+  var inp=document.getElementById('betAmount');
+  inp.value=Math.max(1,Math.floor(bal));
+  updatePotential();
+}
+
+// ── Auto-roll ──
+function toggleAuto(){
+  autoRunning=!autoRunning;
+  var t=document.getElementById('autoToggle');
+  if(autoRunning){
+    autoSessionPL=0;
+    autoRemaining=parseInt(document.getElementById('autoCount').value)||10;
+    t.classList.add('on');t.textContent='⏹ إيقاف التلقائي';
+    if(!isRolling&&!isRequesting)onRoll();
+  }else{
+    t.classList.remove('on');t.textContent='🤖 تلقائي: إيقاف';
+    autoRemaining=0;
+    autoSessionPL=0;
+  }
+}
+var autoSessionPL=0;
+function autoNext(d){
+  if(!autoRunning||autoRemaining<=0)return;
+  var stopWin=document.getElementById('autoStopWin').checked;
+  var stopLoss=document.getElementById('autoStopLoss').checked;
+  var lossLimit=parseFloat(document.getElementById('autoLossLimit').value)||100;
+  if(d){
+    autoSessionPL+=(d.payout||0)-(d.bet||0);
+    if(stopWin&&d.won){toggleAuto();return}
+    if(stopLoss&&autoSessionPL<=-lossLimit){toggleAuto();showToast('⏹ تم الإيقاف: وصلت حد الخسارة','error');return}
+  }
+  setTimeout(function(){if(autoRunning&&!isRolling&&!isRequesting)onRoll()},600);
+}
 
 // ── Power bar (touch drag) ──
 var powerBar=document.getElementById('powerBar');
@@ -528,66 +653,86 @@ function spawnBounceParticles(x,y){
 
 // ── Roll handler ──
 function onRoll(){
-  if(isRolling)return;
-  if(predictedNum===0){showToast('اختر رقم أولاً','error');return}
+  if(isRolling||isRequesting)return;
+  if(betMode==='exact'&&predictedNum===0){showToast(I18N.t('y018'),'error');return}
   var amt=parseFloat(document.getElementById('betAmount').value)||0;
-  if(amt<1){showToast('أدخل مبلغ','error');return}
+  if(amt<1){showToast(I18N.t('y010'),'error');return}
+  if(autoRunning)autoRemaining--;
 
   checkBalanceBeforeBet(amt).then(function(ok){
-    if(!ok)return;
+    if(!ok){if(autoRunning)toggleAuto();return}
+    isRequesting=true;
     var req='dice_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
     apiFetchCritical(BASE+'/api/dice/roll',{
       method:'POST',
-      body:JSON.stringify({bet_amount:amt,predicted_number:predictedNum,target_x:selectedX,request_id:req})
+      body:JSON.stringify({bet_amount:amt,predicted_number:predictedNum||1,target_x:selectedX,bet_mode:betMode,request_id:req})
     }).then(function(r){return r.json()}).then(function(d){
+      isRequesting=false;
       if(d.success){
+        d._bet=amt;
         // Animate roll FIRST — balance updated in showResult AFTER dice stops
         animateRoll(d.result,power,function(){
           showResult(d);
+          autoNext(d);
         });
         soundDiceRoll();haptic('medium');
       } else {
-        if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||'خطأ','error');
-        var btn=document.getElementById('rollBtn');btn.className='roll-btn idle';btn.disabled=false;btn.textContent='ارمِ النرد 🎲';
+        if(autoRunning)toggleAuto();
+        if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||I18N.t('x106'),'error');
+        var btn=document.getElementById('rollBtn');btn.className='roll-btn idle';btn.disabled=false;btn.textContent=I18N.t('x034');
       }
     }).catch(function(){
-      var btn=document.getElementById('rollBtn');btn.className='roll-btn idle';btn.disabled=false;btn.textContent='ارمِ النرد 🎲';
-      showToast('خطأ','error');
+      isRequesting=false;
+      if(autoRunning)toggleAuto();
+      var btn=document.getElementById('rollBtn');btn.className='roll-btn idle';btn.disabled=false;btn.textContent=I18N.t('x034');
+      showToast(I18N.t('x106'),'error');
     });
   });
 }
 
 function showResult(d){
   var btn=document.getElementById('rollBtn');
-  btn.className='roll-btn idle';btn.disabled=false;btn.textContent='ارمِ النرد 🎲';
+  btn.className='roll-btn idle';btn.disabled=false;btn.textContent=I18N.t('x034');
   // Update balance NOW — after dice has stopped, not before
-  document.getElementById('bal').textContent=d.balance_after.toLocaleString();
+  if(typeof d.balance_after==='number'){
+    document.getElementById('bal').textContent=d.balance_after.toLocaleString();
+  }else{loadBalance()}
+  var betAmt=(typeof d._bet==='number')?d._bet:parseFloat(document.getElementById('betAmount').value)||0;
   var disp=document.getElementById('resultDisplay');
   var numEl=document.getElementById('resultNum');
   var txtEl=document.getElementById('resultText');
   numEl.textContent=d.result;
+  var modeTxt=(d.bet_mode==='even')?' (زوجي)':(d.bet_mode==='odd')?' (فردي)':'';
   if(d.won){
     numEl.className='result-num win';
     txtEl.className='result-text win';
-    txtEl.textContent='🎉 ربحت! +'+d.payout.toFixed(0)+' ('+d.multiplier+'x)';
-    sessionW++;sessionPL+=d.payout-parseFloat(document.getElementById('betAmount').value);
+    txtEl.textContent=I18N.t('y137')+d.payout.toFixed(0)+' ('+d.multiplier+'x)';
+    sessionW++;sessionPL+=d.payout-betAmt;
     fireConfetti(document.getElementById('gameArea'));soundDiceWin();haptic('medium');
     var be=document.getElementById('recoveryMsg');
-    be.innerHTML='🎉 <b>ربحت!</b> توقعت '+d.predicted+' والنتيجة '+d.result+'<br><span style="color:#7eff9a;font-weight:900;font-size:16px">+'+d.payout.toFixed(0)+'</span>';
+    be.innerHTML='🎉 <b data-i18n="x115">ربحت!</b>'+modeTxt+' '+I18N.t('z052')+' '+d.predicted+I18N.t('y005')+d.result+'<br><span style="color:#7eff9a;font-weight:900;font-size:16px">+'+d.payout.toFixed(0)+'</span>';
     be.style.color='#7eff9a';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
   } else {
     numEl.className='result-num lose';
     txtEl.className='result-text lose';
-    txtEl.textContent='💥 خسرت — توقعت '+d.predicted+' والنتيجة '+d.result;
-    sessionL++;sessionPL-=parseFloat(document.getElementById('betAmount').value);
+    txtEl.textContent=I18N.t('y147')+d.predicted+modeTxt+' '+I18N.t('y005')+d.result;
+    sessionL++;sessionPL-=betAmt;
     soundDiceLose();haptic('heavy');
     var be=document.getElementById('recoveryMsg');
-    be.innerHTML='💥 <b>خسرت!</b> توقعت '+d.predicted+' والنتيجة '+d.result;
+    be.innerHTML='💥 <b data-i18n="x105">خسرت!</b>'+modeTxt+' '+I18N.t('z052')+' '+d.predicted+I18N.t('y005')+d.result;
     be.style.color='#ff8787';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
   }
   disp.classList.add('show');
   setTimeout(function(){disp.classList.remove('show')},3000);
   updateSessionStats();loadBalance();
+
+  // Track in game history for shared history panel
+  if(typeof addGameRound==='function'){
+    addGameRound({game:'dice',bet:betAmt,payout:d.payout||0,multiplier:d.multiplier,result:d.won?'win':'lose',
+      pf_session_id:d.pf_session_id,pf_seed_hash:d.pf_seed_hash});
+  }
+  // Update PF badge with this round's data
+  if(d.pf_seed_hash){pfSeedHash=d.pf_seed_hash;pfNonce=d.pf_nonce||0;pfRevealedSeed=d.pf_server_seed;pfClientSeed=d.pf_client_seed;updatePFBadge()}
 }
 
 function updateSessionStats(){
@@ -603,11 +748,20 @@ async function loadHistory(){
     if(!r||!r.ok)return;
     var d=await r.json();
     var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🟢';
-    if(d.history){
+    if(d.user_history){
+      var uh=document.getElementById('history');uh.innerHTML='';
+      d.user_history.slice(-15).reverse().forEach(function(item){
+        var el=document.createElement('div');
+        el.className='hist-item '+(item.won?'hist-win':'hist-lose');
+        el.textContent=item.result;
+        el.title=(item.won?'✓ ':'✗ ')+item.x+'x';
+        uh.appendChild(el);
+      });
+    }else if(d.history){
       var h=document.getElementById('history');h.innerHTML='';
       d.history.forEach(function(item){
         var el=document.createElement('div');
-        el.className='hist-item '+(item.result===predictedNum?'hist-win':'hist-lose');
+        el.className='hist-item';
         el.textContent=item.result;
         h.appendChild(el);
       });
@@ -692,10 +846,12 @@ function soundDiceLose(){
 // ── Init ──
 document.getElementById('loading').style.display='none';
 document.getElementById('app').style.display='flex';
-initNumberPicker();initXPicker();
+initNumberPicker();initXPicker();updatePotential();
 requestAnimationFrame(function(){resizeCanvas();drawIdleDice()});
 loadBalance();loadHistory();histTimer=setInterval(loadHistory,5000);
 setInterval(loadBalance,5000);setTimeout(injectDepositButton,100);
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
+<script src="/static/js/auth-gate.js?v=20260818a"></script>
 </body>
 </html>

@@ -1,0 +1,264 @@
+# Smart Publisher - Channel Profiles Configuration
+# كل قناة لها هوية كاملة، جمهور، قواعد، ووكيل ذكي مخصص
+
+channels:
+  # ===== قنوات الأخبار =====
+  - id: "vex_news_ar"
+    name: "VEX أخبار العربية"
+    handle: "@vex_news_ar"
+    language: "ar"
+    primary_type: "news"
+    allowed_types: ["news", "breaking", "injury", "transfer", "lineup"]
+    forbidden_types: ["promo", "casino", "lottery", "pure_prediction"]
+    
+    identity:
+      persona_name: "محرر رياضي خبير"
+      tone: "urgent_professional"      # عاجل، مهني، موثوق
+      style: "concise_factual"         # مختصر، واقعي، بلا فلاف
+      expertise_level: "expert"
+      credibility_signals: ["مصادر موثوقة", "تحقق قبل النشر", "توقيت دقيق"]
+    
+    audience:
+      primary: "arabic_bettors"
+      segments: ["serious_bettors", "news_followers", "injury_trackers"]
+      pain_points: ["معلومات متأخرة", "مصادر غير موثوقة", "إشاعات"]
+      needs: ["أخبار فورية", "إصابات/تشكيلات", "تحليل تأثير"]
+      engagement_triggers: ["عاجل", "حصري", "تأثير مباشر على المباريات"]
+    
+    formatting:
+      required_tags: ["#أخبار", "#تحليل", "#VEX"]
+      optional_tags: ["#إصابات", "#تشكيلات", "#انتقالات"]
+      structure: "headline → lead → impact → source"
+      max_length: 800
+      cta_style: "source_link_only"
+    
+    scheduling:
+      frequency_minutes: 15
+      best_windows:
+        - "08:00-12:00"
+        - "14:00-18:00"
+        - "20:00-23:00"
+      quiet_hours: "02:00-07:00"
+      max_per_window: 3
+      burst_allowed: true  # للكسر العاجل
+    
+    quality_gates:
+      min_arabic_chars: 100
+      require_source: true
+      require_impact_analysis: true
+      forbid_clickbait: true
+      min_credibility_score: 0.8
+    
+    ai_agent:
+      model: "claude-3-5-sonnet"
+      temperature: 0.3
+      system_prompt_file: "prompts/news_agent_ar.txt"
+      memory_retention_days: 90
+      learning_enabled: true
+
+  - id: "vex_news_en"
+    name: "VEX News English"
+    handle: "@vex_news_en"
+    language: "en"
+    primary_type: "news"
+    allowed_types: ["news", "breaking", "injury", "transfer", "lineup"]
+    forbidden_types: ["promo", "casino", "lottery"]
+    
+    identity:
+      persona_name: "Senior Sports Editor"
+      tone: "urgent_professional"
+      style: "concise_factual"
+      expertise_level: "expert"
+    
+    audience:
+      primary: "international_bettors"
+      segments: ["serious_bettors", "news_followers"]
+    
+    scheduling:
+      frequency_minutes: 20
+      best_windows:
+        - "12:00-16:00"
+        - "18:00-22:00"
+    
+    ai_agent:
+      model: "claude-3-5-sonnet"
+      temperature: 0.3
+
+  # ===== قنوات التوقعات =====
+  - id: "vex_predictions_ar"
+    name: "VEX توقعات المباريات"
+    handle: "@vex_predictions_ar"
+    language: "ar"
+    primary_type: "prediction"
+    allowed_types: ["prediction", "preview", "odds_analysis", "value_bet"]
+    forbidden_types: ["news_without_match", "promo", "casino"]
+    
+    identity:
+      persona_name: "محلل تكتيكي خبير"
+      tone: "confident_analytical"       # واثق، تحليلي، مدعوم بالأرقام
+      style: "structured_evidence_based" # منظم، مبني على الأدلة
+      expertise_level: "expert"
+      credibility_signals: ["نسب محسوبة", "أسباب واضحة", "سجل أداء شفاف"]
+    
+    audience:
+      primary: "serious_arabic_bettors"
+      segments: ["value_seekers", "strategic_bettors", "odds_analysts"]
+      pain_points: ["توقعات عشوائية", "بدون أدلة", "نسب وهمية"]
+      needs: ["نسب محسوبة", "أسباب تكتيكية", "قيمة حقيقية", "إدارة مخاطر"]
+      engagement_triggers: ["قيمة عالية", "ثقة 80%+", "سبب تكتيكي واضح"]
+    
+    formatting:
+      required_tags: ["#توقعات", "#نسب_فوز", "#VEX"]
+      optional_tags: ["#قيمة", "#تحليل_تكتيكي", "#إدارة_مخاطر"]
+      structure: "match_header → odds_table → tactical_reasoning → prediction → confidence → risk_note"
+      max_length: 1200
+      cta_style: "analysis_link"
+    
+    scheduling:
+      frequency_minutes: 30
+      best_windows:
+        - "10:00-14:00"
+        - "18:00-02:00"
+      pre_match_hours: [24, 12, 6, 2]
+      live_updates: true
+    
+    quality_gates:
+      require_odds: true
+      require_probabilities: true
+      require_tactical_reasoning: true
+      require_confidence_score: true
+      min_confidence: 0.65
+      forbid_guaranteed_language: true
+    
+    ai_agent:
+      model: "claude-3-5-sonnet"
+      temperature: 0.2
+      system_prompt_file: "prompts/prediction_agent_ar.txt"
+      memory_retention_days: 180
+      learning_enabled: true
+
+  - id: "vex_live_ar"
+    name: "VEX مباشر العربية"
+    handle: "@vex_live_ar"
+    language: "ar"
+    primary_type: "live"
+    allowed_types: ["live_update", "goal", "card", "substitution", "momentum_shift"]
+    forbidden_types: ["pre_match", "post_match_analysis", "promo"]
+    
+    identity:
+      persona_name: "معلق لحظي ذكي"
+      tone: "instant_insightful"
+      style: "minimal_high_signal"
+    
+    audience:
+      primary: "live_bettors"
+      segments: ["in_play_bettors", "momentum_traders"]
+    
+    scheduling:
+      frequency_minutes: 1
+      live_only: true
+    
+    ai_agent:
+      model: "gpt-4o-mini"
+      temperature: 0.4
+      system_prompt_file: "prompts/live_agent_ar.txt"
+
+  # ===== قنوات العروض =====
+  - id: "vex_offers_ar"
+    name: "VEX عروض ومكافآت"
+    handle: "@vex_offers_ar"
+    language: "ar"
+    primary_type: "promo"
+    allowed_types: ["welcome_bonus", "free_bet", "cashback", "enhanced_odds", "loyalty"]
+    forbidden_types: ["news", "prediction", "casino_games"]
+    
+    identity:
+      persona_name: "مستشار عروض ذكي"
+      tone: "exciting_value_focused"
+      style: "benefit_first_transparent"
+      credibility_signals: ["شروط واضحة", "قيمة حقيقية", "مقارنة عادلة"]
+    
+    audience:
+      primary: "bonus_hunters"
+      segments: ["new_players", "bonus_maximizers", "loyalty_seekers"]
+      pain_points: ["شروط مخفية", "قيمة وهمية", "عروض منتهية"]
+      needs: ["قيمة حقيقية", "شروط واضحة", "مقارنة سهلة"]
+    
+    formatting:
+      required_tags: ["#عرض", "#مكافأة", "#VEX"]
+      structure: "hook → value_proposition → terms_summary → cta"
+      cta_style: "claim_button"
+    
+    scheduling:
+      frequency_minutes: 120
+      best_windows:
+        - "12:00-16:00"
+        - "21:00-01:00"
+    
+    quality_gates:
+      require_clear_terms: true
+      require_real_value: true
+      forbid_misleading: true
+
+  # ===== قنوات التحليل العميق =====
+  - id: "vex_analysis_ar"
+    name: "VEX تحليلات عميقة"
+    handle: "@vex_analysis_ar"
+    language: "ar"
+    primary_type: "analysis"
+    allowed_types: ["deep_analysis", "tactical_breakdown", "statistical_model", "betting_strategy"]
+    forbidden_types: ["breaking_news", "promo", "live_updates"]
+    
+    identity:
+      persona_name: "استراتيجي رهانات متقدم"
+      tone: "deep_educational"
+      style: "comprehensive_actionable"
+      expertise_level: "master"
+    
+    audience:
+      primary: "advanced_bettors"
+      segments: ["model_builders", "strategic_thinkers", "long_term_profit_seekers"]
+    
+    scheduling:
+      frequency_minutes: 240
+      best_windows:
+        - "10:00-12:00"
+        - "20:00-22:00"
+    
+    ai_agent:
+      model: "claude-3-opus"
+      temperature: 0.3
+      system_prompt_file: "prompts/analysis_agent_ar.txt"
+      memory_retention_days: 365
+
+# ===== الإعدادات العالمية =====
+global_settings:
+  default_language: "ar"
+  timezone: "Africa/Cairo"
+  max_concurrent_posts: 5
+  retry_attempts: 3
+  retry_delay_seconds: 30
+  
+  quality:
+    global_min_score: 0.7
+    spam_threshold: 0.3
+    duplicate_similarity_threshold: 0.85
+  
+  learning:
+    enabled: true
+    min_samples_for_learning: 50
+    retrain_interval_hours: 24
+    ab_test_enabled: true
+    ab_test_min_samples: 100
+  
+  monitoring:
+    alert_on_failure: true
+    alert_on_low_quality: true
+    alert_on_engagement_drop: true
+    daily_report_time: "08:00"
+  
+  ai_models:
+    default: "claude-3-5-sonnet"
+    fallback: "gpt-4o-mini"
+    max_tokens: 2000
+    default_temperature: 0.3

@@ -1,0 +1,19 @@
+Content-Type: text/javascript; charset=utf-8
+Last-Modified: Mon, 24 Aug 2026 20:09:11 GMT
+Cache-Control: no-cache
+X-Content-Type-Options: nosniff
+
+Content-Type: text/javascript; charset=utf-8
+Last-Modified: Mon, 24 Aug 2026 20:09:13 GMT
+Cache-Control: no-cache
+X-Content-Type-Options: nosniff
+
+Content-Type: text/javascript; charset=utf-8
+Last-Modified: Fri, 21 Aug 2026 22:16:50 GMT
+Cache-Control: no-cache
+X-Content-Type-Options: nosniff
+
+Content-Type: text/javascript; charset=utf-8
+Last-Modified: Fri, 21 Aug 2026 22:16:48 GMT
+Cache-Control: no-cache
+X-Content-Type-Options: nosniff

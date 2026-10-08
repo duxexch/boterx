@@ -1,7 +1,15 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js?v=20260823"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <meta charset="UTF-8">
+<meta property="og:title" content="VEX Games — العب واربح">
+<meta property="og:description" content="منصة ألعاب تيليغرام الأقوى — جوائز حقيقية وألعاب مثيرة">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://vex.deals/static/icons/og-domino.jpg?v=20260821b">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://vex.deals/static/icons/og-domino.jpg?v=20260821b">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 <meta name="theme-color" content="#10141a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -104,6 +112,7 @@ body{
 .lp-result.win{background:#34d399;color:#000}
 .lp-result.lose{background:#ef4444;color:#fff}
 </style>
+<link rel="stylesheet" href="/static/css/bg-logo.css?v=1">
 </head>
 <body>
 <div id="app">
@@ -121,7 +130,7 @@ body{
   <div id="betbar">
     <div class="bet-input-row">
       <input type="number" class="bet-input" id="betInput" value="{{ game.min_bet }}" min="{{ game.min_bet }}" max="{{ game.max_bet }}">
-      <button class="play-btn" id="playBtn" onclick="playRound()">▶️ العب</button>
+      <button class="play-btn" id="playBtn" onclick="playRound()" data-i18n="x196">▶️ العب</button>
     </div>
     <div class="quick-bets" id="quickBets"></div>
   </div>
@@ -211,7 +220,7 @@ async function playRound() {
   if (isPlaying) return;
   const bet = parseFloat(document.getElementById('betInput').value) || 0;
   if (bet < minBet || bet > maxBet) {
-    document.getElementById('resultDisplay').textContent = `الحد ${minBet}-${maxBet}`;
+    document.getElementById('resultDisplay').textContent = `${I18N.t('z025')} ${minBet}-${maxBet}`;
     document.getElementById('resultDisplay').className = 'result-display result-lose';
     return;
   }
@@ -219,7 +228,7 @@ async function playRound() {
   isPlaying = true;
   document.getElementById('playBtn').disabled = true;
   document.getElementById('resultDisplay').textContent = '';
-  document.getElementById('motivational').textContent = '⏳ جارٍ اللعب...';
+  document.getElementById('motivational').textContent = I18N.t('y117');
   
   try {
     const r = await apiFetch(`${BASE}/api/engine/result`, {
@@ -233,7 +242,7 @@ async function playRound() {
       if (d.need_deposit) {
         showDepositModal(bet);
       } else {
-        document.getElementById('resultDisplay').textContent = d.error || 'خطأ';
+        document.getElementById('resultDisplay').textContent = d.error || I18N.t('x106');
         document.getElementById('resultDisplay').className = 'result-display result-lose';
       }
       isPlaying = false;
@@ -253,11 +262,11 @@ async function playRound() {
       confettiBurst();
     } else {
       if (d.near_miss) {
-        rd.textContent = '💨 كادت!';
-        mo.textContent = '🔥 كنت قريباً جداً! حاول مرة أخرى!';
+        rd.textContent = I18N.t('y150');
+        mo.textContent = I18N.t('y158');
       } else {
         rd.textContent = `❌ -${bet}`;
-        mo.textContent = '💪 حظ أوفر!';
+        mo.textContent = I18N.t('y151');
       }
       rd.className = 'result-display result-lose';
       soundLose();
@@ -280,7 +289,7 @@ async function playRound() {
     setTimeout(() => showContinueModal(d, bet), 800);
     
   } catch(e) {
-    document.getElementById('resultDisplay').textContent = '❌ خطأ';
+    document.getElementById('resultDisplay').textContent = I18N.t('y131');
     document.getElementById('resultDisplay').className = 'result-display result-lose';
   }
   
@@ -294,29 +303,29 @@ function showContinueModal(result, lastBet) {
   const box = document.getElementById('modalBox');
   
   let html = `
-    <div class="modal-title">${result.result === 'win' ? '🎉 ربحت!' : '😔 خسرت'}</div>
-    <div class="modal-balance">💰 رصيدك: ${balance.toLocaleString()}</div>
+    <div class="modal-title">${result.result === 'win' ? I18N.t('y136') : I18N.t('y160')}</div>
+    <div class="modal-balance">${I18N.t('z043')} ${balance.toLocaleString()}</div>
   `;
   
   if (balance >= minBet) {
     html += `
       <input type="number" class="modal-input" id="modalBet" value="${lastBet}" min="${minBet}" max="${maxBet}">
-      <button class="modal-btn" onclick="continuePlay()">▶️ العب مرة أخرى</button>
+      <button class="modal-btn" onclick="continuePlay()" data-i18n="x197">▶️ العب مرة أخرى</button>
     `;
   } else {
     html += `
-      <div class="modal-subtitle">⚠️ رصيدك غير كافٍ</div>
-      <button class="modal-btn" onclick="showDepositModal(${minBet})">💰 إيداع سريع</button>
+      <div class="modal-subtitle" data-i18n="x198">⚠️ رصيدك غير كافٍ</div>
+      <button class="modal-btn" onclick="showDepositModal(${minBet})" data-i18n="x245">💰 إيداع سريع</button>
     `;
   }
   
   // Other games
   html += `
     <div class="other-games">
-      <div class="other-games-title">🎮 جرّب ألعاب أخرى</div>
+      <div class="other-games-title" data-i18n="x228">🎮 جرّب ألعاب أخرى</div>
       <div class="games-scroll" id="otherGames"></div>
     </div>
-    <button class="modal-btn secondary" onclick="goBack()" style="margin-top:8px">🏠 القائمة</button>
+    <button class="modal-btn secondary" onclick="goBack()" style="margin-top:8px" data-i18n="x235">🏠 القائمة</button>
   `;
   
   box.innerHTML = html;
@@ -370,9 +379,9 @@ async function showDepositModal(required) {
 
   if (botMethods.length === 0) {
     box.innerHTML = `
-      <div class="modal-title">💰 إيداع محفظة VEX</div>
-      <div class="modal-subtitle">لا توجد وسائل دفع متاحة حالياً</div>
-      <button class="modal-btn" onclick="document.getElementById('modal').style.display='none'">إغلاق</button>
+      <div class="modal-title" data-i18n="x246">💰 إيداع محفظة VEX</div>
+      <div class="modal-subtitle" data-i18n="x163">لا توجد وسائل دفع متاحة حالياً</div>
+      <button class="modal-btn" onclick="document.getElementById('modal').style.display='none'" data-i18n="x017">إغلاق</button>
     `;
     modal.style.display = 'flex';
     return;
@@ -391,27 +400,27 @@ async function showDepositModal(required) {
   `).join('');
 
   box.innerHTML = `
-    <div class="modal-title">💰 إيداع محفظة VEX</div>
-    <div class="modal-subtitle">${required ? `رصيدك غير كافٍ — تحتاج ${required}` : 'اختر وسيلة الدفع'}</div>
+    <div class="modal-title" data-i18n="x246">💰 إيداع محفظة VEX</div>
+    <div class="modal-subtitle">${required ? `${I18N.t('z026')} ${required}` : I18N.t('y020')}</div>
     <div id="depMethodsList">${methodsHtml}</div>
     <div id="depStep2" style="display:none">
-      <div style="font-size:11px;color:#8794a3;margin:10px 0 6px">📋 بيانات الوسيلة:</div>
+      <div style="font-size:11px;color:#8794a3;margin:10px 0 6px" data-i18n="x263">📋 بيانات الوسيلة:</div>
       <div class="copy-box" onclick="copyMethodData()" style="display:flex;align-items:center;justify-content:space-between;background:#10141a;border:1px solid #262e39;border-radius:10px;padding:10px 12px;cursor:pointer;margin-bottom:10px">
         <code id="methodDataDisplay" style="font-size:13px;color:#00e701;word-break:break-all"></code>
-        <span style="font-size:12px;color:#8794a3;flex-shrink:0;margin-right:8px">📋 نسخ</span>
+        <span style="font-size:12px;color:#8794a3;flex-shrink:0;margin-right:8px" data-i18n="x266">📋 نسخ</span>
       </div>
-      <div style="font-size:11px;color:#8794a3;margin:8px 0 4px">💵 المبلغ الذي سترسله:</div>
-      <input type="number" id="depAmount" placeholder="المبلغ" value="${required || minBet}" style="width:100%;background:#10141a;border:1px solid #262e39;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
-      <div style="font-size:11px;color:#8794a3;margin:8px 0 4px">🔐 رقم محفظتك (التي سترسل منها):</div>
-      <input type="text" id="playerWallet" placeholder="رقم محفظتك" style="width:100%;background:#10141a;border:1px solid #262e39;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
+      <div style="font-size:11px;color:#8794a3;margin:8px 0 4px" data-i18n="x251">💵 المبلغ الذي سترسله:</div>
+      <input type="number" id="depAmount" placeholder="المبلغ" data-i18n-ph="x052" value="${required || minBet}" style="width:100%;background:#10141a;border:1px solid #262e39;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
+      <div style="font-size:11px;color:#8794a3;margin:8px 0 4px" data-i18n="x276">🔐 رقم محفظتك (التي سترسل منها):</div>
+      <input type="text" id="playerWallet" placeholder="رقم محفظتك" data-i18n-ph="x124" style="width:100%;background:#10141a;border:1px solid #262e39;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
       <div id="savedWalletsHint" style="display:none;font-size:11px;color:#34d399;margin-bottom:6px"></div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8794a3;margin-bottom:10px;cursor:pointer">
-        <input type="checkbox" id="saveMethod" style="accent-color:#00e701"> حفظ كوسيلة دفع دائمة
+        <input type="checkbox" id="saveMethod" style="accent-color:#00e701"> ${I18N.t('z027')}
       </label>
-      <button class="modal-btn" onclick="submitGameDeposit()">✅ تأكيد الإيداع</button>
-      <button class="modal-btn secondary" onclick="backToMethods()" style="margin-top:6px">‹ رجوع</button>
+      <button class="modal-btn" onclick="submitGameDeposit()" data-i18n="x204">✅ تأكيد الإيداع</button>
+      <button class="modal-btn secondary" onclick="backToMethods()" style="margin-top:6px" data-i18n="x188">‹ رجوع</button>
     </div>
-    <button class="modal-btn secondary" onclick="document.getElementById('modal').style.display='none'" style="margin-top:6px">إلغاء</button>
+    <button class="modal-btn secondary" onclick="document.getElementById('modal').style.display='none'" style="margin-top:6px" data-i18n="x018">إلغاء</button>
   `;
   modal.style.display = 'flex';
 }
@@ -428,7 +437,7 @@ function selectGameMethod(methodId, methodName, methodAccountData, icon) {
     const match = savedWallets.find(w => w.method_name && w.method_name.includes(methodName));
     if (match) {
       savedWallet = match.account_number;
-      savedHint = `✓ محفظتك المحفوظة: ${savedWallet}`;
+      savedHint = `${I18N.t('z028')} ${savedWallet}`;
     }
   }
 
@@ -447,7 +456,7 @@ function copyMethodData() {
   navigator.clipboard.writeText(data).then(() => {
     haptic('light');
     const btn = document.querySelector('.copy-box span');
-    if (btn) { btn.textContent = '✓ تم النسخ'; setTimeout(() => btn.textContent = '📋 نسخ', 1500); }
+    if (btn) { btn.textContent = I18N.t('y130'); setTimeout(() => btn.textContent = I18N.t('x266'), 1500); }
   });
 }
 
@@ -461,9 +470,9 @@ async function submitGameDeposit() {
   const playerWallet = document.getElementById('playerWallet').value.trim();
   const saveMethod = document.getElementById('saveMethod').checked;
 
-  if (amount <= 0) { alert('أدخل المبلغ'); return; }
-  if (!playerWallet) { alert('أدخل رقم محفظتك'); return; }
-  if (!selectedMethod) { alert('اختر وسيلة دفع'); return; }
+  if (amount <= 0) { alert(I18N.t('x000')); return; }
+  if (!playerWallet) { alert(I18N.t('x002')); return; }
+  if (!selectedMethod) { alert(I18N.t('y021')); return; }
 
   try {
     const r = await apiFetch(`${BASE}/api/deposit/quick`, {
@@ -480,14 +489,14 @@ async function submitGameDeposit() {
     const d = await r.json();
     if (d.success) {
       document.getElementById('modalBox').innerHTML = `
-        <div class="modal-title">⏳ بانتظار التأكيد</div>
-        <div class="modal-subtitle">تم إرسال طلب الإيداع<br>سيتم إضافة الرصيد لمحفظة VEX بعد موافقة الإدارة</div>
-        <button class="modal-btn" onclick="document.getElementById('modal').style.display='none';loadBalance();">إغلاق</button>
+        <div class="modal-title" data-i18n="x190">⏳ بانتظار التأكيد</div>
+        <div class="modal-subtitle">${I18N.t('z029')}<br>${I18N.t('z030')}</div>
+        <button class="modal-btn" onclick="document.getElementById('modal').style.display='none';loadBalance();" data-i18n="x017">إغلاق</button>
       `;
     } else {
-      alert(d.error || 'خطأ في الإيداع');
+      alert(d.error || I18N.t('y060'));
     }
-  } catch(e) { alert('خطأ في الاتصال'); }
+  } catch(e) { alert(I18N.t('y061')); }
 }
 
 function confettiBurst() {
@@ -555,7 +564,7 @@ function renderLivePlayers() {
     row.innerHTML = `
       <div class="lp-user">
         <div class="lp-avatar">${avatar}</div>
-        <span class="lp-name">${p.name || '???'}${p.isMe ? ' (أنت)' : ''}</span>
+        <span class="lp-name">${p.name || '???'}${p.isMe ? I18N.t('y000') : ''}</span>
       </div>
       <div style="display:flex;align-items:center;gap:6px">
         <span class="lp-bet">${p.bet}</span>
@@ -600,7 +609,7 @@ playRound = function() {
   const bet = parseFloat(document.getElementById('betInput').value) || 0;
   if (bet > 0 && !isPlaying) {
     addLivePlayer({
-      uid: uid, name: 'أنت', bet: bet,
+      uid: uid, name: I18N.t('y013'), bet: bet,
       status: 'playing', payout: 0, isMe: true
     });
   }
@@ -621,5 +630,7 @@ setInterval(simulatePlayers, 2500);
 simulatePlayers();
 renderLivePlayers();
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
+<script src="/static/js/auth-gate.js?v=20260818a"></script>
 </body>
 </html>

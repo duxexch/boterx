@@ -98,14 +98,20 @@ def _get_bot_info(token):
 
 # ── OTP Code Generation ──
 def _generate_and_store_code(user_id, user_name, phone=''):
-    code = str(random.randint(100000, 999999))
+    # RNG آمن تشفيرياً — random.randint العادي شبه قابل للتنبؤ نظرياً
+    import secrets as _sec
+    code = str(_sec.randbelow(900000) + 100000)
     codes = _load_json(OTP_FILE)
-    codes = {k: v for k, v in codes.items() if k != str(user_id)}
+    # نظّف رموز هذا المستخدم + أي رمز انتهت صلاحيته (> 5 دقائق)
+    now = time.time()
+    codes = {k: v for k, v in codes.items()
+             if k != str(user_id) and now - v.get('created', 0) <= 300}
     codes[str(user_id)] = {
         'code': code,
         'name': user_name,
         'phone': phone,
-        'created': time.time()
+        'created': now,
+        'attempts': 0,   # عداد محاولات خاطئة — يحذفه السيرفر عند 5
     }
     _save_json(OTP_FILE, codes)
     return code
@@ -116,8 +122,8 @@ def _check_financial_anomalies(token):
     global _last_financial_check, _alerted_transactions
     now = time.time()
 
-    # فحص كل 60 ثانية
-    if now - _last_financial_check < 60:
+    # فحص كل 15 دقيقة
+    if now - _last_financial_check < 900:
         return
     _last_financial_check = now
 
@@ -144,20 +150,30 @@ def _check_financial_anomalies(token):
     except:
         pass
 
-    # 2. فحص المعاملات المتكررة من نفس المستخدم (أكثر من 10 في ساعة)
+    # 2. فحص المعاملات المتكررة من نفس المستخدم (نافذة ساعتين فعلية)
     try:
         txns = _read_csv(TRANSACTIONS_CSV)
         user_txn_count = {}
+        cutoff = now - 2 * 3600  # آخر ساعتين فقط
         for t in txns[-100:]:
             uid = t.get('user_id', t.get('telegram_id', ''))
-            ts = t.get('created_at', t.get('timestamp', ''))
+            # transactions.csv يستخدم عمود date — وسمّيات أخرى احتياطية
+            ts_str = str(t.get('date', t.get('created_at', t.get('timestamp', ''))) or '')
+            # فلترة زمنية فعلية — لا نحسب معاملات أقدم من ساعتين
+            try:
+                ts = datetime.strptime(ts_str[:16], '%Y-%m-%d %H:%M').timestamp()
+                if ts < cutoff:
+                    continue
+            except Exception:
+                pass  # توقيت غير مقروء — نحتسبه (دفاعياً)
             user_txn_count[uid] = user_txn_count.get(uid, 0) + 1
 
         for uid, count in user_txn_count.items():
-            if count > 15 and uid:
-                key = f"freq_{uid}_{int(now/3600)}"
+            if count > 50 and uid:
+                # تنبيه واحد لكل مستخدم في اليوم — لا تكرار كل ساعة
+                key = f"freq_{uid}_{datetime.now().strftime('%Y%m%d')}"
                 if key not in _alerted_transactions:
-                    anomalies.append(f"⚠️ نشاط مكثف: المستخدم {uid} — {count} معاملة")
+                    anomalies.append(f"⚠️ نشاط مكثف: المستخدم {uid} — {count} معاملة خلال ساعتين")
                     _alerted_transactions.add(key)
     except:
         pass
@@ -168,9 +184,11 @@ def _check_financial_anomalies(token):
             f"🚨 <b>تنبيه أمني</b>\n\n{alert}\n\n⏰ {datetime.now().strftime('%H:%M:%S')}")
         logger.warning(f"Financial anomaly: {alert}")
 
-    # تنظيف القائمة كل ساعة
+    # تنظيف: نحتفظ بمعرفات الإيداعات (حتى لا تكرر أبداً) ومفاتيح اليوم فقط
     if len(_alerted_transactions) > 100:
-        _alerted_transactions = set(list(_alerted_transactions)[-50:])
+        today = datetime.now().strftime('%Y%m%d')
+        _alerted_transactions = {k for k in _alerted_transactions
+                                 if not k.startswith('freq_') or today in k}
 
 # ── Message Processing ──
 def _process_update(token, update):
@@ -203,14 +221,13 @@ def _process_update(token, update):
         # Generate code
         code = _generate_and_store_code(contact_user_id, full_name, phone)
 
-        # Send code
-        _send_message(token, chat_id,
-            "🔐 <b>رمز دخول موقع VEX</b>\n\n"
-            f"<code>{code}</code>\n\n"
-            "⏰ صالح لمدة 5 دقائق\n"
-            "🌐 أدخل الرمز في: https://vex.deals\n\n"
-            "📋 انسخ الرمز أعلاه وألصقه في خانة الدخول بالموقع",
-            parse_mode='HTML')
+        # Send code — نص فقط بدون صورة (نسخ بنقرة واحدة)
+        caption = ("🔐 <b>رمز دخول موقع VEX</b>\n\n"
+                   f"<code>{code}</code> 👈 اضغط للنسخ\n\n"
+                   "⏰ صالح لمدة 5 دقائق\n"
+                   "🌐 أدخله في: https://vex.deals\n\n"
+                   "📋 اضغط على الرمز أعلاه لنسخه بنقرة واحدة ثم ألصقه في خانة الدخول بالموقع")
+        _send_message(token, chat_id, caption, parse_mode='HTML')
         logger.info(f"OTP code sent to user {contact_user_id} ({full_name}) phone={phone}")
         return
 
@@ -310,12 +327,8 @@ def _poll(token):
     bot_name = info.get('result', {}).get('username', 'unknown')
     logger.info(f"✅ VEX Security Bot started: @{bot_name}")
 
-    # إرسال رسالة بدء التشغيل للأدمن
-    _send_message(token, ADMIN_ID,
-        f"🛡️ <b>بوت الأمان نشط</b>\n\n"
-        f"البوت: @{bot_name}\n"
-        f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-        f"المراقبة: الإيداعات + المعاملات + الأنماط المشبوهة")
+    # تم تعطيل رسالة البداية — البوت الرئيسي يبعت heartbeat كل 5 ساعات
+    logger.info(f"OTP Bot @{bot_name} running — startup message disabled")
 
     while OTP_BOT_RUNNING:
         try:
@@ -368,13 +381,32 @@ def get_otp_bot_token_from_csv():
     except: pass
     return None
 
+# قفل ملفي يحتفظ به الموديول حياً — لا تُطلق fcntl.flock إلا بإغلاق الملف/موت العملية
+_singleton_lock_file = None
+
 def auto_start_otp_bot():
+    global _singleton_lock_file
     token = get_otp_bot_token_from_csv()
-    if token:
-        logger.info("Found security bot token — starting...")
-        start_otp_bot(token)
-        return True
-    return False
+    if not token:
+        return False
+    # نسخة واحدة عبر كل عمال gunicorn: أول عامل يقتنص القفل يشغّل البوت،
+    # والباقي يتجاهل — بدونه يرسل كل عامل رسالة تشغيل وتنبيهات مكررة
+    try:
+        import fcntl
+        lock_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.otp_bot_singleton.lock')
+        _singleton_lock_file = open(lock_path, 'w')
+        try:
+            fcntl.flock(_singleton_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            logger.info("Security bot already running in another worker — skipping")
+            _singleton_lock_file.close()
+            _singleton_lock_file = None
+            return False
+    except ImportError:
+        pass  # بيئات بلا fcntl (تطوير محلي على ويندوز) — عامل واحد عادةً
+    logger.info("Found security bot token — starting...")
+    start_otp_bot(token)
+    return True
 
 def send_security_alert(message):
     """إرسال تنبيه أمني للأدمن عبر بوت الأمان"""
