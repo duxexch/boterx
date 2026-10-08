@@ -3177,11 +3177,20 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             pass
         return channels
 
+    def _publish_target_ok(self, ch):
+        """هل القناة مناسبة كهدف نشر؟ — لا محادثات خاصة ولا قنوات الدفع/الدعم."""
+        if str(ch.get('type') or '').strip() == 'private':
+            return False
+        cat = str(ch.get('category') or '').strip().lower()
+        return cat not in ('payments', 'support', 'user')
+
     def post_to_channels(self, text, photo=None, video=None, document=None, sticker=None, exclude_chat_id=None):
         """نشر محتوى في كل القنوات/المجموعات المرتبطة — مع استثناء القناة المصدر"""
         channels = self.get_bot_channels()
         sent = 0
         for ch in channels:
+            if not self._publish_target_ok(ch):
+                continue
             chat_id = ch.get('chat_id', '')
             if not chat_id:
                 continue
@@ -3226,6 +3235,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             channels = []
         mirrored = 0
         for ch in channels:
+            if not self._publish_target_ok(ch):
+                continue
             chat_id = ch.get('chat_id', '')
             if not chat_id:
                 continue
@@ -3495,7 +3506,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 for ch in all_channels:
                     if str(ch.get('chat_id', '')).strip() == src_cid:
                         continue
-                    if ch.get('channel_role', 'both') in ('publish', 'both'):
+                    if ch.get('channel_role', 'both') in ('publish', 'both') and \
+                            self._publish_target_ok(ch):
                         target_ids.append(ch.get('id') or ch.get('chat_id'))
             content_filter = source.get('forward_mode', 'all')
             ai_edit_text = source.get('ai_enabled', 'no') == 'yes'
