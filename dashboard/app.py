@@ -14266,6 +14266,21 @@ _PROJECT_DOMAINS = [
 ]
 
 
+def _domain_for_channel(channel):
+    """دومين العلامة التجارية المناسب للقناة — تنسيق المنشور حسب هوية القناة."""
+    t = (str(channel.get('title') or '') + ' ' +
+         str(channel.get('company_name') or '')).lower()
+    if 'betjam' in t:
+        return 'https://betjam.sbs'
+    if '1xbet' in t:
+        return 'https://1xbetservices.com'
+    if 'betongame' in t:
+        return 'https://betongame.cloud'
+    if 'vixo' in t:
+        return 'https://vixo.uno'
+    return 'https://vex.deals'
+
+
 def _last_auto_user_post_at():
     """آخر وقت منشور تلقائي موجّه للمستخدمين — لمنع التكرار (حد أدنى6 ساعات)"""
     last = None
@@ -14291,8 +14306,8 @@ def _queue_auto_post_for_channel(ch, now_s):
     chosen_type = random.choice(allowed_types)
     template = random.choice(_CONTENT_TEMPLATES[chosen_type])
     text = _apply_placeholders(template, ch)
-    # دومين عشوائي جديد لكل منشور — روابط عميقة (deep links) داخل نص تليجرام
-    text = text.replace('{random_domain}', random.choice(_PROJECT_DOMAINS))
+    # دومين العلامة التجارية للقناة — روابط عميقة (deep links) داخل نص تليجرام
+    text = text.replace('{random_domain}', _domain_for_channel(ch))
     text = _auto_fill_placeholders(text)
     full_text = text + _get_branding_suffix(ch)
 

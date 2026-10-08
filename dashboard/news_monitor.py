@@ -290,11 +290,46 @@ def _state_save(state):
         pass
 
 
-def _digest_message(items_by_source):
-    """ملخّص جميل: عناوين مرقّمة + اسم المصدر فقط + روابط دوميناتنا (بدون روابط المصدر)."""
+# ===== أهلية القناة + هوية العلامة (تنسيق المنشور لكل قناة) =====
+
+_UNDIGEST_CATEGORIES = ('payments', 'support', 'user')
+
+
+def _channel_digest_ok(ch):
+    """تحديد القناة المناسبة: ممنوع المحادثات الخاصة وقنوات الدفع/الدعم."""
+    if str(ch.get('type') or '').strip() == 'private':
+        return False
+    cat = str(ch.get('category') or '').strip().lower()
+    if cat in _UNDIGEST_CATEGORIES:
+        return False
+    return True
+
+
+def _channel_brand_domain(ch):
+    """دومين العلامة التجارية للقناة — روابط الملخّص تابعة لهوية القناة."""
+    t = (str(ch.get('title') or '') + ' ' +
+         str(ch.get('company_name') or '')).lower()
+    if 'betjam' in t:
+        return 'https://betjam.sbs'
+    if '1xbet' in t:
+        return 'https://1xbetservices.com'
+    if 'betongame' in t:
+        return 'https://betongame.cloud'
+    if 'vixo' in t:
+        return 'https://vixo.uno'
+    return 'https://vex.deals'
+
+
+def _digest_message(items_by_source, channel=None):
+    """ملخّص جميل: عناوين مرقّمة + اسم المصدر فقط + روابط دوميناتنا (بدون روابط المصدر).
+    مع channel: تُستخدم روابط وفوتر هوية علامة القناة (تنسيق خاص بكل قناة)."""
     import random as _rnd
-    doms = [d for d in (_cb.get('project_domains') or []) if d.startswith('http')] or \
-           ['https://vex.deals']
+    if channel is not None:
+        brand = _channel_brand_domain(channel)
+        doms = [brand]
+    else:
+        doms = [d for d in (_cb.get('project_domains') or []) if d.startswith('http')] or \
+               ['https://vex.deals']
     nums = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣']
     lines = ['🗞️ <b>عاجل رياضي — أبرز العناوين</b> ⚽', '']
     n = 0
@@ -312,9 +347,15 @@ def _digest_message(items_by_source):
             break
     if n == 0:
         return ''
-    footer_links = ' · '.join(f'<a href="{d}">{d.replace("https://", "")}</a>' for d in doms)
-    lines.append('━━━━━━━━━━━━━━')
-    lines.append(f'🌐 مواقعنا: {footer_links}')
+    if channel is not None:
+        footer_links = ' · '.join(f'<a href="{d}">{d.replace("https://", "")}</a>'
+                                  for d in doms)
+        lines.append('━━━━━━━━━━━━━━')
+        lines.append(f'🌐 موقعنا الرسمي: {footer_links}')
+    else:
+        footer_links = ' · '.join(f'<a href="{d}">{d.replace("https://", "")}</a>' for d in doms)
+        lines.append('━━━━━━━━━━━━━━')
+        lines.append(f'🌐 مواقعنا: {footer_links}')
     lines.append('⚽ كل جديد الرياضة — معنا يومياً')
     return '\n'.join(lines)
 
@@ -327,12 +368,12 @@ def _random_domain():
 
 
 def _queue_digest(items_by_source):
-    """جدول ملخّص واحد لجميع القنوات النشطة — بصيغة طابور البوت."""
-    msg = _digest_message(items_by_source)
-    if not msg:
+    """جدول ملخّص للقنوات المناسبة فقط — بتنسيق مخصّص لكل قناة (دومين علامتها)."""
+    if not _digest_message(items_by_source):
         return 0
     channels = [c for c in _read_csv('bot_channels.csv')
-                if c.get('is_active') == 'yes' and c.get('platform', 'telegram') == 'telegram']
+                if c.get('is_active') == 'yes' and c.get('platform', 'telegram') == 'telegram'
+                and _channel_digest_ok(c)]
     if not channels:
         return 0
     now_s = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -345,6 +386,9 @@ def _queue_digest(items_by_source):
     import secrets as _secrets
     queued = 0
     for ch in channels:
+        msg = _digest_message(items_by_source, ch)
+        if not msg:
+            continue
         entry = {
             'id': 'NEWS' + _secrets.token_hex(4).upper(),
             'message': msg,
