@@ -11,3 +11,39 @@ __pycache__/
 *.pyo
 *.db
 relay_cursor.json
+*.log
+*.zip
+*.csv
+LangSense_Backup_*.zip
+DUX_Backup_*.zip
+DUX_Professional_Report_*.csv
+bot.log
+backup_server_files/
+attached_assets/
+# Legacy files — not tracked
+advanced_bot.py
+simple_bot.py
+simple_improved_bot.py
+simple_payment_bot.py
+fixed_bot.py
+excel_bot.py
+excel_formatter.py
+test_bot.py
+bot.py
+main.py
+config.py
+models.py
+# Aiogram v3 skeleton — not used in production
+# (handlers/ is ACTIVE in main — never ignore it)
+services/
+utils/
+translations/
+# Test files
+test_company.txt
+dashboard/static/uploads/icons/*
+!dashboard/static/uploads/icons/.gitkeep
+recovery_uploads/
+
+# نظام العملاء — بيانات حساسة (توكنات + هاشات كلمات مرور)
+clients.csv
+clients/

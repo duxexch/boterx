@@ -3400,6 +3400,178 @@ def api_agent_ticket_reply(ticket_id):
     return jsonify({'success': ok})
 
 
+@app.route('/trading')
+@admin_required
+@page_permission_required('view_financial')
+def page_trading():
+    return render_template('trading.html', active_page='trading')
+
+@app.route('/api/agent/self/heartbeat', methods=['POST'])
+def api_agent_heartbeat():
+    agent_id = session.get('agent_id')
+    if not agent_id:
+        return jsonify({'error': 'not logged in'}), 401
+    res = agent_db.agent_heartbeat(agent_id)
+    return jsonify(res)
+
+
+@app.route('/api/agents/stats')
+@api_auth
+@permission_required('view_financial')
+def api_agents_stats():
+    return jsonify(agent_db.get_agent_stats())
+
+
+@app.route('/api/agents/penalties')
+@api_auth
+@permission_required('view_financial')
+def api_agents_penalties():
+    return jsonify({'penalties': agent_db.get_all_penalties(100)})
+
+
+@app.route('/api/agents/<agent_id>/penalties')
+@api_auth
+@permission_required('view_financial')
+def api_agent_penalties(agent_id):
+    return jsonify({'penalties': agent_db.get_penalties(agent_id)})
+
+
+@app.route('/api/agents/<agent_id>/penalty', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_add_agent_penalty(agent_id):
+    data = request.json or {}
+    res = agent_db.add_penalty(agent_id, data.get('type', 'timeout'),
+                                data.get('amount', 0), data.get('reason', ''))
+    return jsonify(res)
+
+
+# ===== Insurance Pool =====
+
+@app.route('/api/insurance')
+@api_auth
+@permission_required('view_financial')
+def api_insurance():
+    return jsonify({
+        'balance': agent_db.get_insurance_balance(),
+        'log': agent_db.get_insurance_log(50)
+    })
+
+
+@app.route('/api/insurance/adjust', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_insurance_adjust():
+    data = request.json or {}
+    res = agent_db.admin_insurance_adjust(
+        data.get('amount', 0), data.get('direction', 'add'),
+        data.get('reason', ''))
+    return jsonify(res)
+
+
+@app.route('/api/insurance/payout', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_insurance_payout():
+    data = request.json or {}
+    res = agent_db.insurance_payout(
+        data.get('agent_id', ''), data.get('match_id', ''),
+        data.get('amount', 0), data.get('reason', ''))
+    return jsonify(res)
+
+
+# ===== Ticket System =====
+
+@app.route('/tickets')
+@admin_required
+@page_permission_required('ban_users')
+def page_tickets():
+    return render_template('tickets.html', active_page='tickets')
+
+
+@app.route('/api/tickets')
+@api_auth
+@permission_required('ban_users')
+def api_tickets():
+    status = request.args.get('status', '')
+    priority = request.args.get('priority', '')
+    return jsonify({
+        'tickets': ticket_system.list_tickets(status=status, priority=priority),
+        'stats': ticket_system.get_ticket_stats()
+    })
+
+
+@app.route('/api/tickets/<ticket_id>')
+@api_auth
+@permission_required('ban_users')
+def api_ticket_detail(ticket_id):
+    t = ticket_system.get_ticket(ticket_id)
+    if not t:
+        return jsonify({'error': 'not found'}), 404
+    t['messages'] = ticket_system.get_ticket_messages(ticket_id)
+    return jsonify(t)
+
+
+@app.route('/api/tickets/<ticket_id>/reply', methods=['POST'])
+@api_auth
+@permission_required('ban_users')
+def api_ticket_reply(ticket_id):
+    data = request.json or {}
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'error': 'empty message'}), 400
+    new_status = data.get('status', '')
+    ok = ticket_system.reply_to_ticket(
+        ticket_id, 'admin', session.get('user_id', ''), message, new_status or None)
+    if ok:
+        return jsonify({'success': True})
+    return jsonify({'error': 'failed'}), 500
+
+
+@app.route('/api/tickets/<ticket_id>/status', methods=['POST'])
+@api_auth
+@permission_required('ban_users')
+def api_ticket_status(ticket_id):
+    data = request.json or {}
+    ok = ticket_system.update_ticket_status(
+        ticket_id, data.get('status', ''), data.get('agent_id', ''))
+    return jsonify({'success': ok})
+
+
+@app.route('/api/tickets/<ticket_id>/reassign', methods=['POST'])
+@api_auth
+@permission_required('ban_users')
+def api_ticket_reassign(ticket_id):
+    data = request.json or {}
+    ok = ticket_system.reassign_ticket(
+        ticket_id, data.get('agent_id', ''), data.get('reason', ''))
+    return jsonify({'success': ok})
+
+
+# Agent ticket endpoints
+
+@app.route('/api/agent/self/tickets')
+def api_agent_tickets():
+    agent_id = session.get('agent_id')
+    if not agent_id:
+        return jsonify({'error': 'not logged in'}), 401
+    return jsonify({'tickets': ticket_system.get_agent_tickets(agent_id)})
+
+
+@app.route('/api/agent/self/tickets/<ticket_id>/reply', methods=['POST'])
+def api_agent_ticket_reply(ticket_id):
+    agent_id = session.get('agent_id')
+    if not agent_id:
+        return jsonify({'error': 'not logged in'}), 401
+    data = request.json or {}
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'error': 'empty message'}), 400
+    ok = ticket_system.reply_to_ticket(
+        ticket_id, 'agent', agent_id, message, data.get('status', 'in_progress') or None)
+    return jsonify({'success': ok})
+
+
 @app.route('/webapp/snatch')
 def webapp_snatch():
     """لعبة Snatch الأركيد — الإصدار الجديد مع نظام رهان حقيقي"""
@@ -3465,8 +3637,14 @@ def page_referrals():
 def page_channels():
     return render_template('channels.html', active_page='channels')
 
-
 @app.route('/clients')
+@admin_required
+@page_permission_required('manage_bots')
+def page_clients():
+    _start_clients_watchdog()
+    return render_template('clients.html', active_page='clients')
+
+
 @app.route('/bots')
 def page_redirect_old():
     return redirect(url_for('page_rental'))

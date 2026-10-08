@@ -8132,6 +8132,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             logger.error(f"post_to_single_channel {cid}: {e}")
             return False, str(e)
         self._log_channel_post(cid, sent_ok)
+        # jitter بعد كل نشر لقناة — لا نمط ثابت
         time.sleep(random.uniform(0.5, 1.8))
         return sent_ok, 'ok' if sent_ok else 'send_failed'
 
@@ -8339,7 +8340,21 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         except Exception as e:
             logger.error(f"خطأ في _process_broadcast_queue: {e}")
 
-
+    def _send_to_channel_group(self, group_id, msg, media_urls):
+        """نشر لمجموعة قنوات (channel_groups.csv) — بالسقوف اليومية لكل قناة"""
+        import csv as _csv
+        try:
+            with open('channel_groups.csv', 'r', encoding='utf-8-sig') as f:
+                for row in _csv.DictReader(f):
+                    if row.get('id') == group_id or row.get('name') == group_id:
+                        ids = [i.strip() for i in (row.get('channel_ids', '') or '').split('|') if i.strip()]
+                        for cid in ids:
+                            ok, reason = self._post_to_single_channel(cid, msg, media_urls)
+                            logger.info(f"Group {group_id} -> {cid}: {reason}")
+                        return True
+        except Exception as e:
+            logger.error(f"channel group {group_id}: {e}")
+        return False
 
     def _send_broadcast_to_user(self, chat_id, msg, media_urls):
         """إرسال بث لمستخدم واحد — نص + وسائط متعددة، crash-safe"""

@@ -112,6 +112,12 @@ input:focus,select:focus{outline:none;border-color:var(--green)}
     <div class="kpi"><div class="kpi-label" data-ar="التصنيف" data-en="Tier">التصنيف</div><div class="kpi-val" id="tier">🥉 Bronze</div></div>
     <div class="kpi"><div class="kpi-label" data-ar="⚡ السرعة" data-en="⚡ Speed">⚡ السرعة</div><div class="kpi-val" id="speed">—</div></div>
   </div>
+  <!-- Performance -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+    <div class="kpi"><div class="kpi-label">📊 الدرجة</div><div class="kpi-val" id="score">50</div></div>
+    <div class="kpi"><div class="kpi-label">التصنيف</div><div class="kpi-val" id="tier">🥉 Bronze</div></div>
+    <div class="kpi"><div class="kpi-label">⚡ سرعة الاستجابة</div><div class="kpi-val" id="speed">—</div></div>
+  </div>
 
   <!-- Pending Requests -->
   <div class="section" id="pendingSection">
@@ -185,6 +191,7 @@ function loadSelf(){
   fetch('/api/agent/self').then(function(r){return r.json()}).then(function(d){
     document.getElementById('balance').textContent=parseFloat(d.balance||0).toFixed(0);
     document.getElementById('escrow').textContent=parseFloat(d.escrow_balance||0).toFixed(0);
+    document.getElementById('deposit').textContent=parseFloat(d.security_deposit||0).toFixed(0);
     document.getElementById('daily').textContent=(d.current_daily_count||0)+'/'+(d.max_daily_transactions||0);
     var t=document.getElementById('traffic');
     t.textContent=d.traffic_enabled==='yes'?t('▶️ نشط','▶️ Active'):t('⏸️ متوقف','⏸️ Stopped');
